@@ -1,0 +1,21 @@
+name = "tuba-rating-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+# 将 Worker 绑定到自定义域名 ratingapi.tubawinui3.cn
+# 前提：tubawinui3.cn 已经加到 Cloudflare 账号（Dashboard → Add a Site）
+# custom_domain = true 会让 Cloudflare 自动创建解析记录
+routes = [
+  { pattern = "ratingapi.tubawinui3.cn", custom_domain = true }
+]
+
+[observability]
+enabled = true
+
+# D1 数据库绑定 —— 部署前请先创建并执行 schema.sql：
+#   wrangler d1 create tuba-ratings
+# 然后将下面 database_name / database_id 替换为返回值
+[[d1_databases]]
+binding = "DB"
+database_name = "tuba-ratings"
+database_id = "c0d04b07-0a08-4bff-8d24-fba0a96edb81"

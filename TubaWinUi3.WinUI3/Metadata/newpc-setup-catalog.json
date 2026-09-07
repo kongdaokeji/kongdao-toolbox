@@ -1,0 +1,141 @@
+{
+  "commonPackages": [
+    { "id": "Google.Chrome", "name": "Google Chrome", "category": "浏览器", "glyph": "\uE774", "description": "谷歌浏览器" },
+    { "id": "Mozilla.Firefox", "name": "Firefox", "category": "浏览器", "glyph": "\uE774", "description": "火狐浏览器" },
+    { "id": "7zip.7zip", "name": "7-Zip", "category": "压缩工具", "glyph": "\uE8D7", "description": "开源文件压缩工具" },
+    { "id": "M2Team.NanaZip", "name": "NanaZip", "category": "压缩工具", "glyph": "\uE8D7", "description": "现代化的7-Zip解压缩工具" },
+    { "id": "RARLab.WinRAR", "name": "WinRAR", "category": "压缩工具", "glyph": "\uE8D7", "description": "经典压缩解压软件" },
+    { "id": "Microsoft.PowerToys", "name": "PowerToys", "category": "系统工具", "glyph": "\uE90F", "description": "微软官方系统增强工具集" },
+    { "id": "voidtools.Everything", "name": "Everything", "category": "系统工具", "glyph": "\uE721", "description": "极速文件搜索工具" },
+    { "id": "AntibodySoftware.WizTree", "name": "WizTree", "category": "系统工具", "glyph": "\uEDA2", "description": "磁盘空间分析工具" },
+    { "id": "Microsoft.WindowsTerminal", "name": "Windows Terminal", "category": "系统工具", "glyph": "\uE756", "description": "现代化终端" },
+    { "id": "Yerong.OfficeToolPlus", "name": "Office Tool Plus", "category": "办公工具", "glyph": "\uE8BD", "description": "Office部署与管理工具" },
+    { "id": "KingSoft.WPSOffice", "name": "WPS Office", "category": "办公工具", "glyph": "\uE8BD", "description": "金山办公套件" },
+    { "id": "VideoLAN.VLC", "name": "VLC Media Player", "category": "媒体播放", "glyph": "\uE8B2", "description": "开源多媒体播放器" },
+    { "id": "PotPlayer.PotPlayer", "name": "PotPlayer", "category": "媒体播放", "glyph": "\uE8B2", "description": "高性能多媒体播放器" },
+    { "id": "qBittorrent.qBittorrent", "name": "qBittorrent", "category": "下载工具", "glyph": "\uE896", "description": "开源BitTorrent客户端" },
+    { "id": "agalwood.Motrix", "name": "Motrix", "category": "下载工具", "glyph": "\uE896", "description": "多线程下载管理器" },
+    { "id": "IDRIX.VeraCrypt", "name": "VeraCrypt", "category": "安全工具", "glyph": "\uE72E", "description": "开源磁盘加密工具" },
+    { "id": "HiBitSoft.StartMenu", "name": "HiBit Uninstaller", "category": "安全工具", "glyph": "\uE74D", "description": "强大的卸载工具" },
+    { "id": "GIMP.GIMP", "name": "GIMP", "category": "图像编辑", "glyph": "\uEB9F", "description": "开源图像编辑器" },
+    { "id": "dotPDN.PaintDotNet", "name": "Paint.NET", "category": "图像编辑", "glyph": "\uEB9F", "description": "免费图像编辑器" },
+    { "id": "DuongDieuPhap.ImageGlass", "name": "ImageGlass", "category": "图像编辑", "glyph": "\uEB9F", "description": "轻量级图片查看器" },
+    { "id": "OBSProject.OBSStudio", "name": "OBS Studio", "category": "视频编辑", "glyph": "\uE960", "description": "开源录屏与直播软件" },
+    { "id": "KDE.Kdenlive", "name": "Kdenlive", "category": "视频编辑", "glyph": "\uE960", "description": "开源视频编辑器" },
+    { "id": "Audacity.Audacity", "name": "Audacity", "category": "音频编辑", "glyph": "\uEB9F", "description": "开源音频编辑器" },
+    { "id": "Notepad++.Notepad++", "name": "Notepad++", "category": "文本编辑", "glyph": "\uE8AC", "description": "免费源代码编辑器" },
+    { "id": "Figma.Figma", "name": "Figma", "category": "设计工具", "glyph": "\uEB9F", "description": "在线UI设计工具" },
+    { "id": "9PNMNF92JNFP", "name": "1Remote", "category": "终端工具", "glyph": "\uE756", "description": "远程桌面管理工具", "source": "msstore" },
+    { "id": "Eugeny.Tabby", "name": "Tabby", "category": "终端工具", "glyph": "\uE756", "description": "跨平台终端模拟器" }
+  ],
+
+  "devCommonPackages": [
+    { "id": "Microsoft.VisualStudioCode", "name": "VS Code", "category": "开发工具", "glyph": "\uE943", "description": "轻量级代码编辑器" },
+    { "id": "Git.Git", "name": "Git", "category": "开发工具", "glyph": "\uE943", "description": "分布式版本控制系统" },
+    { "id": "Microsoft.PowerShell", "name": "PowerShell 7", "category": "开发工具", "glyph": "\uE756", "description": "现代化命令行Shell" },
+    { "id": "Docker.DockerDesktop", "name": "Docker Desktop", "category": "开发工具", "glyph": "\uE943", "description": "容器化开发环境" }
+  ],
+
+  "aiTools": [
+    { "id": "Anysphere.Cursor", "name": "Cursor", "category": "AI 编程", "glyph": "\uE945", "description": "AI 原生代码编辑器" },
+    { "id": "Codeium.Windsurf", "name": "Windsurf", "category": "AI 编程", "glyph": "\uE945", "description": "Codeium AI IDE" },
+    { "id": "openai-codex", "name": "Codex CLI", "category": "AI 编程", "glyph": "\uE945", "description": "OpenAI 终端 AI 助手", "installCommand": "npm i -g @openai/codex", "dependsOn": "OpenJS.NodeJS.LTS" },
+    { "id": "claude-code", "name": "Claude Code", "category": "AI 编程", "glyph": "\uE945", "description": "Anthropic 终端 AI 助手", "installCommand": "npm i -g @anthropic-ai/claude-code", "dependsOn": "OpenJS.NodeJS.LTS" },
+    { "id": "opencode-ai", "name": "OpenCode", "category": "AI 编程", "glyph": "\uE945", "description": "开源 AI 编程助手", "installCommand": "npm i -g opencode-ai", "dependsOn": "OpenJS.NodeJS.LTS" }
+  ],
+
+  "devLanguages": [
+    {
+      "language": "C/C++",
+      "glyph": "\uE943",
+      "description": "C/C++ 系统级开发环境",
+      "packages": [
+        { "id": "Microsoft.VisualStudio.Community", "name": "Visual Studio 2026", "category": "C/C++", "glyph": "\uE943", "description": "微软集成开发环境（含C++工作负载）" },
+        { "id": "Kitware.CMake", "name": "CMake", "category": "C/C++", "glyph": "\uE943", "description": "跨平台构建工具" }
+      ]
+    },
+    {
+      "language": "C#/.NET",
+      "glyph": "\uE943",
+      "description": ".NET 应用开发环境",
+      "packages": [
+        { "id": "Microsoft.VisualStudio.Community", "name": "Visual Studio 2026", "category": "C#/.NET", "glyph": "\uE943", "description": "微软集成开发环境（含.NET工作负载）", "skipIfSelected": "Microsoft.VisualStudio.Community" },
+        { "id": "Microsoft.DotNet.SDK.9", "name": ".NET SDK", "category": "C#/.NET", "glyph": "\uE943", "description": ".NET 开发工具包" }
+      ]
+    },
+    {
+      "language": "Python",
+      "glyph": "\uEB9F",
+      "description": "Python 数据科学与开发环境",
+      "packages": [
+        { "id": "Python.Python.3.13", "name": "Python 3.13", "category": "Python", "glyph": "\uEB9F", "description": "Python 编程语言" },
+        { "id": "Anaconda.Miniconda3", "name": "Miniconda3", "category": "Python", "glyph": "\uEB9F", "description": "轻量级 Conda 环境管理器" },
+        { "id": "JetBrains.PyCharm.Community", "name": "PyCharm Community", "category": "Python", "glyph": "\uE943", "description": "Python 专业 IDE" }
+      ]
+    },
+    {
+      "language": "Java",
+      "glyph": "\uE943",
+      "description": "Java 企业级开发环境",
+      "packages": [
+        { "id": "EclipseAdoptium.Temurin.21.JDK", "name": "Eclipse Temurin JDK 21", "category": "Java", "glyph": "\uE943", "description": "OpenJDK 发行版" },
+        { "id": "JetBrains.IntelliJIDEA.Community", "name": "IntelliJ IDEA Community", "category": "Java", "glyph": "\uE943", "description": "Java 专业 IDE" }
+      ]
+    },
+    {
+      "language": "Node.js/前端",
+      "glyph": "\uE943",
+      "description": "前端与 Node.js 开发环境",
+      "packages": [
+        { "id": "OpenJS.NodeJS.LTS", "name": "Node.js LTS", "category": "Node.js/前端", "glyph": "\uE943", "description": "JavaScript 运行时（LTS 版本）" },
+        { "id": "pnpm.pnpm", "name": "pnpm", "category": "Node.js/前端", "glyph": "\uE943", "description": "快速磁盘高效的包管理器" },
+        { "id": "JetBrains.WebStorm", "name": "WebStorm", "category": "Node.js/前端", "glyph": "\uE943", "description": "前端专业 IDE" }
+      ]
+    },
+    {
+      "language": "Go",
+      "glyph": "\uE943",
+      "description": "Go 语言开发环境",
+      "packages": [
+        { "id": "GoLang.Go", "name": "Go", "category": "Go", "glyph": "\uE943", "description": "Go 编程语言" },
+        { "id": "JetBrains.GoLand", "name": "GoLand", "category": "Go", "glyph": "\uE943", "description": "Go 专业 IDE" }
+      ]
+    },
+    {
+      "language": "Rust",
+      "glyph": "\uE943",
+      "description": "Rust 系统编程环境",
+      "packages": [
+        { "id": "Rustlang.Rustup", "name": "Rustup", "category": "Rust", "glyph": "\uE943", "description": "Rust 工具链安装器" },
+        { "id": "JetBrains.RustRover", "name": "RustRover", "category": "Rust", "glyph": "\uE943", "description": "Rust 专业 IDE" }
+      ]
+    }
+  ],
+
+  "databaseTools": [
+    { "id": "DBeaver.DBeaver.Community", "name": "DBeaver Community", "category": "数据库", "glyph": "\uE943", "description": "通用数据库客户端" },
+    { "id": "SQLite.SQLite", "name": "SQLite", "category": "数据库", "glyph": "\uE943", "description": "SQLite 轻量级数据库" }
+  ],
+
+  "apiTools": [
+    { "id": "Postman.Postman", "name": "Postman", "category": "API 测试", "glyph": "\uE943", "description": "API 开发与测试平台" },
+    { "id": "Ruihu.Apifox", "name": "Apifox", "category": "API 测试", "glyph": "\uE943", "description": "API 管理、测试与文档平台" }
+  ],
+
+  "manualTools": [
+    { "id": "huorong", "name": "火绒安全", "category": "安全工具", "glyph": "\uE72E", "description": "轻量级国产安全软件", "manualUrl": "https://www.huorong.cn" }
+  ],
+
+  "optionalServices": [
+    { "serviceName": "SysMain", "displayName": "SysMain (原 SuperFetch)", "description": "预加载数据到内存，机械硬盘有提升，SSD 可关闭释放内存", "recommendation": "建议关闭" },
+    { "serviceName": "DiagTrack", "displayName": "Connected User Experiences and Telemetry", "description": "Windows 遥测与诊断数据收集", "recommendation": "建议关闭" },
+    { "serviceName": "dmwappushservice", "displayName": "WAP Push Message Routing", "description": "WAP 推送消息路由服务", "recommendation": "建议关闭" },
+    { "serviceName": "MapsBroker", "displayName": "Downloaded Maps Manager", "description": "离线地图管理服务", "recommendation": "可选关闭" },
+    { "serviceName": "RetailDemo", "displayName": "Retail Demo Service", "description": "零售演示服务", "recommendation": "建议关闭" },
+    { "serviceName": "WSearch", "displayName": "Windows Search", "description": "Windows 搜索索引，关闭后搜索变慢但减少磁盘IO", "recommendation": "按需关闭" },
+    { "serviceName": "Fax", "displayName": "Fax", "description": "传真服务", "recommendation": "建议关闭" },
+    { "serviceName": "lfsvc", "displayName": "Geolocation Service", "description": "地理位置服务", "recommendation": "可选关闭" },
+    { "serviceName": "PhoneSvc", "displayName": "Phone Service", "description": "手机连接服务", "recommendation": "可选关闭" },
+    { "serviceName": "TrkWks", "displayName": "Distributed Link Tracking Client", "description": "分布式链接跟踪", "recommendation": "可选关闭" }
+  ]
+}

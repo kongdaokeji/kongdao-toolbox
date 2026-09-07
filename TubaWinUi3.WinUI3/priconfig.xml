@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <index root="\" startIndexAt="\">
+    <indexer filePath=".\Assets" type="folder"/>
+  </index>
+  <qualifiers>
+    <Language>zh-CN</Language>
+  </qualifiers>
+</resources>

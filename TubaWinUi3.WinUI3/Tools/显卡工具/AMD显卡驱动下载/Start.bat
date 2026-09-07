@@ -1,0 +1,1 @@
+Start AMDÇı¶¯ÏÂÔØ.url

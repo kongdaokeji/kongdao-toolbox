@@ -1,0 +1,113 @@
+name: Bug 报告
+description: 报告软件运行中的问题（请尽量提供完整硬件信息，否则难以排查）
+title: "[Bug] 简述问题"
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 提交前请检查
+        - 请先搜索 [已有 Issues](https://github.com/luolangaga/tubatool/issues) 是否已有相同问题
+        - 本软件需以**管理员权限**运行，部分功能涉及内核驱动与 WMI，请确认是以管理员方式启动
+        - 请认准官方渠道版本，非官方渠道的版本可能被篡改
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 清晰描述发生了什么、期望的结果是什么
+      placeholder: 打开「硬件信息」页面时程序崩溃……
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 一步步描述如何触发此问题
+      placeholder: |
+        1. 打开软件
+        2. 点击「xxx」
+        3. 崩溃
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: 截图 / 日志
+      description: 拖入截图、错误弹窗或相关日志（如崩溃日志、命令行输出）
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        ### 环境信息（请务必填写，缺失会显著拖慢排查）
+
+  - type: input
+    id: os-version
+    attributes:
+      label: Windows 系统版本
+      description: 设置 → 系统 → 关于 中的完整版本号
+      placeholder: 例如：Windows 11 专业版 24H2 (26100)
+    validations:
+      required: true
+
+  - type: input
+    id: cpu
+    attributes:
+      label: CPU
+      placeholder: 例如：Intel Core i7-13700K
+    validations:
+      required: true
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU
+      placeholder: 例如：NVIDIA RTX 4070
+    validations:
+      required: false
+
+  - type: input
+    id: driver
+    attributes:
+      label: 显卡驱动版本
+      placeholder: 例如：551.86
+    validations:
+      required: false
+
+  - type: input
+    id: app-version
+    attributes:
+      label: 图吧工具箱版本
+      description: 关于/设置页中的版本号
+      placeholder: 例如：1.5.11
+    validations:
+      required: true
+
+  - type: dropdown
+    id: arch
+    attributes:
+      label: 系统架构
+      options:
+        - x64 (64位)
+        - x86 (32位)
+        - ARM64
+    validations:
+      required: false
+
+  - type: dropdown
+    id: install-mode
+    attributes:
+      label: 安装方式
+      options:
+        - 便携版（解压即用）
+        - 安装版（Inno Setup 安装程序）
+        - 源码自编译
+        - 其他
+    validations:
+      required: false

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Browser Benchmark</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;color:#e0e0e0;font:13px 'Segoe UI',system-ui,sans-serif;overflow-y:auto;height:100vh;display:flex;flex-direction:column}
+#header{padding:12px 16px;background:#16213e;border-bottom:1px solid #0f3460}
+#header h2{font-size:16px;color:#00d2ff;margin-bottom:4px}
+#progress-bar{width:100%;height:4px;background:#0f3460;border-radius:2px;overflow:hidden}
+#progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#00d2ff,#7b2ff7);transition:width 0.3s}
+#content{flex:1;position:relative;overflow-y:auto;min-height:300px}
+#test-area{position:absolute;top:0;left:0;width:100%;min-height:100%;overflow-y:auto;background:#fff;color:#333;font-size:12px}
+#status{position:absolute;bottom:0;left:0;right:0;padding:8px 16px;background:rgba(22,33,62,0.95);border-top:1px solid #0f3460;font-size:12px;color:#aaa;display:flex;justify-content:space-between}
+#sub-results{position:absolute;top:8px;right:12px;font-size:11px;color:#00d2ff;text-align:right;line-height:1.8;z-index:10}
+.test-label{color:#7b2ff7;font-weight:600}
+#test-area table{border-collapse:collapse;width:100%}
+#test-area td,#test-area th{border:1px solid #ddd;padding:4px 8px;font-size:11px}
+#test-area th{background:#f0f0f0;font-weight:600}
+#test-area .card{background:#fff;border:1px solid #ddd;border-radius:6px;padding:8px;margin:4px;display:inline-block;width:120px;vertical-align:top}
+#test-area .card h3{font-size:11px;margin-bottom:4px;color:#333}
+#test-area .card p{font-size:10px;color:#666}
+</style></head>
+<body>
+<div id="header">
+  <h2>浏览器性能测试</h2>
+  <div id="progress-bar"><div id="progress-fill"></div></div>
+</div>
+<div id="content">
+  <div id="test-area"></div>
+  <div id="sub-results"></div>
+</div>
+<div id="status">
+  <span id="phase-text">准备中...</span>
+  <span id="detail-text"></span>
+</div>
+<script>
+(function(){
+var area=document.getElementById('test-area');
+var progressFill=document.getElementById('progress-fill');
+var phaseText=document.getElementById('phase-text');
+var detailText=document.getElementById('detail-text');
+var subResults=document.getElementById('sub-results');
+function setProgress(p){progressFill.style.width=p+'%';}
+function setPhase(t){phaseText.textContent=t;}
+function setDetail(t){detailText.textContent=t;}
+function addSub(label,val){subResults.innerHTML+='<div><span class="test-label">'+label+'</span> '+val+'</div>';}
+function score(ms,base){return Math.max(1,Math.round(100*base/ms));}
+function median(arr){
+  var s=arr.slice().sort(function(a,b){return a-b;});
+  var m=Math.floor(s.length/2);
+  return s.length%2?s[m]:(s[m-1]+s[m])/2;
+}
+function trimmedMean(arr){
+  if(arr.length<4) return arr.reduce(function(a,b){return a+b;},0)/arr.length;
+  var s=arr.slice().sort(function(a,b){return a-b;});
+  var trim=Math.max(1,Math.round(s.length*0.1));
+  var trimmed=s.slice(trim,s.length-trim);
+  return trimmed.reduce(function(a,b){return a+b;},0)/trimmed.length;
+}
+var R={};
+
+function runJSOnce(){
+  var t0=performance.now();
+  var x=1.1;
+  for(var i=0;i<30000000;i++){x=Math.sin(x)*Math.cos(x)+Math.sqrt(Math.abs(x)+1);x=Math.tanh(x)*Math.log(Math.abs(x)+1);x=Math.atan2(x,i%100+1)*Math.exp(-Math.abs(x)*0.001);}
+  var mathMs=performance.now()-t0;
+  t0=performance.now();var s="";
+  for(var i=0;i<80000;i++){s+="abcdefghij".repeat(10);s=s.substring(100)+s.slice(0,100);s=s.toUpperCase()+s.toLowerCase();s=JSON.stringify({v:i,t:s.length});}
+  var strMs=performance.now()-t0;
+  t0=performance.now();
+  for(var r=0;r<40;r++){var arr=new Array(100000);for(var i=0;i<100000;i++)arr[i]=Math.random();arr.sort(function(a,b){return a-b;});}
+  var arrMs=performance.now()-t0;
+  t0=performance.now();var map=new Map(),set=new Set();
+  for(var i=0;i<500000;i++){map.set("k"+i,{v:i,d:i*2,s:"val"+i});set.add(i);if(i%3===0){map.delete("k"+(i-3));set.delete(i-3);}}
+  var objMs=performance.now()-t0;
+  t0=performance.now();
+  var proms=[];for(var i=0;i<200000;i++)proms.push(Promise.resolve(i).then(function(v){return v*2;}));
+  Promise.all(proms);
+  var promMs=performance.now()-t0;
+  return {total:mathMs+strMs+arrMs+objMs+promMs, mathMs:mathMs, strMs:strMs, arrMs:arrMs, objMs:objMs, promMs:promMs};
+}
+
+function benchJS(){
+  setPhase('JS 引擎测试');setDetail('运行3次取中位数 (1/3)...');setProgress(0);
+  var RUNS=3;
+  var results=[];
+  for(var run=0;run<RUNS;run++){
+    setDetail('运行3次取中位数 ('+(run+1)+'/'+RUNS+')...');
+    results.push(runJSOnce());
+  }
+  var totals=results.map(function(r){return r.total;});
+  var medTotal=median(totals);
+  var medIdx=0;var minDiff=Infinity;
+  for(var i=0;i<totals.length;i++){var d=Math.abs(totals[i]-medTotal);if(d<minDiff){minDiff=d;medIdx=i;}}
+  var med=results[medIdx];
+  R.jsScore=score(medTotal,3533);
+  R.jsDetail='Math:'+med.mathMs.toFixed(0)+' Str:'+med.strMs.toFixed(0)+' Arr:'+med.arrMs.toFixed(0)+' Obj:'+med.objMs.toFixed(0)+' Prom:'+med.promMs.toFixed(0)+'ms';
+  addSub('JS引擎',R.jsScore+'分 ('+medTotal.toFixed(0)+'ms)');
+  setProgress(17);
+}
+
+function runDOMTableOnce(){
+  area.innerHTML='';
+  var t0=performance.now();
+  var html='<table><thead><tr><th>ID</th><th>姓名</th><th>年龄</th><th>城市</th><th>职业</th><th>薪资</th><th>邮箱</th><th>状态</th></tr></thead><tbody>';
+  var names=['张伟','李娜','王芳','刘洋','陈军','杨秀英','赵敏','黄磊','周杰','吴霞','徐明','孙丽','马超','朱红','胡波','郭静','林涛','何雪','高峰','罗勇'];
+  var cities=['北京','上海','广州','深圳','杭州','成都','武汉','南京','重庆','西安','苏州','天津','长沙','郑州','青岛'];
+  var jobs=['工程师','设计师','产品经理','运营','市场','财务','人事','法务','销售','测试','架构师','总监'];
+  for(var i=0;i<50000;i++){
+    html+='<tr><td>'+i+'</td><td>'+names[i%20]+'</td><td>'+(20+i%40)+'</td><td>'+cities[i%15]+'</td><td>'+jobs[i%12]+'</td><td>'+(5000+i*100%45000).toLocaleString()+'</td><td>user'+i+'@test.com</td><td>'+(i%3===0?'在职':'离职')+'</td></tr>';
+  }
+  html+='</tbody></table>';
+  area.innerHTML=html;
+  var insertMs=performance.now()-t0;
+  t0=performance.now();
+  var rows=Array.from(area.querySelectorAll('tbody tr'));
+  rows.sort(function(a,b){return parseInt(a.cells[5].textContent.replace(/,/g,''))-parseInt(b.cells[5].textContent.replace(/,/g,''));});
+  var tbody=area.querySelector('tbody');
+  for(var i=0;i<rows.length;i++)tbody.appendChild(rows[i]);
+  var sortMs=performance.now()-t0;
+  t0=performance.now();
+  rows=area.querySelectorAll('tbody tr');
+  rows.forEach(function(r){r.style.display=r.cells[7].textContent==='在职'?'':'none';});
+  var filterMs=performance.now()-t0;
+  t0=performance.now();
+  area.innerHTML='';
+  var clearMs=performance.now()-t0;
+  return {total:insertMs+sortMs+filterMs+clearMs, insertMs:insertMs, sortMs:sortMs, filterMs:filterMs, clearMs:clearMs};
+}
+
+function benchDOMTable(){
+  setPhase('DOM 表格测试');setDetail('运行3次取中位数 (1/3)...');setProgress(17);
+  var RUNS=3;
+  var results=[];
+  for(var run=0;run<RUNS;run++){
+    setDetail('运行3次取中位数 ('+(run+1)+'/'+RUNS+')...');
+    results.push(runDOMTableOnce());
+  }
+  var totals=results.map(function(r){return r.total;});
+  var medTotal=median(totals);
+  var medIdx=0;var minDiff=Infinity;
+  for(var i=0;i<totals.length;i++){var d=Math.abs(totals[i]-medTotal);if(d<minDiff){minDiff=d;medIdx=i;}}
+  var med=results[medIdx];
+  R.domScore=score(medTotal,1057);
+  R.domDetail='Insert:'+med.insertMs.toFixed(0)+' Sort:'+med.sortMs.toFixed(0)+' Filter:'+med.filterMs.toFixed(0)+' Clear:'+med.clearMs.toFixed(0)+'ms';
+  addSub('DOM表格',R.domScore+'分 ('+medTotal.toFixed(0)+'ms)');
+  setProgress(33);
+}
+
+function runCardRound(){
+  area.innerHTML='';
+  var t0=performance.now();
+  var html='<div style="padding:8px;display:flex;flex-wrap:wrap;gap:4px">';
+  var products=['手机','笔记本','平板','耳机','键盘','鼠标','显示器','硬盘','路由器','摄像头','音箱','充电器','U盘','机箱','主板','显卡','内存','散热器','电源','线缆'];
+  for(var i=0;i<10000;i++){
+    html+='<div class="card"><h3>'+products[i%20]+i+'</h3><p>品牌'+(i%10)+' 型号'+i+'</p><p style="color:#e74c3c;font-weight:700">&yen;'+(99+i*7%9999)+'</p></div>';
+  }
+  html+='</div>';
+  area.innerHTML=html;
+  var createMs=performance.now()-t0;
+  t0=performance.now();
+  var cards=area.querySelectorAll('.card');
+  cards.forEach(function(c){
+    var h3=c.querySelector('h3');
+    if(h3&&h3.textContent.indexOf('手机')>=0){c.style.border='2px solid #e74c3c';}
+  });
+  var findMs=performance.now()-t0;
+  t0=performance.now();
+  var container=area.firstElementChild;
+  var removed=[];
+  for(var i=0;i<cards.length;i+=3){removed.push(cards[i]);container.removeChild(cards[i]);}
+  for(var i=0;i<removed.length;i++)container.appendChild(removed[i]);
+  var reorderMs=performance.now()-t0;
+  t0=performance.now();area.innerHTML='';
+  var clearMs=performance.now()-t0;
+  return createMs+findMs+reorderMs+clearMs;
+}
+
+function benchDOMCards(){
+  setPhase('DOM 卡片列表测试');setDetail('运行80轮...');setProgress(33);
+  var ROUNDS=80, roundTimes=[];
+  for(var r=0;r<ROUNDS;r++){
+    roundTimes.push(runCardRound());
+    if(r%10===0)setDetail('卡片测试 轮 '+(r+1)+'/'+ROUNDS);
+  }
+  var avg=trimmedMean(roundTimes);
+  var avgPerRound=1511.0/30;
+  R.cardScore=score(avg,avgPerRound);
+  R.cardDetail=ROUNDS+'轮:'+roundTimes.reduce(function(a,b){return a+b;},0).toFixed(0)+'ms (avg:'+avg.toFixed(0)+'ms)';
+  addSub('DOM卡片',R.cardScore+'分 (avg:'+avg.toFixed(0)+'ms)');
+  setProgress(50);
+}
+
+function benchCSS(){
+  setPhase('CSS 动画测试');setDetail('创建动画元素...');setProgress(50);
+  area.innerHTML='';
+  var t0=performance.now();
+  var html='<style>#css-test .box{position:absolute;width:20px;height:20px;border-radius:3px;animation:cssBench 2s infinite linear}</style>';
+  html+='<style>@keyframes cssBench{0%{transform:translate(0,0) rotate(0deg)}25%{transform:translate(200px,50px) rotate(90deg)}50%{transform:translate(400px,0) rotate(180deg)}75%{transform:translate(200px,-50px) rotate(270deg)}100%{transform:translate(0,0) rotate(360deg)}}</style>';
+  html+='<div id="css-test" style="position:relative;height:100%">';
+  var colors=['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#34495e','#2980b9','#27ae60'];
+  for(var i=0;i<2000;i++){
+    html+='<div class="box" style="left:'+(i%50*15)+'px;top:'+(Math.floor(i/50)*25)+'px;animation-delay:'+(i*0.003)+'s;background:'+colors[i%10]+';opacity:'+(0.5+Math.random()*0.5).toFixed(2)+'"></div>';
+  }
+  html+='</div>';
+  area.innerHTML=html;
+  var createMs=performance.now()-t0;
+  setDetail('CSS动画运行中 (2000元素, 10秒)...');
+  var CSS_DURATION=10;
+  var startT=performance.now(),lastReportT=startT,rafCount=0;
+  return new Promise(function(resolve){
+    function tick(){
+      rafCount++;
+      var now=performance.now();
+      var elapsed=(now-startT)/1000;
+      if(elapsed>=CSS_DURATION){
+        area.innerHTML='';
+        var fps=rafCount/elapsed;
+        R.cssScore=Math.max(1,Math.round(fps/94*100));
+        R.cssDetail='Create:'+createMs.toFixed(0)+'ms FPS:'+fps.toFixed(0)+' Boxes:2000';
+        addSub('CSS动画',R.cssScore+'分 ('+fps.toFixed(0)+'fps)');
+        setProgress(67);
+        resolve();
+        return;
+      }
+      if(now-lastReportT>=1000){setDetail('CSS FPS: ~'+(rafCount/elapsed).toFixed(0)+' ('+elapsed.toFixed(0)+'s/'+CSS_DURATION+'s)');lastReportT=now;}
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  });
+}
+
+function runLayoutRound(){
+  area.innerHTML='';
+  var t0=performance.now();
+  var html='<div id="flex-test" style="display:flex;flex-wrap:wrap;padding:8px;gap:4px">';
+  for(var i=0;i<5000;i++){
+    html+='<div style="flex:0 0 auto;padding:4px 8px;background:hsl('+(i%360)+',60%,90%);border-radius:4px;font-size:11px;border:1px solid hsl('+(i%360)+',40%,80%)">Item '+i+'</div>';
+  }
+  html+='</div>';
+  area.innerHTML=html;
+  var flexMs=performance.now()-t0;
+  t0=performance.now();
+  var ghtml='<div id="grid-test" style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding:8px">';
+  for(var i=0;i<5000;i++){
+    ghtml+='<div style="padding:8px;background:hsl('+(i%360)+',50%,92%);border:1px solid #ddd;font-size:11px">Cell '+i+'</div>';
+  }
+  ghtml+='</div>';
+  area.innerHTML=ghtml;
+  var gridMs=performance.now()-t0;
+  t0=performance.now();
+  var cells=area.querySelectorAll('#grid-test div');
+  cells.forEach(function(c,i){
+    c.style.display=i%5===0?'none':'';
+    c.style.width=i%7===0?'200px':'';
+    c.style.fontSize=i%3===0?'14px':'11px';
+  });
+  var reflowMs=performance.now()-t0;
+  t0=performance.now();area.innerHTML='';
+  var clearMs=performance.now()-t0;
+  return flexMs+gridMs+reflowMs+clearMs;
+}
+
+function benchLayout(){
+  setPhase('布局重排测试');setDetail('运行80轮...');setProgress(67);
+  var ROUNDS=80, roundTimes=[];
+  for(var r=0;r<ROUNDS;r++){
+    roundTimes.push(runLayoutRound());
+    if(r%10===0)setDetail('布局测试 轮 '+(r+1)+'/'+ROUNDS);
+  }
+  var avg=trimmedMean(roundTimes);
+  var avgPerRound=205.0/30;
+  R.layoutScore=score(avg,avgPerRound);
+  R.layoutDetail=ROUNDS+'轮:'+roundTimes.reduce(function(a,b){return a+b;},0).toFixed(0)+'ms (avg:'+avg.toFixed(0)+'ms)';
+  addSub('布局重排',R.layoutScore+'分 (avg:'+avg.toFixed(0)+'ms)');
+  setProgress(83);
+}
+
+function runEventRound(){
+  area.innerHTML='';
+  var t0=performance.now();
+  var html='<div id="event-test" style="padding:8px">';
+  for(var i=0;i<5000;i++){
+    html+='<button class="evt-btn" data-idx="'+i+'" style="margin:1px;padding:2px 6px;font-size:10px">Btn '+i+'</button>';
+  }
+  html+='</div>';
+  area.innerHTML=html;
+  var createMs=performance.now()-t0;
+  t0=performance.now();
+  var clickCount=0;
+  area.querySelectorAll('.evt-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){clickCount++;});
+  });
+  var bindMs=performance.now()-t0;
+  t0=performance.now();
+  var container=area.querySelector('#event-test');
+  container.addEventListener('click',function(e){if(e.target.classList.contains('evt-btn'))clickCount++;});
+  var btns=area.querySelectorAll('.evt-btn');
+  for(var i=0;i<Math.min(btns.length,2000);i++){
+    btns[i].click();
+  }
+  var fireMs=performance.now()-t0;
+  t0=performance.now();
+  var mutations=0;
+  var observer=new MutationObserver(function(){mutations++;});
+  observer.observe(container,{childList:true,subtree:true,attributes:true});
+  for(var i=0;i<2000;i++){
+    btns[i].textContent='Changed '+i;
+    btns[i].style.color='red';
+  }
+  var newDiv=document.createElement('div');newDiv.textContent='added';container.appendChild(newDiv);
+  observer.disconnect();
+  var mutMs=performance.now()-t0;
+  t0=performance.now();area.innerHTML='';
+  var clearMs=performance.now()-t0;
+  return createMs+bindMs+fireMs+mutMs+clearMs;
+}
+
+function benchEvent(){
+  setPhase('事件处理测试');setDetail('运行80轮...');setProgress(83);
+  var ROUNDS=80, roundTimes=[];
+  for(var r=0;r<ROUNDS;r++){
+    roundTimes.push(runEventRound());
+    if(r%10===0)setDetail('事件测试 轮 '+(r+1)+'/'+ROUNDS);
+  }
+  var avg=trimmedMean(roundTimes);
+  var avgPerRound=312.0/30;
+  R.eventScore=score(avg,avgPerRound);
+  R.eventDetail=ROUNDS+'轮:'+roundTimes.reduce(function(a,b){return a+b;},0).toFixed(0)+'ms (avg:'+avg.toFixed(0)+'ms)';
+  addSub('事件处理',R.eventScore+'分 (avg:'+avg.toFixed(0)+'ms)');
+  setProgress(100);
+  finish();
+}
+
+function finish(){
+  setPhase('测试完成!');
+  var total=Math.round(
+    (R.jsScore||0)*0.25+
+    (R.domScore||0)*0.15+
+    (R.cardScore||0)*0.10+
+    (R.cssScore||0)*0.15+
+    (R.layoutScore||0)*0.20+
+    (R.eventScore||0)*0.15
+  );
+  R.totalScore=total;
+  try{window.chrome.webview.postMessage(JSON.stringify(R));}catch(e){}
+}
+
+async function run(){
+  benchJS();
+  benchDOMTable();
+  benchDOMCards();
+  await benchCSS();
+  benchLayout();
+  benchEvent();
+}
+run();
+})();
+</script></body></html>

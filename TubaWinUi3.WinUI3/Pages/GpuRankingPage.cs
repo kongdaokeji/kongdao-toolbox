@@ -1,0 +1,805 @@
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
+
+using TubaWinUi3.Models;
+using TubaWinUi3.Services;
+using Windows.UI;
+
+namespace TubaWinUi3.Pages;
+
+public sealed partial class GpuRankingPage : Page
+{
+    private string _category = "desktop";
+    private string _brand = "全部";
+    private string _keyword = "";
+    private string _sortBy = "tflops";
+    private bool _isRefreshing;
+    private double _lastScrollOffset;
+    private bool _navCollapsed;
+
+    private static readonly Color Gold = Color.FromArgb(255, 255, 215, 0);
+    private readonly Color Silver = Color.FromArgb(255, 192, 192, 192);
+    private readonly Color Bronze = Color.FromArgb(255, 205, 127, 50);
+    private static readonly Color NvidiaGreen = Color.FromArgb(255, 118, 185, 0);
+    private static readonly Color AmdRed = Color.FromArgb(255, 237, 28, 36);
+    private static readonly Color IntelBlue = Color.FromArgb(255, 0, 114, 198);
+    private static readonly Color AppleGray = Color.FromArgb(255, 160, 160, 160);
+    private static readonly Color QualcommPurple = Color.FromArgb(255, 99, 71, 217);
+
+    private static SvgImageSource? NvidiaLogo;
+    private static SvgImageSource? AmdLogo;
+    private static SvgImageSource? IntelLogo;
+    private static SvgImageSource? AppleLogo;
+    private static SvgImageSource? QualcommLogo;
+
+    private StackPanel _listContainer = null!;
+    private ScrollViewer _listScroll = null!;
+    private InfoBar _infoBar = null!;
+    private ProgressBar _loadingBar = null!;
+    private TextBlock _subtitleText = null!;
+    private FrameworkElement _headerRow = null!;
+    private FrameworkElement _filterRow = null!;
+    private FrameworkElement _statsRow = null!;
+
+    public GpuRankingPage()
+    {
+        InitializeComponent();
+        GpuRankingService.Load();
+        LoadBrandLogos();
+
+        var root = BuildUI();
+        Content = root;
+
+        RefreshList();
+    }
+
+    private static void LoadBrandLogos()
+    {
+        if (NvidiaLogo is not null) return;
+
+        var brandsDir = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "Brands");
+        NvidiaLogo = LoadSvg(System.IO.Path.Combine(brandsDir, "nvidia.svg"));
+        AmdLogo = LoadSvg(System.IO.Path.Combine(brandsDir, "amd.svg"));
+        IntelLogo = LoadSvg(System.IO.Path.Combine(brandsDir, "intel.svg"));
+        AppleLogo = LoadSvg(System.IO.Path.Combine(brandsDir, "apple.svg"));
+        QualcommLogo = LoadSvg(System.IO.Path.Combine(brandsDir, "qualcomm.svg"));
+    }
+
+    private static SvgImageSource? LoadSvg(string path)
+    {
+        if (!File.Exists(path)) return null;
+        try
+        {
+            var uri = new Uri($"ms-appx:///Assets/Brands/{System.IO.Path.GetFileName(path)}");
+            return new SvgImageSource(uri);
+        }
+        catch { return null; }
+    }
+
+    private static SvgImageSource? GetBrandLogo(string brand) => brand switch
+    {
+        "Nvidia" => NvidiaLogo,
+        "AMD" => AmdLogo,
+        "Intel" => IntelLogo,
+        "Apple" => AppleLogo,
+        "Qualcomm" => QualcommLogo,
+        _ => null
+    };
+
+    private static Color GetBrandColor(string brand) => brand switch
+    {
+        "Nvidia" => NvidiaGreen, "AMD" => AmdRed, "Intel" => IntelBlue,
+        "Apple" => AppleGray, "Qualcomm" => QualcommPurple, _ => ThemeColors.DimText
+    };
+
+    private Grid BuildUI()
+    {
+        var mainGrid = new Grid
+        {
+            Padding = new Thickness(28, 48, 28, 20),
+            RowSpacing = 14
+        };
+        mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+        _headerRow = BuildHeader();
+        mainGrid.Children.Add(_headerRow);
+        Grid.SetRow(_headerRow, 0);
+
+        _filterRow = BuildFilterBar();
+        mainGrid.Children.Add(_filterRow);
+        Grid.SetRow(_filterRow, 1);
+
+        _statsRow = BuildStatsCards();
+        mainGrid.Children.Add(_statsRow);
+        Grid.SetRow(_statsRow, 2);
+
+        var listRow = BuildListArea();
+        mainGrid.Children.Add(listRow);
+        Grid.SetRow(listRow, 3);
+
+        return mainGrid;
+    }
+
+    private StackPanel BuildHeader()
+    {
+        var title = new TextBlock
+        {
+            Text = "GPU 天梯图",
+            FontSize = 28,
+            FontWeight = Microsoft.UI.Text.FontWeights.Bold
+        };
+
+        _subtitleText = new TextBlock
+        {
+            Text = $"数据来源 TopCPU.net · 更新于 {GpuRankingService.LastUpdated ?? "内置数据"} · FP32 浮点性能排列",
+            FontSize = 12,
+            Foreground = new SolidColorBrush(ThemeColors.DimText),
+            Margin = new Thickness(0, 4, 0, 0)
+        };
+
+        var refreshBtn = new Button
+        {
+            Content = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 6,
+                Children =
+                {
+                    new FontIcon { Glyph = "\uE72C", FontSize = 13 },
+                    new TextBlock { Text = "刷新数据", FontSize = 13 }
+                }
+            },
+            Background = new SolidColorBrush(ThemeColors.SubtleBg),
+            Foreground = new SolidColorBrush(ThemeColors.PrimaryText),
+            BorderBrush = new SolidColorBrush(ThemeColors.BorderColor),
+            Padding = new Thickness(14, 6, 14, 6),
+            CornerRadius = new CornerRadius(6),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        refreshBtn.Click += async (_, _) => await RefreshDataAsync();
+
+        var headerGrid = new Grid { ColumnSpacing = 12 };
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        headerGrid.Children.Add(new StackPanel { Spacing = 2, Children = { title, _subtitleText } });
+        headerGrid.Children.Add(refreshBtn); Grid.SetColumn(refreshBtn, 1);
+
+        _infoBar = new InfoBar
+        {
+            Severity = InfoBarSeverity.Informational,
+            IsOpen = false,
+            IsClosable = true,
+            Title = "",
+            Message = ""
+        };
+
+        _loadingBar = new ProgressBar
+        {
+            IsIndeterminate = true,
+            Visibility = Visibility.Collapsed
+        };
+
+        var outer = new StackPanel { Spacing = 12 };
+        outer.Children.Add(headerGrid);
+        outer.Children.Add(_loadingBar);
+        outer.Children.Add(_infoBar);
+
+        return outer;
+    }
+
+    private async Task RefreshDataAsync()
+    {
+        if (_isRefreshing) return;
+
+        if (!GpuRankingService.CanRefresh)
+        {
+            var remaining = GpuRankingService.CooldownTime - (DateTime.Now - GpuRankingService.LastRefreshTime);
+            _infoBar.Title = "提示";
+            _infoBar.Message = $"数据已是最新，{remaining.Minutes} 分钟后可再次刷新";
+            _infoBar.Severity = InfoBarSeverity.Warning;
+            _infoBar.IsOpen = true;
+            return;
+        }
+
+        _isRefreshing = true;
+        _loadingBar.Visibility = Visibility.Visible;
+        _infoBar.IsOpen = false;
+
+        var refreshResult = await GpuRankingService.RefreshFromNetworkAsync();
+
+        _isRefreshing = false;
+        _loadingBar.Visibility = Visibility.Collapsed;
+
+        if (refreshResult.Success)
+        {
+            _infoBar.Title = "刷新成功";
+            _infoBar.Message = refreshResult.Message;
+            _infoBar.Severity = InfoBarSeverity.Success;
+            _infoBar.IsOpen = true;
+
+            _subtitleText.Text = $"数据来源 TopCPU.net · 更新于 {GpuRankingService.LastUpdated} · FP32 浮点性能排列";
+            RefreshList();
+        }
+        else
+        {
+            _infoBar.Title = "刷新失败";
+            _infoBar.Message = refreshResult.Message;
+            _infoBar.Severity = InfoBarSeverity.Error;
+            _infoBar.IsOpen = true;
+        }
+    }
+
+    private Grid BuildFilterBar()
+    {
+        var grid = new Grid { ColumnSpacing = 16, VerticalAlignment = VerticalAlignment.Center };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var catToggle = BuildCategoryToggle();
+        grid.Children.Add(catToggle);
+        Grid.SetColumn(catToggle, 0);
+
+        var brandBar = BuildBrandFilter();
+        grid.Children.Add(brandBar);
+        Grid.SetColumn(brandBar, 1);
+
+        var searchBox = new AutoSuggestBox
+        {
+            PlaceholderText = "搜索 GPU 名称...",
+            QueryIcon = new SymbolIcon(Symbol.Find),
+            MinWidth = 200
+        };
+        searchBox.TextChanged += (s, e) =>
+        {
+            _keyword = searchBox.Text;
+            RefreshList();
+        };
+        grid.Children.Add(searchBox);
+        Grid.SetColumn(searchBox, 2);
+
+        var sortCombo = new ComboBox
+        {
+            MinWidth = 120,
+            SelectedIndex = 0,
+            Header = null
+        };
+        sortCombo.Items.Add("TFLOPS");
+        sortCombo.Items.Add("评分");
+        sortCombo.Items.Add("排名顺序");
+        sortCombo.SelectionChanged += (s, e) =>
+        {
+            _sortBy = sortCombo.SelectedIndex switch
+            {
+                0 => "tflops",
+                1 => "rating",
+                _ => "rank"
+            };
+            RefreshList();
+        };
+        grid.Children.Add(sortCombo);
+        Grid.SetColumn(sortCombo, 3);
+
+        return grid;
+    }
+
+    private Border BuildCategoryToggle()
+    {
+        var desktopBtn = new Button
+        {
+            Content = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 6,
+                Children =
+                {
+                    new FontIcon { Glyph = "\uE964", FontSize = 14 },
+                    new TextBlock { Text = "桌面", FontSize = 13 }
+                }
+            },
+            Padding = new Thickness(16, 8, 16, 8),
+            CornerRadius = new CornerRadius(6, 0, 0, 6),
+            Tag = "desktop"
+        };
+
+        var laptopBtn = new Button
+        {
+            Content = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 6,
+                Children =
+                {
+                    new FontIcon { Glyph = "\uE7F7", FontSize = 14 },
+                    new TextBlock { Text = "笔记本", FontSize = 13 }
+                }
+            },
+            Padding = new Thickness(16, 8, 16, 8),
+            CornerRadius = new CornerRadius(0, 6, 6, 0),
+            Tag = "laptop"
+        };
+
+        var stack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 0 };
+        stack.Children.Add(desktopBtn);
+        stack.Children.Add(laptopBtn);
+
+        desktopBtn.Click += (s, e) =>
+        {
+            _category = "desktop";
+            UpdateCategoryButtons(desktopBtn, laptopBtn);
+            RefreshList();
+        };
+        laptopBtn.Click += (s, e) =>
+        {
+            _category = "laptop";
+            UpdateCategoryButtons(laptopBtn, desktopBtn);
+            RefreshList();
+        };
+
+        UpdateCategoryButtons(desktopBtn, laptopBtn);
+
+        return new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            BorderBrush = new SolidColorBrush(ThemeColors.BorderColor),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(2),
+            Child = stack
+        };
+    }
+
+    private static void UpdateCategoryButtons(Button active, Button inactive)
+    {
+        var accentColor = ThemeColors.AccentBlue;
+
+        active.Background = new SolidColorBrush(Color.FromArgb(40, accentColor.R, accentColor.G, accentColor.B));
+        active.Foreground = new SolidColorBrush(accentColor);
+        active.BorderBrush = new SolidColorBrush(accentColor);
+
+        inactive.Background = new SolidColorBrush(ThemeColors.SubtleBg);
+        inactive.Foreground = new SolidColorBrush(ThemeColors.DimText);
+        inactive.BorderBrush = new SolidColorBrush(ThemeColors.SubtleBg);
+    }
+
+    private StackPanel BuildBrandFilter()
+    {
+        var brands = new[] { "全部", "Nvidia", "AMD", "Intel", "Apple", "Qualcomm" };
+        var brandColors = new Dictionary<string, Color?>
+        {
+            ["全部"] = null, ["Nvidia"] = NvidiaGreen, ["AMD"] = AmdRed,
+            ["Intel"] = IntelBlue, ["Apple"] = AppleGray, ["Qualcomm"] = QualcommPurple
+        };
+
+        var stack = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+
+        foreach (var label in brands)
+        {
+            var c = brandColors[label];
+            var logo = GetBrandLogo(label);
+
+            FrameworkElement btnContent;
+            if (label == "全部")
+            {
+                btnContent = new TextBlock { Text = "全部", FontSize = 12, FontWeight = Microsoft.UI.Text.FontWeights.Bold };
+            }
+            else if (logo is not null)
+            {
+                btnContent = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 6,
+                    Children =
+                    {
+                        new Image { Source = logo, Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center },
+                        new TextBlock { Text = label, FontSize = 12, FontWeight = Microsoft.UI.Text.FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center }
+                    }
+                };
+            }
+            else
+            {
+                btnContent = new TextBlock { Text = label, FontSize = 12, FontWeight = Microsoft.UI.Text.FontWeights.Bold };
+            }
+
+            var btn = new Button
+            {
+                Content = btnContent,
+                Padding = new Thickness(12, 6, 12, 6),
+                CornerRadius = new CornerRadius(6),
+                Tag = label
+            };
+
+            btn.Click += (s, e) =>
+            {
+                _brand = label;
+                UpdateBrandButtons(stack, label);
+                RefreshList();
+            };
+
+            stack.Children.Add(btn);
+        }
+
+        UpdateBrandButtons(stack, "全部");
+        return stack;
+    }
+
+    private static void UpdateBrandButtons(StackPanel stack, string selected)
+    {
+        var brandColors = new Dictionary<string, Color?>
+        {
+            ["全部"] = null, ["Nvidia"] = NvidiaGreen, ["AMD"] = AmdRed,
+            ["Intel"] = IntelBlue, ["Apple"] = AppleGray, ["Qualcomm"] = QualcommPurple
+        };
+
+        foreach (var btn in stack.Children.OfType<Button>())
+        {
+            var label = (string)btn.Tag;
+            var isSelected = label == selected;
+
+            if (isSelected)
+            {
+                var c = brandColors[label] ?? ThemeColors.AccentBlue;
+                btn.Background = new SolidColorBrush(Color.FromArgb(40, c.R, c.G, c.B));
+                btn.Foreground = new SolidColorBrush(c);
+                btn.BorderBrush = new SolidColorBrush(c);
+                btn.BorderThickness = new Thickness(1);
+            }
+            else
+            {
+                btn.Background = new SolidColorBrush(ThemeColors.SubtleBg);
+                btn.Foreground = new SolidColorBrush(ThemeColors.DimText);
+                btn.BorderBrush = new SolidColorBrush(ThemeColors.SubtleBg);
+                btn.BorderThickness = new Thickness(0);
+            }
+        }
+    }
+
+    private Grid BuildStatsCards()
+    {
+        var entries = GpuRankingService.GetByCategory(_category);
+        var total = entries.Count;
+        var nvidiaCount = entries.Count(e => e.Brand == "Nvidia");
+        var amdCount = entries.Count(e => e.Brand == "AMD");
+        var topRating = entries.Count > 0 ? entries.MaxBy(e => e.Rating)?.Rating ?? 0 : 0;
+
+        var totalCard = MakeStatCard("总计", $"{total} 款", "\uE9D9", ThemeColors.AccentBlue, null);
+        var nvidiaCard = MakeStatCard("Nvidia", $"{nvidiaCount} 款", "\uE912", NvidiaGreen, NvidiaLogo);
+        var amdCard = MakeStatCard("AMD", $"{amdCount} 款", "\uE9D5", AmdRed, AmdLogo);
+        var topCard = MakeStatCard("最高分", $"{topRating} 分", "\uE8CA", Color.FromArgb(255, 251, 191, 36), null);
+
+        var grid = new Grid { ColumnSpacing = 10 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.Children.Add(totalCard);
+        grid.Children.Add(nvidiaCard); Grid.SetColumn(nvidiaCard, 1);
+        grid.Children.Add(amdCard); Grid.SetColumn(amdCard, 2);
+        grid.Children.Add(topCard); Grid.SetColumn(topCard, 3);
+
+        return grid;
+    }
+
+    private static Border MakeStatCard(string label, string value, string glyph, Color accent, SvgImageSource? logo)
+    {
+        FrameworkElement iconChild;
+        if (logo is not null)
+            iconChild = new Image { Source = logo, Width = 18, Height = 18 };
+        else
+            iconChild = new FontIcon { FontSize = 18, Foreground = new SolidColorBrush(accent), Glyph = glyph };
+
+        var iconBorder = new Border
+        {
+            Width = 38, Height = 38,
+            Background = new SolidColorBrush(Color.FromArgb(26, accent.R, accent.G, accent.B)),
+            CornerRadius = new CornerRadius(8),
+            Child = iconChild
+        };
+
+        var labelBlock = new TextBlock { Text = label, FontSize = 11, Foreground = new SolidColorBrush(ThemeColors.DimText) };
+        var valueBlock = new TextBlock { Text = value, FontSize = 16, FontWeight = Microsoft.UI.Text.FontWeights.Bold, Foreground = new SolidColorBrush(accent) };
+
+        var stack = new StackPanel { Spacing = 2 };
+        stack.Children.Add(labelBlock);
+        stack.Children.Add(valueBlock);
+
+        var innerGrid = new Grid { ColumnSpacing = 10 };
+        innerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(38) });
+        innerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        innerGrid.Children.Add(iconBorder);
+        innerGrid.Children.Add(stack); Grid.SetColumn(stack, 1);
+
+        return new Border
+        {
+            Padding = new Thickness(14, 10, 14, 10),
+            Background = new SolidColorBrush(ThemeColors.CardBg),
+            BorderBrush = new SolidColorBrush(ThemeColors.BorderColor),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Child = innerGrid
+        };
+    }
+
+    private Grid BuildListArea()
+    {
+        var headerGrid = new Grid
+        {
+            ColumnSpacing = 10,
+            Padding = new Thickness(14, 8, 14, 8)
+        };
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(44) });
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+
+        AddHeader(headerGrid, "", 0);
+        AddHeader(headerGrid, "#", 1);
+        AddHeader(headerGrid, "GPU", 2);
+        AddHeader(headerGrid, "TFLOPS", 3);
+        AddHeader(headerGrid, "显存", 4);
+
+        var headerBorder = new Border
+        {
+            Background = new SolidColorBrush(ThemeColors.HeaderBg),
+            CornerRadius = new CornerRadius(8, 8, 0, 0),
+            Child = headerGrid
+        };
+
+        _listContainer = new StackPanel { Spacing = 2 };
+
+        _listScroll = new ScrollViewer
+        {
+            Content = _listContainer,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+
+        _listScroll.ViewChanged += OnListScrollChanged;
+
+        var listBorder = new Border
+        {
+            BorderBrush = new SolidColorBrush(ThemeColors.BorderColor),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(0, 0, 8, 8),
+            Child = _listScroll
+        };
+
+        var outer = new Grid();
+        outer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        outer.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        outer.Children.Add(headerBorder); Grid.SetRow(headerBorder, 0);
+        outer.Children.Add(listBorder); Grid.SetRow(listBorder, 1);
+
+        return outer;
+    }
+
+    private void OnListScrollChanged(object? sender, ScrollViewerViewChangedEventArgs e)
+    {
+        if (_listScroll is null) return;
+
+        var currentOffset = _listScroll.VerticalOffset;
+        var threshold = 30;
+
+        // 修正运算符优先级：展开条件应为「(_navCollapsed 且向上越过阈值) 或 已滚到顶部」，
+        // 否则 `|| currentOffset <= 0` 会在未折叠态也恒成立，导致行可见性反复切换。
+        var shouldCollapse = !_navCollapsed && currentOffset > _lastScrollOffset + threshold && currentOffset > 60;
+        var shouldExpand = (_navCollapsed && currentOffset < _lastScrollOffset - threshold) || currentOffset <= 0;
+
+        _lastScrollOffset = currentOffset;
+
+        if (shouldCollapse == shouldExpand)
+            return; // 两者皆不成立时不动作（不可能同时成立，此处仅防御）
+
+        // 延迟到布局完成后再切换筛选/统计行的可见性，
+        // 避免滚动事件回调中直接改动可视树高度引发 LayoutCycleException。
+        var collapse = shouldCollapse;
+        _ = DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (collapse) CollapseNav();
+            else ExpandNav();
+        });
+    }
+
+    private void CollapseNav()
+    {
+        _navCollapsed = true;
+        if (_statsRow is not null) _statsRow.Visibility = Visibility.Collapsed;
+        if (_filterRow is not null) _filterRow.Visibility = Visibility.Collapsed;
+        if (_headerRow is not null) _headerRow.Visibility = Visibility.Collapsed;
+    }
+
+    private void ExpandNav()
+    {
+        _navCollapsed = false;
+        if (_headerRow is not null) _headerRow.Visibility = Visibility.Visible;
+        if (_filterRow is not null) _filterRow.Visibility = Visibility.Visible;
+        if (_statsRow is not null) _statsRow.Visibility = Visibility.Visible;
+    }
+
+    private static void AddHeader(Grid grid, string text, int column)
+    {
+        var tb = new TextBlock
+        {
+            Text = text,
+            FontSize = 11,
+            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            Foreground = new SolidColorBrush(ThemeColors.DimText)
+        };
+        grid.Children.Add(tb);
+        Grid.SetColumn(tb, column);
+    }
+
+    private void RefreshList()
+    {
+        if (_listContainer is null) return;
+
+        var entries = GpuRankingService.GetByCategory(_category);
+        entries = GpuRankingService.Filter(entries, _brand, _keyword);
+
+        entries = _sortBy switch
+        {
+            "tflops" => entries.OrderByDescending(e => double.TryParse(e.Tflops, out var t) ? t : 0).ToList(),
+            "rating" => entries.OrderByDescending(e => e.Rating).ToList(),
+            _ => entries.OrderBy(e => e.Rank).ToList()
+        };
+
+        _listContainer.Children.Clear();
+
+        var displayRank = 0;
+        foreach (var entry in entries)
+        {
+            displayRank++;
+            _listContainer.Children.Add(CreateRow(entry, displayRank));
+        }
+
+        RefreshStats(entries);
+    }
+
+    private void RefreshStats(List<GpuRankingEntry> filtered)
+    {
+        var mainGrid = Content as Grid;
+        if (mainGrid is null) return;
+
+        var statsRow = mainGrid.Children.FirstOrDefault(c => Grid.GetRow(c as FrameworkElement) == 2);
+        if (statsRow is Grid statsGrid)
+        {
+            statsGrid.Children.Clear();
+
+            var total = filtered.Count;
+            var nvidiaCount = filtered.Count(e => e.Brand == "Nvidia");
+            var amdCount = filtered.Count(e => e.Brand == "AMD");
+            var topRating = filtered.Count > 0 ? filtered.MaxBy(e => e.Rating)?.Rating ?? 0 : 0;
+
+            var totalCard = MakeStatCard("总计", $"{total} 款", "\uE9D9", ThemeColors.AccentBlue, null);
+            var nvidiaCard = MakeStatCard("Nvidia", $"{nvidiaCount} 款", "\uE912", NvidiaGreen, NvidiaLogo);
+            var amdCard = MakeStatCard("AMD", $"{amdCount} 款", "\uE9D5", AmdRed, AmdLogo);
+            var topCard = MakeStatCard("最高分", $"{topRating} 分", "\uE8CA", Color.FromArgb(255, 251, 191, 36), null);
+
+            statsGrid.Children.Add(totalCard);
+            statsGrid.Children.Add(nvidiaCard); Grid.SetColumn(nvidiaCard, 1);
+            statsGrid.Children.Add(amdCard); Grid.SetColumn(amdCard, 2);
+            statsGrid.Children.Add(topCard); Grid.SetColumn(topCard, 3);
+        }
+    }
+
+    private Border CreateRow(GpuRankingEntry entry, int displayRank)
+    {
+        var rankColor = displayRank <= 3 ? (displayRank == 1 ? Gold : displayRank == 2 ? Silver : Bronze) : ThemeColors.DimText;
+        var brandColor = GetBrandColor(entry.Brand);
+        var brandLogo = GetBrandLogo(entry.Brand);
+
+        FrameworkElement rankBadge;
+        if (displayRank <= 3)
+        {
+            rankBadge = new Border
+            {
+                Width = 32, Height = 32,
+                CornerRadius = new CornerRadius(6),
+                Background = new SolidColorBrush(Color.FromArgb(40, rankColor.R, rankColor.G, rankColor.B)),
+                Child = new TextBlock
+                {
+                    Text = displayRank.ToString(), FontSize = 14, FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                    Foreground = new SolidColorBrush(rankColor),
+                    HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
+                }
+            };
+        }
+        else
+        {
+            rankBadge = new TextBlock
+            {
+                Text = displayRank.ToString(), FontSize = 13, Foreground = new SolidColorBrush(ThemeColors.DimText),
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Width = 32
+            };
+        }
+
+        var nameText = new TextBlock
+        {
+            Text = entry.Name, FontSize = 13, FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            Foreground = new SolidColorBrush(ThemeColors.PrimaryText), VerticalAlignment = VerticalAlignment.Center
+        };
+
+        var vramSubText = !string.IsNullOrWhiteSpace(entry.TimeSpy)
+            ? new TextBlock
+            {
+                Text = entry.TimeSpy, FontSize = 10, Foreground = new SolidColorBrush(ThemeColors.DimText),
+                VerticalAlignment = VerticalAlignment.Center
+            }
+            : null;
+
+        var namePanel = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
+        namePanel.Children.Add(nameText);
+        if (vramSubText is not null) namePanel.Children.Add(vramSubText);
+
+        var tflopsColor = entry.Rating >= 80 ? NvidiaGreen
+            : entry.Rating >= 50 ? ThemeColors.AccentBlue
+            : entry.Rating >= 20 ? ThemeColors.AccentOrange
+            : ThemeColors.DimText;
+
+        var tflopsText = new TextBlock
+        {
+            Text = !string.IsNullOrWhiteSpace(entry.Tflops) ? entry.Tflops : "-",
+            FontSize = 13, FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            Foreground = new SolidColorBrush(tflopsColor), VerticalAlignment = VerticalAlignment.Center
+        };
+
+        var vramText = new TextBlock
+        {
+            Text = !string.IsNullOrWhiteSpace(entry.TimeSpy) ? entry.TimeSpy : "-",
+            FontSize = 12, Foreground = new SolidColorBrush(ThemeColors.DimText),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        FrameworkElement logoCell;
+        if (brandLogo is not null)
+        {
+            logoCell = new Image { Source = brandLogo, Width = 20, Height = 20, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+        }
+        else
+        {
+            logoCell = new Border
+            {
+                Width = 20, Height = 20,
+                CornerRadius = new CornerRadius(4),
+                Background = new SolidColorBrush(Color.FromArgb(30, brandColor.R, brandColor.G, brandColor.B)),
+                Child = new TextBlock
+                {
+                    Text = entry.Brand.Length > 0 ? entry.Brand[..1] : "?",
+                    FontSize = 10, FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                    Foreground = new SolidColorBrush(brandColor),
+                    HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
+                }
+            };
+        }
+
+        var rowGrid = new Grid { ColumnSpacing = 10, VerticalAlignment = VerticalAlignment.Center };
+        rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
+        rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(44) });
+        rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });
+        rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+
+        rowGrid.Children.Add(logoCell); Grid.SetColumn(logoCell, 0);
+        rowGrid.Children.Add(rankBadge); Grid.SetColumn(rankBadge, 1);
+        rowGrid.Children.Add(namePanel); Grid.SetColumn(namePanel, 2);
+        rowGrid.Children.Add(tflopsText); Grid.SetColumn(tflopsText, 3);
+        rowGrid.Children.Add(vramText); Grid.SetColumn(vramText, 4);
+
+        return new Border
+        {
+            Padding = new Thickness(14, 8, 14, 8),
+            Background = new SolidColorBrush(ThemeColors.CardBg),
+            BorderBrush = new SolidColorBrush(ThemeColors.BorderColor),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Child = rowGrid
+        };
+    }
+
+}

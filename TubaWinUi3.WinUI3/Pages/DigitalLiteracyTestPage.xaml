@@ -1,0 +1,14 @@
+<Page
+    x:Class="TubaWinUi3.Pages.DigitalLiteracyTestPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="Transparent">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled" Padding="48,32,48,32">
+        <StackPanel x:Name="ContentPanel" Opacity="1" VerticalAlignment="Center">
+            <StackPanel.RenderTransform>
+                <TranslateTransform x:Name="ContentPanelTransform" Y="0" />
+            </StackPanel.RenderTransform>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

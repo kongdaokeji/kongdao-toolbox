@@ -1,0 +1,65 @@
+<Page
+    x:Class="TubaWinUi3.Pages.QuickDeviceCheckPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="Transparent">
+
+    <Grid Padding="48,24,48,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Spacing="8" HorizontalAlignment="Center">
+            <StackPanel x:Name="StepProgressPanel" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                <Border Width="12" Height="12" CornerRadius="6" Background="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                <Border Width="8" Height="8" CornerRadius="4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                <Border Width="8" Height="8" CornerRadius="4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                <Border Width="8" Height="8" CornerRadius="4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                <Border Width="8" Height="8" CornerRadius="4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                <Border Width="8" Height="8" CornerRadius="4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                <Border Width="8" Height="8" CornerRadius="4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                <Border Width="8" Height="8" CornerRadius="4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" />
+            </StackPanel>
+            <TextBlock x:Name="StepIndicatorText" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Spacing="6" HorizontalAlignment="Center" Margin="0,16,0,16">
+            <FontIcon x:Name="StepGlyphIcon" Glyph="&#xE734;" FontSize="36" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" />
+            <TextBlock x:Name="StepTitleText" FontSize="28" FontWeight="Bold" HorizontalAlignment="Center" />
+            <TextBlock x:Name="StepDescText" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled">
+            <StackPanel x:Name="StepContentPanel" Opacity="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel.RenderTransform>
+                    <TranslateTransform x:Name="StepContentPanelTransform" Y="0" />
+                </StackPanel.RenderTransform>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Grid.Row="3" Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Button x:Name="BackButton"
+                    Content="上一步"
+                    Padding="24,10,24,10"
+                    Visibility="Collapsed"
+                    Click="BackButton_Click"
+                    HorizontalAlignment="Left" />
+
+            <Button x:Name="NextButton"
+                    Content="下一步"
+                    Style="{ThemeResource AccentButtonStyle}"
+                    Padding="32,10,32,10"
+                    Grid.Column="1"
+                    Click="NextButton_Click" />
+        </Grid>
+    </Grid>
+</Page>

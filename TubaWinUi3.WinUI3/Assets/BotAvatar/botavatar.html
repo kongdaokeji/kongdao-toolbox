@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<!--
+  bloub bot 吉祥物（AI 助手聊天区输入框上方悬浮动画）
+  引擎来自 https://github.com/jeremy-prt/bloub （MIT License）
+  src/bot 纯函数引擎经 esbuild 打包为 bloub.bot.js（无框架、无 DOM 依赖）。
+  宿主通信（WinUI WebView2 PostWebMessageAsJson）：
+    { type:"state",  id:"thinking" }           持久切换状态（15 态见 states.ts）
+    { type:"pulse",  id:"wink", ms:2200 }      短暂状态，ms 后回落到 back（默认 idle）
+    { type:"colors", ink:"#1b1b1f", paper:"#f9f9f9" }  主题配色（body/眼睛镂空底色）
+  15 态联动（AiAgentPage.xaml.cs）：
+    idle 空闲 / thinking 发消息 / orbit 工具执行（桥内 3s 循环重放）/
+    wink 定稿无消耗 / notify 定稿有消耗 / burst 定稿 >4000 tokens /
+    alert 失败 / play 新对话 / sleep 5 分钟无活动 / wide 完全访问开 /
+    exclaim 完全访问关 / swirl 打开设置 / comet 历史加载完成 /
+    egg / hexagon AI 写入记忆随机变形
+-->
+<title>bot-avatar</title>
+<style>
+  /* 透明背景：必须同时满足 WebView2 DefaultBackgroundColor=Transparent（宿主侧）
+     和这里根元素透明。!important 防止任何注入/继承样式把背景涂成黑色 */
+  html, body { margin: 0; padding: 0; background: transparent !important; overflow: hidden; }
+  svg { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<svg id="bot" viewBox="-158 -158 316 316" aria-hidden="true">
+  <defs>
+    <!-- 眼睛是身体上的真镂空（mask 黑洞），随视线滑到轮廓边缘时自动裁切 -->
+    <mask id="m" maskUnits="userSpaceOnUse" x="-158" y="-158" width="316" height="316">
+      <path id="mBody" fill="#fff" d="" />
+      <g id="mEyes"></g>
+      <circle id="mNotch" r="0" fill="#000" style="display:none" />
+    </mask>
+    <g id="grads"></g>
+  </defs>
+
+  <g id="arcBack" fill="none" stroke-linecap="round"></g>
+  <g id="dotsBack"></g>
+
+  <g id="bodyG">
+    <!-- 眼睛镂空处的底色（paper），让身后经过的圆环/粒子不会从眼里透出来 -->
+    <path id="paperPath" fill="#f9f9f9" d="" />
+    <g mask="url(#m)">
+      <rect id="inkRect" x="-158" y="-158" width="316" height="316" fill="#1b1b1f" />
+    </g>
+  </g>
+
+  <g id="dotsFront"></g>
+  <circle id="notif" r="0" fill="#2496e8" style="display:none" />
+  <g id="arcFront" fill="none" stroke-linecap="round"></g>
+</svg>
+
+<script src="bloub.bot.js"></script>
+<script>
+(function () {
+  'use strict';
+  var Engine = Bloub.BotEngine, R = Bloub.RAYON, mixHex = Bloub.mixHex;
+
+  var engine = new Engine(R, 'idle', null, null);
+  // 调试入口：浏览器直接打开 botavatar.html#state=orbit 可单验某状态（WebView2 内走桥接，hash 不生效）
+  var hashState = /(?:^|&)state=([\w-]+)/.exec((location.hash || '').slice(1));
+  if (hashState && Bloub.STATE_BY_ID.has(hashState[1])) engine.reset(hashState[1], 0);
+  var ink = '#1b1b1f', paper = '#f9f9f9';
+  var clock = 0, last = 0, pulseTimer = 0;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var el = {
+    mBody: $('mBody'), mEyes: $('mEyes'), mNotch: $('mNotch'),
+    grads: $('grads'), arcBack: $('arcBack'), arcFront: $('arcFront'),
+    dotsBack: $('dotsBack'), dotsFront: $('dotsFront'),
+    bodyG: $('bodyG'), paperPath: $('paperPath'), inkRect: $('inkRect'),
+    notif: $('notif')
+  };
+  var SVGNS = 'http://www.w3.org/2000/svg';
+
+  function setColors(i, p) {
+    ink = i; paper = p;
+    el.inkRect.setAttribute('fill', ink);
+    el.paperPath.setAttribute('fill', paper);
+  }
+
+  function makeNode(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+
+  function renderDots(group, dots) {
+    while (group.firstChild) group.removeChild(group.firstChild);
+    for (var i = 0; i < dots.length; i++) {
+      var d = dots[i];
+      var fill = d.color !== undefined && d.color !== null ? d.color
+        : (d.depth === undefined ? ink : mixHex(paper, ink, d.depth));
+      if (d.d) {
+        group.appendChild(makeNode('path', {
+          d: d.d, fill: fill, opacity: d.opacity,
+          transform: 'translate(' + d.x + ' ' + d.y + ') rotate(' + (d.rot || 0) + ') scale(' + R + ')'
+        }));
+      } else {
+        group.appendChild(makeNode('circle', { cx: d.x, cy: d.y, r: d.r, fill: fill, opacity: d.opacity }));
+      }
+    }
+  }
+
+  function renderArcs(frame) {
+    while (el.arcBack.firstChild) el.arcBack.removeChild(el.arcBack.firstChild);
+    while (el.arcFront.firstChild) el.arcFront.removeChild(el.arcFront.firstChild);
+    while (el.grads.firstChild) el.grads.removeChild(el.grads.firstChild);
+    for (var i = 0; i < frame.arcs.length; i++) {
+      var a = frame.arcs[i];
+      var gid = 'g' + a.id;
+      var grad = makeNode('linearGradient', {
+        id: gid, gradientUnits: 'userSpaceOnUse',
+        x1: a.grad.x1, y1: a.grad.y1, x2: a.grad.x2, y2: a.grad.y2
+      });
+      for (var s = 0; s < a.grad.stops.length; s++) {
+        grad.appendChild(makeNode('stop', { offset: s / (a.grad.stops.length - 1), 'stop-color': a.grad.stops[s] }));
+      }
+      el.grads.appendChild(grad);
+      var stroke = 'url(#' + gid + ')';
+      var attrs = { d: a.back, stroke: stroke, 'stroke-width': a.width, opacity: a.opacity };
+      el.arcBack.appendChild(makeNode('path', attrs));
+      attrs.d = a.front;
+      el.arcFront.appendChild(makeNode('path', attrs));
+    }
+  }
+
+  var eyeEls = [];
+  function renderFrame(f) {
+    el.mBody.setAttribute('d', f.bodyPath);
+    // 眼睛数量恒为 0 或 2，就位复用
+    while (eyeEls.length < f.eyes.length) {
+      var p = makeNode('path', { fill: '#000', d: '' });
+      el.mEyes.appendChild(p); eyeEls.push(p);
+    }
+    for (var i = 0; i < f.eyes.length; i++) {
+      eyeEls[i].setAttribute('d', f.eyes[i].d);
+      eyeEls[i].setAttribute('transform', f.eyes[i].matrix);
+      eyeEls[i].setAttribute('opacity', f.eyes[i].alpha);
+    }
+    if (f.notch) {
+      el.mNotch.style.display = '';
+      el.mNotch.setAttribute('cx', f.notch.x);
+      el.mNotch.setAttribute('cy', f.notch.y);
+      el.mNotch.setAttribute('r', f.notch.r);
+    } else {
+      el.mNotch.style.display = 'none';
+    }
+    el.bodyG.setAttribute('opacity', f.bodyAlpha);
+    el.paperPath.setAttribute('d', f.bodyPath);
+    renderArcs(f);
+    renderDots(f.dotsBehind ? el.dotsBack : el.dotsFront, f.dots);
+    renderDots(f.dotsBehind ? el.dotsFront : el.dotsBack, []);
+    if (f.notif) {
+      el.notif.style.display = '';
+      el.notif.setAttribute('cx', f.notif.x);
+      el.notif.setAttribute('cy', f.notif.y);
+      el.notif.setAttribute('r', f.notif.r);
+    } else {
+      el.notif.style.display = 'none';
+    }
+  }
+
+  // ---- 宿主（WinUI）消息桥 ----
+  // orbit 的环在 3.6s 后淡出（states.ts fade 曲线），长亮需要周期性重放：
+  // 工具执行多久就转多久，收到其他状态即停。
+  var orbitTimer = 0;
+  function stopOrbitLoop() {
+    if (orbitTimer) { clearInterval(orbitTimer); orbitTimer = 0; }
+  }
+  function apply(msg) {
+    if (!msg || !msg.type) return;
+    if (msg.type === 'state' && typeof msg.id === 'string') {
+      stopOrbitLoop();
+      engine.setState(msg.id, clock);
+      if (msg.id === 'orbit') {
+        orbitTimer = setInterval(function () { engine.reset('orbit', clock); }, 3000);
+      }
+    } else if (msg.type === 'pulse' && typeof msg.id === 'string') {
+      stopOrbitLoop();
+      engine.setState(msg.id, clock);
+      clearTimeout(pulseTimer);
+      pulseTimer = setTimeout(function () { engine.setState(msg.back || 'idle', clock); }, msg.ms || 2200);
+    } else if (msg.type === 'look') {
+      // 视线跟随（原版 gaze 规则）：只在休息脸状态（baseFace）生效，
+      // thinking/orbit 等动画态的注视就是动画本身，不叠加
+      if (msg.active === false) { engine.setLook(null, clock); return; }
+      var def = Bloub.STATE_BY_ID.get(engine.state);
+      if (!def || !def.baseFace) return;
+      var nx = Math.max(-1, Math.min(1, Number(msg.nx) || 0));
+      var ny = Math.max(-1, Math.min(1, Number(msg.ny) || 0));
+      // yaw±16° / pitch 10±13°：测量值（gaze.ts），足以区别于静止漂移又不至于翻出眼窝
+      engine.setLook({ yaw: nx * 16, pitch: 10 - ny * 13, mix: 1, spin: 0, wander: 0 }, clock);
+    } else if (msg.type === 'colors') {
+      setColors(msg.ink || ink, msg.paper || paper);
+    }
+  }
+  if (window.chrome && window.chrome.webview) {
+    window.chrome.webview.addEventListener('message', function (e) { apply(e.data); });
+  }
+
+  // ---- 渲染循环（时钟带 delta 上限，隐藏后恢复不跳帧）----
+  function tick(ms) {
+    requestAnimationFrame(tick);
+    var dt = last ? Math.min((ms - last) / 1000, 0.064) : 0;
+    last = ms;
+    clock += dt;
+    renderFrame(engine.sample(clock));
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1822 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<DisplayDriverUninstaller Version="18.1.5.6">
+	<LogEntries>
+		<Event>
+			<Time>7/19/2026 3:52:28 PM</Time>
+			<Message>The following paths are detected.</Message>
+			<Values Separator=" = ">
+				<KvP>
+					<Key>[Found] AppExeFile</Key>
+					<Value>C:\Users\luolan\Desktop\tubawinui3\TubaWinUi3.WinUI3\Tools\显卡工具\DDU\Display Driver Uninstaller.exe</Value>
+				</KvP>
+				<KvP>
+					<Key>[Found] AppBase</Key>
+					<Value>C:\Users\luolan\Desktop\tubawinui3\TubaWinUi3.WinUI3\Tools\显卡工具\DDU\</Value>
+				</KvP>
+				<KvP>
+					<Key>[Found] Settings</Key>
+					<Value>C:\Users\luolan\Desktop\tubawinui3\TubaWinUi3.WinUI3\Tools\显卡工具\DDU\Settings\</Value>
+				</KvP>
+				<KvP>
+					<Key>[Found] Logs</Key>
+					<Value>C:\Users\luolan\Desktop\tubawinui3\TubaWinUi3.WinUI3\Tools\显卡工具\DDU\DDU Logs\</Value>
+				</KvP>
+				<KvP>
+					<Key>[Found] Language</Key>
+					<Value>C:\Users\luolan\Desktop\tubawinui3\TubaWinUi3.WinUI3\Tools\显卡工具\DDU\Settings\Languages\</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Key>[Found] ProgramFiles</Key>
+					<Value>C:\Program Files\</Value>
+				</KvP>
+				<KvP>
+					<Key>[Found] ProgramFilesx86</Key>
+					<Value>C:\Program Files (x86)\</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Key>[Found] Roaming</Key>
+					<Value>C:\ProgramData\</Value>
+				</KvP>
+				<KvP>
+					<Key>[Not found] AppBaseRoaming</Key>
+					<Value>C:\ProgramData\DisplayDriverUninstaller\</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Key>[Found] SystemDrive</Key>
+					<Value>C:\</Value>
+				</KvP>
+				<KvP>
+					<Key>[Found] WinDir</Key>
+					<Value>C:\WINDOWS\</Value>
+				</KvP>
+				<KvP>
+					<Key>[Found] UserPath</Key>
+					<Value>C:\Users\</Value>
+				</KvP>
+				<KvP>
+					<Key>[Found] System32</Key>
+					<Value>C:\WINDOWS\system32\</Value>
+				</KvP>
+				<KvP>
+					<Key>[Found] SysWOW64</Key>
+					<Value>C:\WINDOWS\SysWOW64\</Value>
+				</KvP>
+			</Values>
+		</Event>
+		<Warning>
+			<Time>7/19/2026 3:52:30 PM</Time>
+			<Message>We are not in Safe Mode</Message>
+		</Warning>
+		<Event>
+			<Time>7/19/2026 3:52:30 PM</Time>
+			<Message>The following third-party driver packages are installed on this computer</Message>
+			<Values Separator=" = ">
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem0.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Display</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem1.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem10.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Honor</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem100.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Realtek</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Camera</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem101.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Xbox</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SCSIAdapter</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem102.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Oracle Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>USB</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem103.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem104.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem106.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>vivo Mobile Communication Co.,Ltd.</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Display</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem107.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem108.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Oracle Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>NetService</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem109.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Senary Technology Limited</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem11.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Xbox</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>HSM</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem110.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem111.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>net</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem112.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem113.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem114.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>GameViewer</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Display</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem115.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Senary Technology Co.,Ltd</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem116.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem117.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel(R) Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>MEDIA</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem118.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Nahimic</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>MEDIA</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem119.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Oracle Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem12.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>NetEase</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>MEDIA</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem120.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Senary</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>MEDIA</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem121.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem122.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem123.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem124.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem126.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem127.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>netease</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>HIDClass</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem128.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>A-Volute</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem129.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Microsoft</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Printer</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem13.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>INTEL</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem130.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem131.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>INTEL</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem132.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Senary Technology Co.,Ltd</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem133.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>ComputeAccelerator</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem134.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>net</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem135.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>net</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem136.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>MEDIA</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem137.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem138.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Bluetooth</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem139.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Bluetooth</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem14.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem140.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Bluetooth</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem141.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Bluetooth</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem142.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Bluetooth</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem143.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Bluetooth</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem144.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Bluetooth</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem145.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Bluetooth</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem146.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Bluetooth</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem15.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Honor</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Display</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem16.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel(R) Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem17.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem18.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Honor</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>ActivityMonitor</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem19.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem2.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Microsoft Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem20.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>net</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem21.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Oracle Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem22.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Nefarius Software Solutions e.U.</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem23.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel(R) Platform Monitoring Technology (PMT) Device</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem24.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem25.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel(R) Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>MEDIA</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem26.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>vivo, Inc.</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>AndroidUsbDeviceClass</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem27.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Honor</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem28.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem29.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem3.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Realtek</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Camera</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem30.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Microsoft Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>AudioProcessingObject</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem31.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Sonix</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem32.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Microsoft Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>AudioProcessingObject</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem33.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Blackmagic Design</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Media</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem34.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel(R) Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>MEDIA</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem35.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>HONOR</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Firmware</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem36.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel(R) Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem37.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>netease</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Mouse</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem38.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel(R) Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem39.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Microsoft Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>AudioProcessingObject</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem4.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem40.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem41.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem42.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem43.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>BERTREADER</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem44.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>HONOR</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem45.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel(R) Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>MEDIA</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem46.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel(R) Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem47.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem48.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>WireGuard LLC</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Net</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem49.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Display</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem5.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Microsoft</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Printer</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem50.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem51.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Tencent</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>MyAppsVirtualBus</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem52.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem53.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Senary Technology Co.,Ltd</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem54.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem55.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Nmap Project</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>NetService</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem56.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Blackmagic Design</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Media</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem57.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel(R) Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>MEDIA</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem58.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem59.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem6.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>INTEL</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem60.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Realtek</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem61.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem62.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Senary</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem63.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>BERTREADER</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem64.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem65.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Microsoft Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem66.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Honor</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Display</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem67.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Microsoft Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem69.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Egis Technology Inc.</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Biometric</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem7.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Senary Technology Co.,Ltd</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>AudioProcessingObject</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem70.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem71.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Nahimic</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>MEDIA</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem72.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>ASIX</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Net</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem73.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>A-Volute</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem74.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Honor Device Co.,Ltd.</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Virtual Hid</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem75.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem76.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Senary</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem77.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Realtek</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Net</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem78.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem79.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel(R) Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>MEDIA</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem8.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem80.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>ComputeAccelerator</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem81.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>namazso</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareDevice</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem82.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Bluetooth</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem83.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel(R) Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem84.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Microsoft Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>AudioProcessingObject</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem85.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>A-Volute</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>AudioProcessingObject</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem86.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Honor</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Monitor</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem87.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem88.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Oracle Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Net</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem89.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem9.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Microsoft Corporation</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem90.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Senary</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem91.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Honor</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem93.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>SoftwareComponent</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem94.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem95.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Senary Technology Limited</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem96.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Blackmagic Design</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Media</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem97.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Senary</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>Extension</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem98.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Tencent</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>MyAppsVirtualBus</Value>
+				</KvP>
+				<KvP />
+				<KvP>
+					<Value>C:\WINDOWS\inf\oem99.inf</Value>
+				</KvP>
+				<KvP>
+					<Key>Provider</Key>
+					<Value>Intel</Value>
+				</KvP>
+				<KvP>
+					<Key>Class</Key>
+					<Value>System</Value>
+				</KvP>
+				<KvP />
+			</Values>
+		</Event>
+		<Event>
+			<Time>7/19/2026 3:52:32 PM</Time>
+			<Message>Trying to impersonate the SYSTEM account... SUCCESS !</Message>
+			<Values Separator=" : ">
+				<KvP>
+					<Key>Number of process to check</Key>
+					<Value>373</Value>
+				</KvP>
+				<KvP>
+					<Key>trantorAgent</Key>
+					<Value>S-1-5-18</Value>
+				</KvP>
+				<KvP>
+					<Key>trantorAgent</Key>
+					<Value>SYSTEM token obtained: SUCCESS</Value>
+				</KvP>
+			</Values>
+		</Event>
+		<Event>
+			<Time>7/19/2026 3:52:32 PM</Time>
+			<Message>Reverting the Impersonalisation is successful !</Message>
+		</Event>
+		<Event>
+			<Time>7/19/2026 3:52:40 PM</Time>
+			<Message>&gt;&gt; Successfully saved log to file!</Message>
+		</Event>
+	</LogEntries>
+</DisplayDriverUninstaller>

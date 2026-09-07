@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="TubaWinUi3.Pages.StressTestPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:ctrl="using:TubaWinUi3.Controls"
+    mc:Ignorable="d">
+
+    <Grid RowSpacing="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Padding="24,20,24,12" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Border Width="40" Height="40" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="8">
+                <FontIcon FontSize="20" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" Glyph="&#xECAD;" />
+            </Border>
+            <StackPanel Grid.Column="1" Spacing="2">
+                <TextBlock FontSize="22" FontWeight="Bold" Text="一键三烤" />
+                <TextBlock x:Name="SubtitleText" Opacity="0.8" FontSize="12" Text="CPU / GPU / 网卡压力测试 — 实时监控温度、频率、功耗与网卡吞吐" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="2" Click="CloseButton_Click">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE72B;" FontSize="12" />
+                    <TextBlock Text="返回" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <ctrl:StressTestControl x:Name="StressControl" Grid.Row="1" />
+    </Grid>
+</Page>

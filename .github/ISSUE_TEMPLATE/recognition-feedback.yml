@@ -1,0 +1,73 @@
+name: 识别反馈
+description: 使用「识别反馈」功能从软件内提交的误报/漏报反馈（应用内"识别反馈"按钮会带此模板）
+title: "[识别反馈] 类型 - 软件名称"
+labels: [recognition-feedback]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 识别反馈
+
+        本模板由软件内「识别反馈」功能自动带出，请补充以下信息以便核查。
+
+  - type: input
+    id: software-name
+    attributes:
+      label: 软件显示名称
+      description: 当前被识别（或未识别）的软件名称
+      placeholder: 例如：某卸载工具
+    validations:
+      required: true
+
+  - type: dropdown
+    id: feedback-type
+    attributes:
+      label: 反馈类型
+      options:
+        - 误报（不是危险项却被标记）
+        - 漏报（是危险项却没被识别）
+        - 分类错误（识别到了但类别不对）
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-result
+    attributes:
+      label: 用户期望
+      description: 你期望软件如何判断/展示此项？
+      placeholder: 例如：希望标记为"建议清除"而不是"风险"
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 证据 / 说明
+      description: 相关的文件路径、注册表项、扫描结果截图或其它佐证
+      placeholder: 粘贴证据或补充说明
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        ### 环境信息（请尽量填写）
+
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows 版本
+      placeholder: 例如：Windows 11 24H2
+    validations:
+      required: false
+
+  - type: input
+    id: product-version
+    attributes:
+      label: 图吧工具箱版本
+      placeholder: 例如：1.5.11
+    validations:
+      required: false

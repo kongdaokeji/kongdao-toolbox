@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="TubaWinUi3.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:TubaWinUi3"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="图吧工具箱"
+    xmlns:controls="using:TubaWinUi3.Controls"
+    mc:Ignorable="d">
+
+    <Grid PointerPressed="RootGrid_PointerPressed"
+          Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.Resources>
+            <local:IconPathToVisibilityConverter x:Key="IconPathToVisibility" />
+            <local:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility" />
+        </Grid.Resources>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid x:Name="SplashOverlay"
+              Grid.RowSpan="3"
+              HorizontalAlignment="Stretch"
+              VerticalAlignment="Stretch"
+              Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+              Canvas.ZIndex="9999"
+              RenderTransformOrigin="0.5,0.5">
+            <Grid.RenderTransform>
+                <ScaleTransform />
+            </Grid.RenderTransform>
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Center" RowSpacing="24">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border
+                    Width="96"
+                    Height="96"
+                    Background="{ThemeResource AccentFillColorDefaultBrush}"
+                    CornerRadius="20"
+                    HorizontalAlignment="Center">
+                    <Image
+                        Width="64"
+                        Height="64"
+                        Source="ms-appx:///Assets/AppIcon.ico"
+                        Stretch="Uniform"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center" />
+                </Border>
+
+                <StackPanel Grid.Row="1" HorizontalAlignment="Center" Spacing="4">
+                    <TextBlock
+                        FontSize="28"
+                        FontWeight="Bold"
+                        HorizontalAlignment="Center"
+                        Text="空岛图吧工具箱" />
+                    <TextBlock
+                        FontSize="13"
+                        HorizontalAlignment="Center"
+                        Opacity="0.6"
+                        x:Name="SplashStatusText"
+                        Text="正在初始化..." />
+                </StackPanel>
+
+                <ProgressBar
+                    x:Name="SplashProgress"
+                    Grid.Row="2"
+                    Width="200"
+                    IsIndeterminate="True"
+                    HorizontalAlignment="Center" />
+
+                <TextBlock
+                    x:Name="SplashVersionText"
+                    Grid.Row="3"
+                    FontSize="11"
+                    HorizontalAlignment="Center"
+                    Opacity="0.4" />
+            </Grid>
+        </Grid>
+
+        <TitleBar
+            x:Name="AppTitleBar"
+            Title="图吧工具箱"
+
+            FontWeight="Bold"
+            BackRequested="TitleBar_BackRequested"
+            IsBackButtonVisible="True"
+            IsPaneToggleButtonVisible="True"
+            PaneToggleRequested="TitleBar_PaneToggleRequested">
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="ms-appx:///Assets/AppIcon.ico" />
+            </TitleBar.IconSource>
+            <TitleBar.Content>
+                <Grid VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="320" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Grid Grid.Column="0" Width="320">
+                        <TextBox
+                            x:Name="SearchTextBox"
+                            PlaceholderText="搜索工具、设置..."
+                            MinHeight="30"
+                            VerticalAlignment="Center"
+                            GotFocus="SearchTextBox_GotFocus"
+                            LostFocus="SearchTextBox_LostFocus"
+                            TextChanged="SearchTextBox_TextChanged"
+                            KeyDown="SearchTextBox_KeyDown" />
+                        <Button
+                            x:Name="SearchSubmitButton"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Right"
+                            Width="30" Height="30"
+                            Padding="0"
+                            BorderThickness="0"
+                            Background="Transparent"
+                            Click="SearchSubmitButton_Click">
+                            <FontIcon FontSize="14" Glyph="&#xE721;" />
+                        </Button>
+                        <Popup
+                            x:Name="SearchPopup"
+                            VerticalOffset="32"
+                            GettingFocus="SearchPopup_GettingFocus">
+                            <Popup.Transitions>
+                                <TransitionCollection>
+                                    <PopupThemeTransition />
+                                </TransitionCollection>
+                            </Popup.Transitions>
+                            <Border
+                                x:Name="SearchPopupBorder"
+                                Width="318"
+                                MaxHeight="400"
+                                Background="{ThemeResource AcrylicBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="4">
+                                <ListView
+                                    x:Name="SearchListView"
+                                    SelectionMode="Single"
+                                    IsItemClickEnabled="True"
+                                    KeyDown="SearchListView_KeyDown"
+                                    ItemClick="SearchListView_ItemClick">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnSpacing="12" Padding="4,6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="32" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <Border
+                                                    Width="32"
+                                                    Height="32"
+                                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                                    CornerRadius="6">
+                                                    <Grid>
+                                                        <Image
+                                                            Width="24" Height="24"
+                                                            Stretch="Uniform"
+                                                            Source="{Binding IconPath}"
+                                                            Visibility="{Binding HasIconPath, Converter={StaticResource IconPathToVisibility}}" />
+                                                        <FontIcon
+                                                            FontSize="14"
+                                                            HorizontalAlignment="Center"
+                                                            VerticalAlignment="Center"
+                                                            Glyph="{Binding Glyph}"
+                                                            Visibility="{Binding HasIconPath, Converter={StaticResource InverseBoolToVisibility}}" />
+                                                    </Grid>
+                                                </Border>
+
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                                                    <TextBlock
+
+                                                        FontSize="13"
+                                                        FontWeight="Bold"
+                                                        MaxLines="1"
+                                                        Text="{Binding Title}"
+                                                        TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock
+
+                                                        FontSize="11"
+                                                        Opacity="1.0"
+                                                        MaxLines="1"
+                                                        Text="{Binding Subtitle}"
+                                                        TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+
+                                                <Border
+                                                    Grid.Column="2"
+                                                    Padding="6,2"
+                                                    CornerRadius="4"
+                                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                                    VerticalAlignment="Center">
+                                                    <TextBlock
+
+                                                        FontSize="10"
+                                                        Text="{Binding KindText}" />
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </Border>
+                        </Popup>
+                    </Grid>
+
+                    <StackPanel
+                        Grid.Column="2"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Spacing="6">
+                        <Button
+                            x:Name="AiQuickButton"
+                            Click="AiQuickButton_Click"
+                            Width="34" Height="30"
+                            Padding="0"
+                            BorderThickness="0"
+                            Background="Transparent"
+                            ToolTipService.ToolTip="AI 助手"
+                            AutomationProperties.Name="AI 助手">
+                            <FontIcon FontSize="14" Glyph="&#xE99A;" />
+                        </Button>
+
+                        <Button
+                            x:Name="NewbieTutorialButton"
+                            Click="NewbieTutorialButton_Click"
+                            Width="34" Height="30"
+                            Padding="0"
+                            BorderThickness="0"
+                            Background="Transparent"
+                            ToolTipService.ToolTip="新手教程"
+                            AutomationProperties.Name="新手教程">
+                            <FontIcon FontSize="14" Glyph="&#xE7BE;" />
+                        </Button>
+
+                        <Button
+                            x:Name="DownloadQueueButton"
+                            Click="DownloadQueueButton_Click"
+                            Width="34" Height="30"
+                            Padding="0"
+                            BorderThickness="0"
+                            Background="Transparent"
+                            AutomationProperties.Name="下载队列">
+                            <Grid>
+                                <FontIcon FontSize="14" Glyph="&#xE896;" />
+                                <InfoBadge
+                                    x:Name="DownloadQueueBadge"
+                                    Value="0"
+                                    Visibility="Collapsed"
+                                    VerticalAlignment="Top"
+                                    HorizontalAlignment="Right"
+                                    Margin="0,-4,-4,0" />
+                            </Grid>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </TitleBar.Content>
+        </TitleBar>
+
+        <StackPanel Grid.Row="1">
+            <controls:UpdateBanner x:Name="UpdateBanner" />
+            <InfoBar
+                x:Name="ToolUpdateToast"
+                IsClosable="True"
+                IsOpen="False" />
+        </StackPanel>
+
+        <Grid Grid.Row="2">
+            <Grid.ChildrenTransitions>
+                <TransitionCollection>
+                    <EntranceThemeTransition />
+                </TransitionCollection>
+            </Grid.ChildrenTransitions>
+            <Image
+                x:Name="BackgroundImg"
+                Stretch="UniformToFill"
+                Opacity="0.15"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                IsHitTestVisible="False" />
+
+            <NavigationView
+                x:Name="NavView"
+                CompactModeThresholdWidth="0"
+                ExpandedModeThresholdWidth="600"
+                IsBackButtonVisible="Collapsed"
+                IsPaneToggleButtonVisible="False"
+                OpenPaneLength="200"
+                SelectionChanged="NavView_SelectionChanged">
+                <NavigationView.Resources>
+                    <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+                </NavigationView.Resources>
+                <NavigationView.MenuItems>
+                    <NavigationViewItem
+                        Content="全部"
+                        Tag="all">
+                        <NavigationViewItem.Icon>
+                            <FontIcon Glyph="&#xE80F;" FontWeight="Bold" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="常用" Tag="favorites">
+                        <NavigationViewItem.Icon>
+                            <FontIcon Glyph="&#xE735;" FontWeight="Bold" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="硬件信息" Tag="hardware">
+                        <NavigationViewItem.Icon>
+                            <FontIcon Glyph="&#xE977;" FontWeight="Bold" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="内置" Tag="builtin">
+                        <NavigationViewItem.Icon>
+                            <FontIcon Glyph="&#xE90F;" FontWeight="Bold" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem Content="性能测试" Tag="benchmark">
+                        <NavigationViewItem.Icon>
+                            <FontIcon Glyph="&#xE9D9;" FontWeight="Bold" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                    <NavigationViewItem x:Name="CommunityNavItem" Content="社区" Tag="community">
+                        <NavigationViewItem.Icon>
+                            <FontIcon Glyph="&#xE779;" FontWeight="Bold" />
+                        </NavigationViewItem.Icon>
+                    </NavigationViewItem>
+                </NavigationView.MenuItems>
+                <Frame x:Name="NavFrame" CacheSize="10" />
+            </NavigationView>
+        </Grid>
+    </Grid>
+</Window>

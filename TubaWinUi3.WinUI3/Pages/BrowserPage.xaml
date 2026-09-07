@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="TubaWinUi3.Pages.BrowserPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid RowSpacing="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Padding="16,20,16,8" ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Border Width="32" Height="32" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6">
+                <FontIcon FontSize="16" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" Glyph="&#xE774;" />
+            </Border>
+
+            <TextBlock x:Name="TitleText" Grid.Column="1" FontSize="14" FontWeight="Bold" VerticalAlignment="Center" Text="浏览器" />
+
+            <ProgressRing x:Name="LoadingRing" Grid.Column="2" Width="20" Height="20" IsActive="False" VerticalAlignment="Center" />
+
+            <Button x:Name="BackButton" Grid.Column="3" Click="BackButton_Click" Padding="6" ToolTipService.ToolTip="后退">
+                <FontIcon FontSize="12" Glyph="&#xE72B;" />
+            </Button>
+            <Button x:Name="RefreshButton" Grid.Column="4" Click="RefreshButton_Click" Padding="6" ToolTipService.ToolTip="刷新">
+                <FontIcon FontSize="12" Glyph="&#xE72C;" />
+            </Button>
+            <Button x:Name="OpenInBrowserButton" Grid.Column="5" Click="OpenInBrowserButton_Click" Padding="6" ToolTipService.ToolTip="在浏览器中打开">
+                <FontIcon FontSize="12" Glyph="&#xE774;" />
+            </Button>
+            <Button x:Name="CloseButton" Grid.Column="6" Click="CloseButton_Click" Padding="6" ToolTipService.ToolTip="返回">
+                <FontIcon FontSize="12" Glyph="&#xE711;" />
+            </Button>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <WebView2
+                x:Name="WebView"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch" />
+        </Grid>
+    </Grid>
+</Page>

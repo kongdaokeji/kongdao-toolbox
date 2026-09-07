@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>毒蘑菇测试</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <canvas id="gl-canvas"></canvas>
+
+    <!-- 顶部 HUD -->
+    <header class="hud-top">
+        <div class="hud-left">
+            <div class="hud-title">
+                <div>
+                    <div class="hud-title-main">毒蘑菇测试</div>
+                    <div class="hud-title-sub" id="gpu-info">正在检测 GPU …</div>
+                </div>
+            </div>
+        </div>
+        <div class="hud-right">
+            <div class="fps-card" id="fps-card">
+                <div class="fps-value">
+                    <span id="fps-now">--</span><span class="fps-unit">FPS</span>
+                </div>
+                <div class="fps-meta" id="fps-meta">-- ms</div>
+                <div class="fps-res" id="fps-res">渲染 --×--</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 压力模式选择 -->
+    <nav class="mode-bar" id="mode-bar">
+        <button class="mode-btn" data-mode="easy">轻松</button>
+        <button class="mode-btn active" data-mode="medium">中等</button>
+        <button class="mode-btn" data-mode="insane">变态</button>
+    </nav>
+
+    <!-- 底部控制 -->
+    <div class="ctl-bar">
+        <button class="ctl-btn" id="btn-pause" title="暂停 / 继续">
+            <span class="glyph" id="glyph-pause">&#xE769;</span>
+        </button>
+        <button class="ctl-btn" id="btn-reset-view" title="重置视角">
+            <span class="glyph">&#xE72C;</span>
+        </button>
+        <button class="ctl-btn accent" id="btn-settings" title="设置">
+            <span class="glyph">&#xE713;</span>
+        </button>
+    </div>
+
+    <!-- Fluent 设置悬窗 -->
+    <div class="flyout-mask" id="flyout-mask" hidden></div>
+    <aside class="flyout" id="settings-flyout" hidden aria-label="设置">
+        <div class="flyout-header">
+            <span class="flyout-title">设置</span>
+            <button class="icon-btn" id="btn-close" title="关闭">
+                <span class="glyph">&#xE8BB;</span>
+            </button>
+        </div>
+        <div class="flyout-body">
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span class="setting-name">渲染倍率</span>
+                    <span class="setting-desc">720p 基准分辨率倍率，越高负载越大</span>
+                </div>
+                <div class="setting-control">
+                    <span class="setting-value" id="val-scale">1.0×</span>
+                    <input type="range" id="sld-scale" min="40" max="300" step="10" value="100">
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span class="setting-name">步进精度</span>
+                    <span class="setting-desc">值越小光线步进越密，负载越大</span>
+                </div>
+                <div class="setting-control">
+                    <span class="setting-value" id="val-step">0.0020</span>
+                    <input type="range" id="sld-step" min="12" max="60" step="1" value="30">
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span class="setting-name">最大步数</span>
+                    <span class="setting-desc">单像素光线追踪的最大迭代</span>
+                </div>
+                <div class="setting-control">
+                    <span class="setting-value" id="val-maxk">1002</span>
+                    <input type="range" id="sld-maxk" min="300" max="2000" step="50" value="1002">
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span class="setting-name">分形迭代</span>
+                    <span class="setting-desc">分形公式的嵌套计算次数</span>
+                </div>
+                <div class="setting-control">
+                    <span class="setting-value" id="val-kiter">5</span>
+                    <input type="range" id="sld-kiter" min="3" max="8" step="1" value="5">
+                </div>
+            </div>
+
+            <div class="setting-row switch-row">
+                <div class="setting-label">
+                    <span class="setting-name">自动旋转</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="sw-auto" checked>
+                    <span class="switch-track"></span>
+                </label>
+            </div>
+
+            <div class="setting-row switch-row">
+                <div class="setting-label">
+                    <span class="setting-name">显示帧率</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="sw-fps" checked>
+                    <span class="switch-track"></span>
+                </label>
+            </div>
+        </div>
+        <div class="flyout-footer">
+            <button class="btn" id="btn-reset-view2">重置视角</button>
+            <button class="btn accent" id="btn-done">完成</button>
+        </div>
+    </aside>
+
+    <div id="gl-error" class="gl-error" hidden></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<!--
+  格式转换 · 文档引擎宿主页
+  由 FormatConverterPage 中隐藏的 WebView2 加载（虚拟主机 doceng 映射）。
+  所有第三方库均为浏览器版（随应用打包，运行时零下载）：
+    markdown-it 15.0.0 (MIT)          https://github.com/markdown-it/markdown-it
+    docx-preview 0.3.5 (MIT)          https://github.com/VolodymyrBaydalka/docxjs
+    jszip 3.10.1 (MIT)                https://github.com/Stuk/jszip
+    SheetJS xlsx 0.18.5 (Apache-2.0)  https://sheetjs.com
+    pdfjs-dist 4.10.38 (Apache-2.0)   https://github.com/mozilla/pdf.js
+    pdf-lib 1.17.1 (MIT)              https://github.com/Hopding/pdf-lib
+
+  重要：WebView2 的 ExecuteScriptAsync 不会等待 JavaScript Promise（会将其
+  序列化为空对象 {}），因此所有异步任务都采用「同步启动 + 轮询 getJob 结果」
+  模式（见 startJob/getJob），只有同步函数（markdown/setContent 等）直接返回。
+  C# 通过 ExecuteScriptAsync 调用 window.docengine 上的函数并取回 JSON 结果。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文档引擎</title>
+<style>
+    @page { size: A4; margin: 14mm 12mm; }
+    html, body { margin: 0; padding: 0; background: #fff; color: #1b1b1b; }
+    body { font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif; }
+    #content { padding: 2mm 1mm; }
+    /* markdown 渲染 */
+    .md h1, .md h2, .md h3 { line-height: 1.3; margin: 0.9em 0 0.4em; page-break-after: avoid; }
+    .md p { margin: 0.4em 0; line-height: 1.6; }
+    .md code { font-family: Consolas, "Courier New", monospace; background: #f3f3f3; padding: 1px 4px; border-radius: 3px; font-size: 0.9em; }
+    .md pre { background: #f6f8fa; border: 1px solid #e1e4e8; border-radius: 6px; padding: 10px 12px; overflow: hidden; page-break-inside: avoid; }
+    .md pre code { background: none; padding: 0; }
+    .md blockquote { border-left: 4px solid #d0d7de; margin: 0.6em 0; padding: 2px 12px; color: #57606a; }
+    .md table { border-collapse: collapse; margin: 0.6em 0; page-break-inside: avoid; }
+    .md table th, .md table td { border: 1px solid #d0d7de; padding: 5px 10px; }
+    .md table th { background: #f6f8fa; }
+    .md img { max-width: 100%; }
+    .md a { color: #0969da; }
+    /* docx 渲染（docx-preview 自带内联样式，此处仅兜底） */
+    .docx img { max-width: 100%; }
+    /* xlsx / ods 表格 */
+    .xlsx .sheet-title, .ods .sheet-title { font-size: 14px; margin: 0.8em 0 0.3em; }
+    .xlsx table, .ods table { border-collapse: collapse; margin: 0.3em 0 1em; }
+    .xlsx table td, .xlsx table th, .ods table td, .ods table th { border: 1px solid #ccc; padding: 4px 8px; font-size: 11px; }
+    /* 幻灯片（pptx / odp） */
+    .pptx .slide, .odp .slide { border: 1px solid #ddd; margin: 0 0 14px; page-break-after: always; padding: 6px; }
+    .pptx .slide:last-child, .odp .slide:last-child { page-break-after: auto; }
+    .pptx .slide img, .odp .slide img { max-width: 100%; height: auto; }
+    .odt img { max-width: 100%; }
+</style>
+</head>
+<body>
+<div id="content"></div>
+
+<script src="markdown-it.min.js"></script>
+<script src="jszip.min.js"></script>
+<script src="docx-preview.min.js"></script>
+<script src="xlsx.full.min.js"></script>
+<script src="pdf-lib.min.js"></script>
+
+<script type="module">
+    import * as pdfjsLib from "./pdf.min.mjs";
+    window.pdfjsLib = pdfjsLib;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "./pdf.worker.min.mjs";
+</script>
+
+<script>
+(function () {
+    "use strict";
+
+    // base64 → Uint8Array（pdf.js 的 data 需要字节数组而非 base64 字符串）
+    function b64ToBytes(b64) {
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return bytes;
+    }
+
+    // Uint8Array → base64（分块避免栈溢出）
+    function b64FromBytes(bytes) {
+        let bin = "";
+        const chunk = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunk)
+            bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+        return btoa(bin);
+    }
+
+    // 判断两个相邻文本片段拼接时是否需要空格（拉丁字母/数字间加，CJK 间不加）
+    function joinText(a, b) {
+        if (!a) return b;
+        const re = /[A-Za-z0-9]/;
+        return re.test(a[a.length - 1]) && re.test(b[0]) ? a + " " + b : a + b;
+    }
+
+    // pdf.js 文本项 → 行/单元格聚类（按 y 分行，按 x 间隙分列，近似还原表格结构）
+    function itemsToRows(items) {
+        const sorted = items.slice().sort(function (a, b) { return (b.y - a.y) || (a.x - b.x); });
+        const rows = [];
+        let cur = null, curY = 0;
+        for (const it of sorted) {
+            const tol = Math.max(3, it.h * 0.6);
+            if (!cur || Math.abs(it.y - curY) > tol) {
+                cur = [];
+                rows.push(cur);
+                curY = it.y;
+            }
+            cur.push(it);
+        }
+        return rows.map(function (row) {
+            const rs = row.slice().sort(function (a, b) { return a.x - b.x; });
+            const cells = [];
+            let text = "", right = 0, h = 0;
+            const flush = function () { if (text) cells.push(text); text = ""; };
+            for (const it of rs) {
+                const gap = text ? it.x - right : 0;
+                if (text && gap > Math.max(4, it.h * 0.5)) flush();
+                text = joinText(text, it.str);
+                right = it.x + (it.w || 0);
+                h = Math.max(h, it.h || 0);
+            }
+            flush();
+            return cells;
+        });
+    }
+
+    function content() {
+        return document.getElementById("content");
+    }
+
+    // ── 异步任务池：同步启动 + C# 轮询 getJob ──
+    window.__jobs = {};
+
+    function startJob(key, runner) {
+        window.__jobs[key] = { state: "pending" };
+        try {
+            Promise.resolve().then(runner).then(
+                function (data) { window.__jobs[key] = { state: "done", data: data }; },
+                function (err) {
+                    window.__jobs[key] = {
+                        state: "error",
+                        message: (err && err.message) ? err.message : String(err)
+                    };
+                }
+            );
+        } catch (err) {
+            window.__jobs[key] = {
+                state: "error",
+                message: (err && err.message) ? err.message : String(err)
+            };
+        }
+        return true;
+    }
+
+    window.docengine = {
+        ready: true,
+
+        /** C# 轮询任务状态：{state: pending|done|error, data?, message?} */
+        getJob: function (key) {
+            return window.__jobs[key] || { state: "pending" };
+        },
+
+        setContent: function (html) {
+            content().innerHTML = html;
+            return true;
+        },
+
+        clear: function () {
+            content().innerHTML = "";
+            return true;
+        },
+
+        /** 等待 #content 内所有图片加载完成（打印前置步骤，异步任务）。 */
+        startWaitImages: function () {
+            return startJob("images", function () {
+                return new Promise(function (resolve) {
+                    const imgs = Array.from(document.querySelectorAll("#content img"));
+                    if (imgs.length === 0) { resolve(true); return; }
+                    let left = imgs.length;
+                    const done = () => { if (--left <= 0) resolve(true); };
+                    imgs.forEach(function (img) {
+                        if (img.complete && img.naturalWidth > 0) done();
+                        else {
+                            img.addEventListener("load", done);
+                            img.addEventListener("error", done);
+                        }
+                    });
+                    setTimeout(resolve, 5000); // 兜底超时
+                });
+            });
+        },
+
+        /** markdown → HTML（同步，markdown-it） */
+        markdownToHtml: function (md) {
+            const M = window.markdownit;
+            const Ctor = (M && M.default) ? M.default : M;
+            const it = new Ctor({ html: true, linkify: true, breaks: true });
+            return '<div class="md">' + it.render(String(md)) + "</div>";
+        },
+
+        /** docx → HTML（异步任务，docx-preview） */
+        startDocxToHtml: function (b64) {
+            return startJob("docx", async function () {
+                const docx = window.docx;
+                if (!docx || !docx.renderAsync) throw new Error("docx-preview 未加载");
+                const holder = document.createElement("div");
+                holder.style.display = "none";
+                document.body.appendChild(holder);
+                try {
+                    // 注意参数顺序：renderAsync(数据, 容器, styleId, options) —— 第一个参数是被解析的 zip 数据
+                    // 数据用 Uint8Array（纯 base64 字符串不被 JSZip 接受）
+                    await docx.renderAsync(b64ToBytes(b64), holder, null, {
+                        inWrapper: false,
+                        ignoreWidth: true,
+                        ignoreHeight: true,
+                        breakPages: false,
+                        ignoreLastRenderedPageBreak: true
+                    });
+                    return '<div class="docx">' + holder.innerHTML + "</div>";
+                } finally {
+                    holder.remove();
+                }
+            });
+        },
+
+        /** xlsx/csv → HTML 表格（同步，SheetJS） */
+        xlsxToHtmlAsync: function (b64) {
+            const wb = XLSX.read(b64, { type: "base64", cellStyles: true, codepage: 936 });
+            let out = '<div class="xlsx">';
+            wb.SheetNames.forEach(function (name) {
+                const ws = wb.Sheets[name];
+                const html = XLSX.utils.sheet_to_html(ws, { header: "" });
+                out += '<div class="sheet-title">' + name + "</div>" + html;
+            });
+            return out + "</div>";
+        },
+
+        /** PDF → 每页图片（异步任务，pdf.js），成功时 data 为 dataURL 数组。
+         *  merge=true 时把所有页面纵向拼接为一张长图（单元素数组）。
+         *  浏览器 canvas 有尺寸上限，拼接总高超过 16000px 时抛错提示分页导出。 */
+        startPdfToImages: function (b64, fmt, quality, maxLongEdge, merge) {
+            return startJob("pdf", async function () {
+                const lib = window.pdfjsLib;
+                if (!lib) throw new Error("pdf.js 未加载");
+                const pdf = await lib.getDocument({ data: b64ToBytes(b64) }).promise;
+                const out = [];
+                const mime = fmt === "jpg" ? "image/jpeg" : "image/png";
+                try {
+                    // ── 合并为一张长图 ──
+                    if (merge) {
+                        const pages = [];
+                        let totalH = 0, maxW = 0;
+                        for (let p = 1; p <= pdf.numPages; p++) {
+                            const page = await pdf.getPage(p);
+                            const vp = page.getViewport({ scale: 1 });
+                            let scale = 2;
+                            if (maxLongEdge > 0) {
+                                const longest = Math.max(vp.width, vp.height);
+                                scale = Math.min(Math.max(maxLongEdge / longest, 0.5), 4);
+                            }
+                            const viewport = page.getViewport({ scale: scale });
+                            const w = Math.ceil(viewport.width);
+                            const h = Math.ceil(viewport.height);
+                            pages.push({ page: page, viewport: viewport, w: w, h: h });
+                            totalH += h;
+                            maxW = Math.max(maxW, w);
+                        }
+                        if (totalH > 16000 || maxW > 16000)
+                            throw new Error("合并长图尺寸超出浏览器上限（16000px），请取消「合并为一张长图」改为分页导出");
+                        const canvas = document.createElement("canvas");
+                        canvas.width = maxW;
+                        canvas.height = totalH;
+                        const ctx = canvas.getContext("2d");
+                        ctx.fillStyle = "#ffffff";
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        let y = 0;
+                        for (const pg of pages) {
+                            await pg.page.render({
+                                canvasContext: ctx,
+                                viewport: pg.viewport,
+                                transform: [1, 0, 0, 1, 0, y],
+                                background: "#ffffff"
+                            }).promise;
+                            y += pg.h;
+                        }
+                        out.push(canvas.toDataURL(mime, (quality || 85) / 100));
+                        return out;
+                    }
+
+                    // ── 每页一张图片 ──
+                    for (let p = 1; p <= pdf.numPages; p++) {
+                        const page = await pdf.getPage(p);
+                        const vp = page.getViewport({ scale: 1 });
+                        let scale = 2;
+                        if (maxLongEdge > 0) {
+                            const longest = Math.max(vp.width, vp.height);
+                            scale = Math.min(Math.max(maxLongEdge / longest, 0.5), 4);
+                        }
+                        const viewport = page.getViewport({ scale: scale });
+                        const canvas = document.createElement("canvas");
+                        canvas.width = Math.ceil(viewport.width);
+                        canvas.height = Math.ceil(viewport.height);
+                        const ctx = canvas.getContext("2d");
+                        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                        out.push(canvas.toDataURL(mime, (quality || 85) / 100));
+                    }
+                } finally {
+                    try { pdf.destroy(); } catch (e) { /* ignore */ }
+                }
+                return out;
+            });
+        },
+
+        /** PDF → 文本 + 表格行（异步任务，pdf.js）。
+         *  返回 {pages:[{page, text, rows:[[单元格,...],...]}]}，供 C# 生成 TXT/HTML/XLSX。 */
+        startPdfExtract: function (b64) {
+            return startJob("pdfextract", async function () {
+                const lib = window.pdfjsLib;
+                if (!lib) throw new Error("pdf.js 未加载");
+                const pdf = await lib.getDocument({ data: b64ToBytes(b64) }).promise;
+                const pages = [];
+                try {
+                    for (let p = 1; p <= pdf.numPages; p++) {
+                        const page = await pdf.getPage(p);
+                        const tc = await page.getTextContent();
+                        const items = tc.items
+                            .filter(function (it) { return it.str && it.str.trim().length > 0; })
+                            .map(function (it) {
+                                return {
+                                    str: it.str,
+                                    x: it.transform[4],
+                                    y: it.transform[5],
+                                    w: it.width || 0,
+                                    h: Math.abs(it.transform[3]) || it.height || 10
+                                };
+                            });
+                        const rows = itemsToRows(items);
+                        const text = rows
+                            .map(function (cells) { return cells.join("    "); })
+                            .join("\n");
+                        pages.push({ page: p, text: text, rows: rows });
+                    }
+                } finally {
+                    try { pdf.destroy(); } catch (e) { /* ignore */ }
+                }
+                return { pages: pages };
+            });
+        },
+
+        /** 多份 PDF 合并为一个（异步任务，pdf-lib）。b64Json 为 base64 数组的 JSON 文本。 */
+        startPdfMerge: function (b64Json) {
+            return startJob("pdfmerge", async function () {
+                if (!window.PDFLib) throw new Error("pdf-lib 未加载");
+                const list = JSON.parse(b64Json);
+                if (!list.length) throw new Error("没有可合并的 PDF");
+                const out = await PDFLib.PDFDocument.create();
+                for (const b64 of list) {
+                    const src = await PDFLib.PDFDocument.load(b64ToBytes(b64), { ignoreEncryption: true });
+                    const copied = await out.copyPages(src, src.getPageIndices());
+                    copied.forEach(function (pg) { out.addPage(pg); });
+                }
+                return b64FromBytes(await out.save());
+            });
+        },
+
+        /** 单份 PDF 拆分为单页 PDF（异步任务，pdf-lib）。返回每页一个 base64。 */
+        startPdfSplit: function (b64) {
+            return startJob("pdfsplit", async function () {
+                if (!window.PDFLib) throw new Error("pdf-lib 未加载");
+                const src = await PDFLib.PDFDocument.load(b64ToBytes(b64), { ignoreEncryption: true });
+                const out = [];
+                for (let i = 0; i < src.getPageCount(); i++) {
+                    const doc = await PDFLib.PDFDocument.create();
+                    const [pg] = await doc.copyPages(src, [i]);
+                    doc.addPage(pg);
+                    out.push(b64FromBytes(await doc.save()));
+                }
+                return out;
+            });
+        },
+
+        /** 工作簿（xlsx/xls/ods/csv/et）→ 每个工作表的 CSV 或 JSON 文本。
+         *  format: "csv" | "json"。返回 [{name, text}]。 */
+        startWorkbookOut: function (b64, format) {
+            return startJob("wbout", async function () {
+                const wb = XLSX.read(b64, { type: "base64", cellStyles: true, codepage: 936 });
+                const out = [];
+                wb.SheetNames.forEach(function (name) {
+                    const ws = wb.Sheets[name];
+                    const text = format === "json"
+                        ? JSON.stringify(XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false }), null, 2)
+                        : XLSX.utils.sheet_to_csv(ws, { FS: "," });
+                    out.push({ name: name, text: text });
+                });
+                if (!out.length) throw new Error("工作簿中没有工作表");
+                return out;
+            });
+        },
+
+        /** 工作簿 → 合并所有工作表的 XLSX（异步任务，SheetJS）。返回 base64。 */
+        startWorkbookToXlsx: function (b64) {
+            return startJob("wbxlsx", async function () {
+                const wb = XLSX.read(b64, { type: "base64", cellStyles: true, codepage: 936 });
+                if (!wb.SheetNames.length) throw new Error("工作簿中没有工作表");
+                return XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+            });
+        },
+
+        /** 行数组 JSON（{sheets:[{name, rows:[[...]]}]}）→ XLSX（异步任务，SheetJS）。返回 base64。 */
+        startAoaToXlsx: function (jsonText) {
+            return startJob("aoaxlsx", async function () {
+                const data = JSON.parse(jsonText);
+                if (!data.sheets || !data.sheets.length) throw new Error("没有可写入的表格数据");
+                const wb = XLSX.utils.book_new();
+                data.sheets.forEach(function (s) {
+                    const ws = XLSX.utils.aoa_to_sheet(s.rows || []);
+                    XLSX.utils.book_append_sheet(wb, ws, (s.name || "Sheet").slice(0, 31));
+                });
+                return XLSX.write(wb, { bookType: "xlsx", type: "base64" });
+            });
+        }
+    };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+name: android-build
+
+# 手动触发：构建「图吧工具箱安装助手」Android App 的 APK，上传为 artifact 供侧载
+on:
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/setup-android@v4
+
+      - name: 构建 Debug APK 并运行单元测试
+        working-directory: android-tuba-installer
+        run: ./gradlew --no-daemon assembleDebug test
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: tuba-installer-apk
+          path: android-tuba-installer/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: 上传单元测试报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: android-tuba-installer/app/build/reports/tests/testDebugUnitTest/

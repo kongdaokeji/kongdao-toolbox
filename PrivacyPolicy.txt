@@ -1,0 +1,64 @@
+隐私政策 / Privacy Policy
+
+图吧工具箱winui3  —  最后更新：2026年5月
+Tuba Toolbox WinUI3  —  Last updated: May 2026
+
+=======================================
+一、数据收集 / Data Collection
+=======================================
+
+图吧工具箱winui3 不收集、不存储、不传输任何用户个人数据。
+
+Tuba Toolbox WinUI3 does not collect, store, or transmit any user personal data.
+
+- 不收集姓名、邮箱、电话号码等个人身份信息
+  No personal identity information (name, email, phone number, etc.)
+- 不收集设备标识符、IP地址或地理位置
+  No device identifiers, IP addresses, or geolocation
+- 不使用Cookie或任何追踪技术
+  No cookies or tracking technologies
+- 不接入任何第三方分析、广告或社交SDK
+  No third-party analytics, advertising, or social SDKs
+
+=======================================
+二、本地数据存储 / Local Data Storage
+=======================================
+
+应用仅在您的设备本地存储以下数据：
+The app stores only the following data locally on your device:
+
+1. 收藏夹数据 — 您标记为"收藏"的工具路径列表，存储在Windows本地应用设置中
+   Favorites Data — A list of tool paths you have favorited, stored in Windows local application settings
+
+2. 图标缓存 — 工具可执行文件的图标提取缓存，存储在 %LocalAppData%\TubaWinUi3\IconCache\ 目录下
+   Icon Cache — Extracted icons from tool executables, stored under %LocalAppData%\TubaWinUi3\IconCache\
+
+以上所有数据均保存在您的本地设备上，不会上传至任何服务器。卸载应用时将被清除。
+All data is stored exclusively on your local device and is not uploaded to any server. It is removed upon uninstall.
+
+=======================================
+三、网络访问 / Network Access
+=======================================
+
+本应用为纯离线应用，不进行任何网络通信。
+This application is fully offline and performs no network communication.
+
+=======================================
+四、所需权限 / Required Permissions
+=======================================
+
+- runFullTrust — 用于启动第三方诊断工具、读取WMI硬件信息、编辑系统Hosts文件、管理证书存储、清理系统垃圾文件等
+  Required for launching third-party diagnostic tools, querying WMI hardware info, editing Hosts file, managing certificate stores, cleaning junk files, etc.
+
+=======================================
+五、第三方工具 / Third-Party Tools
+=======================================
+
+本应用集成了多个第三方PC硬件诊断工具。这些工具作为独立程序运行。本应用仅提供统一的快捷启动入口，不干涉也不监控这些工具的数据行为。
+This application integrates multiple third-party PC hardware diagnostic tools that run as independent programs. This app only provides a unified launcher and does not interfere with or monitor the data behavior of these tools.
+
+=======================================
+六、联系我们 / Contact
+=======================================
+
+邮箱 / Email: xiaohuzi12323@163.com

@@ -1,0 +1,426 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.0.3)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+      draft:
+        description: 'Create as draft release'
+        required: false
+        type: boolean
+        default: true
+      from_ref:
+        description: 'Changelog start ref (tag/commit/branch). Leave empty to auto-detect from last successful workflow run.'
+        required: false
+        type: string
+        default: ''
+permissions:
+  contents: write
+  actions: read
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
+jobs:
+  build-tools:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Tools.zip
+        shell: pwsh
+        run: |
+          if (-not (Test-Path -LiteralPath 'TubaWinUi3.WinUI3/Tools')) {
+            Write-Host '::error::Tools/ directory not found'
+            exit 1
+          }
+          $staging = Join-Path $env:RUNNER_TEMP 'tools-staging'
+          if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
+          Copy-Item -LiteralPath 'TubaWinUi3.WinUI3\Tools' -Destination $staging -Recurse
+          $exclude = Join-Path $staging '综合检测\AIDA64\pkey.txt'
+          if (Test-Path -LiteralPath $exclude) {
+            Remove-Item -LiteralPath $exclude -Force
+            Write-Host "Excluded from Tools.zip: $exclude"
+          }
+          Compress-Archive -Path "$staging\*" -DestinationPath 'Tools.zip'
+          $size = [math]::Round((Get-Item 'Tools.zip').Length / 1MB, 1)
+          Write-Host "Tools.zip size: $size MB"
+
+      - name: Upload Tools.zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: tools-zip
+          path: Tools.zip
+
+  build:
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            rid: win-x64
+            os: windows-latest
+          # arm64 需要原生 ARM64 runner：x64 机器上无法运行 arm64 exe，
+          # GenerateBundledToolCache 会跳过（csproj 架构守卫），包内无随包缓存。
+          # windows-11-arm 为 public preview，若不可用可回退 windows-latest（仅降级缓存）。
+          - arch: arm64
+            rid: win-arm64
+            os: windows-11-arm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update version in .csproj and .iss files
+        shell: pwsh
+        run: |
+          $ver = "${{ inputs.version }}"
+
+          $csproj = Get-Content -LiteralPath 'TubaWinUi3.WinUI3/TubaWinUi3.csproj' -Raw
+          $csproj = $csproj -replace '<Version>[^<]*</Version>', "<Version>$ver</Version>"
+          Set-Content -LiteralPath 'TubaWinUi3.WinUI3/TubaWinUi3.csproj' -Value $csproj -NoNewline
+
+          $compatCsproj = Get-Content -LiteralPath 'TubaWinUi3.Compatible/TubaWinUi3.Compatible.csproj' -Raw
+          $compatCsproj = $compatCsproj -replace '<Version>[^<]*</Version>', "<Version>$ver</Version>"
+          Set-Content -LiteralPath 'TubaWinUi3.Compatible/TubaWinUi3.Compatible.csproj' -Value $compatCsproj -NoNewline
+
+          foreach ($iss in @('installer.iss', 'installer-x64.iss', 'installer-x86.iss', 'installer-arm64.iss')) {
+            if (Test-Path -LiteralPath $iss) {
+              $content = Get-Content -LiteralPath $iss -Raw
+              $content = $content -replace '#define MyAppVersion "[^"]*"', "#define MyAppVersion ""$ver"""
+              Set-Content -LiteralPath $iss -Value $content -NoNewline
+            }
+          }
+
+          Write-Host "Version updated to $ver"
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup fonttools (build-time font subsetting)
+        run: pip install fonttools
+
+      - name: Publish app (portable)
+        run: |
+          dotnet publish TubaWinUi3.WinUI3/TubaWinUi3.csproj `
+            -c Release `
+            -r ${{ matrix.rid }} `
+            --self-contained true `
+            -p:Platform=${{ matrix.arch }} `
+            -p:PublishTrimmed=false `
+            -p:PublishReadyToRun=false `
+            -p:WindowsAppSDKSelfContained=true `
+            -p:WindowsPackageType=None `
+            -o publish_${{ matrix.arch }}
+
+      - name: Restore .pri file for portable
+        shell: pwsh
+        run: |
+          $priFile = "TubaWinUi3.WinUI3\bin\${{ matrix.arch }}\Release\net10.0-windows10.0.26100.0\${{ matrix.rid }}\TubaWinUi3.pri"
+          if (Test-Path -LiteralPath $priFile) {
+            Copy-Item -LiteralPath $priFile -Destination publish_${{ matrix.arch }} -Force
+            Write-Host "Restored TubaWinUi3.pri for portable"
+          } else {
+            Write-Host "::warning::TubaWinUi3.pri not found at $priFile"
+          }
+
+      - name: Publish app (for installer)
+        run: |
+          dotnet publish TubaWinUi3.WinUI3/TubaWinUi3.csproj `
+            -c Release `
+            -r ${{ matrix.rid }} `
+            --self-contained true `
+            -p:Platform=${{ matrix.arch }} `
+            -p:PublishTrimmed=false `
+            -p:PublishReadyToRun=false `
+            -p:WindowsAppSDKSelfContained=true `
+            -p:WindowsPackageType=None `
+            -o publish_${{ matrix.arch }}_installer
+
+      - name: Restore .pri file for installer
+        shell: pwsh
+        run: |
+          $priFile = "TubaWinUi3.WinUI3\bin\${{ matrix.arch }}\Release\net10.0-windows10.0.26100.0\${{ matrix.rid }}\TubaWinUi3.pri"
+          if (Test-Path -LiteralPath $priFile) {
+            Copy-Item -LiteralPath $priFile -Destination publish_${{ matrix.arch }}_installer -Force
+            Write-Host "Restored TubaWinUi3.pri for installer"
+          }
+          New-Item -ItemType File -Path (Join-Path "publish_${{ matrix.arch }}_installer" '.installed') -Force | Out-Null
+
+      - name: Verify remotedefender in publish output
+        shell: pwsh
+        run: |
+          foreach ($root in @("publish_${{ matrix.arch }}", "publish_${{ matrix.arch }}_installer")) {
+            $rdPath = Join-Path $root "remotedefender"
+            if (Test-Path -LiteralPath $rdPath) {
+              Write-Host "OK: $rdPath exists"
+              Get-ChildItem -LiteralPath $rdPath -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
+            } else {
+              Write-Host "::warning::remotedefender folder NOT found in $root"
+            }
+          }
+
+      - name: Clean up publish directories
+        shell: pwsh
+        run: |
+          foreach ($root in @("publish_${{ matrix.arch }}", "publish_${{ matrix.arch }}_installer")) {
+            Get-ChildItem -LiteralPath $root -Filter '*.pdb' -Recurse -Force -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Build Inno Setup installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.5
+        with:
+          path: installer-${{ matrix.arch }}.iss
+
+      - name: Build compatible edition (single-file .NET Framework)
+        shell: pwsh
+        run: |
+          dotnet build TubaWinUi3.Compatible/TubaWinUi3.Compatible.csproj -c Release
+          $compatExe = "TubaWinUi3.Compatible/bin/Release/net48/图吧工具箱Winui3兼容版.exe"
+          if (Test-Path -LiteralPath $compatExe) {
+            Write-Host "Compatible edition built successfully"
+            $size = [math]::Round((Get-Item -LiteralPath $compatExe).Length / 1MB, 1)
+            Write-Host "  Size: $size MB"
+          } else {
+            Write-Host "::warning::Compatible edition exe not found at $compatExe"
+          }
+
+      - name: Create portable zip (src/ layout with launcher)
+        shell: pwsh
+        run: |
+          $publishDir = "publish_${{ matrix.arch }}"
+          $stagingDir = "portable_staging_${{ matrix.arch }}"
+          $srcDir = Join-Path $stagingDir 'src'
+
+          if (Test-Path -LiteralPath $stagingDir) { Remove-Item -LiteralPath $stagingDir -Recurse -Force }
+          New-Item -ItemType Directory -Path $srcDir -Force | Out-Null
+
+          Get-ChildItem -LiteralPath $publishDir | Where-Object { $_.Extension -ne '.pdb' -and $_.Name -ne '.installed' } | Move-Item -Destination $srcDir -Force
+
+          Copy-Item -LiteralPath "Launcher\bin\图吧工具箱WinUI3_${{ matrix.arch }}.exe" -Destination (Join-Path $stagingDir '图吧工具箱WinUI3.exe') -Force
+
+          $compatExe = "TubaWinUi3.Compatible/bin/Release/net48/图吧工具箱Winui3兼容版.exe"
+          if (Test-Path -LiteralPath $compatExe) {
+            Copy-Item -LiteralPath $compatExe -Destination (Join-Path $stagingDir '图吧工具箱Winui3兼容版.exe') -Force
+            Write-Host "Added compatible edition to portable zip"
+          }
+
+          Compress-Archive -Path "$stagingDir\*" `
+            -DestinationPath "TubaWinUi3_Portable_${{ inputs.version }}_${{ matrix.arch }}.zip"
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.arch }}
+          path: SetupOutput\TubaWinUi3_Setup_*_${{ matrix.arch }}.exe
+
+      - name: Upload portable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-${{ matrix.arch }}
+          path: TubaWinUi3_Portable_${{ inputs.version }}_${{ matrix.arch }}.zip
+
+      - name: Publish app (lite, no tools, x64 only)
+        if: matrix.arch == 'x64'
+        run: |
+          dotnet publish TubaWinUi3.WinUI3/TubaWinUi3.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:Platform=x64 `
+            -p:PublishTrimmed=false `
+            -p:PublishReadyToRun=false `
+            -p:WindowsAppSDKSelfContained=true `
+            -p:WindowsPackageType=None `
+            -p:ExcludeToolsFromPublish=true `
+            -o publish_x64_lite
+
+      - name: Restore .pri file for lite
+        if: matrix.arch == 'x64'
+        shell: pwsh
+        run: |
+          $priFile = "TubaWinUi3.WinUI3\bin\x64\Release\net10.0-windows10.0.26100.0\win-x64\TubaWinUi3.pri"
+          if (Test-Path -LiteralPath $priFile) {
+            Copy-Item -LiteralPath $priFile -Destination publish_x64_lite -Force
+            Write-Host "Restored TubaWinUi3.pri for lite"
+          }
+
+      - name: Create lite portable zip (no tools, with marker, x64 only)
+        if: matrix.arch == 'x64'
+        shell: pwsh
+        run: |
+          $publishDir = "publish_x64_lite"
+          $stagingDir = "portable_staging_x64_lite"
+          $srcDir = Join-Path $stagingDir 'src'
+
+          if (Test-Path -LiteralPath $stagingDir) { Remove-Item -LiteralPath $stagingDir -Recurse -Force }
+          New-Item -ItemType Directory -Path $srcDir -Force | Out-Null
+
+          Get-ChildItem -LiteralPath $publishDir | Where-Object { $_.Extension -ne '.pdb' } | Move-Item -Destination $srcDir -Force
+
+          New-Item -ItemType File -Path (Join-Path $srcDir '.lite_build') -Force | Out-Null
+
+          Copy-Item -LiteralPath "Launcher\bin\图吧工具箱WinUI3_x64.exe" -Destination (Join-Path $stagingDir '图吧工具箱WinUI3.exe') -Force
+
+          $compatExe = "TubaWinUi3.Compatible/bin/Release/net48/图吧工具箱Winui3兼容版.exe"
+          if (Test-Path -LiteralPath $compatExe) {
+            Copy-Item -LiteralPath $compatExe -Destination (Join-Path $stagingDir '图吧工具箱Winui3兼容版.exe') -Force
+            Write-Host "Added compatible edition to lite portable zip"
+          }
+
+          Compress-Archive -Path "$stagingDir\*" `
+            -DestinationPath "TubaWinUi3_Lite_${{ inputs.version }}_x64.zip"
+
+          $size = [math]::Round((Get-Item "TubaWinUi3_Lite_${{ inputs.version }}_x64.zip").Length / 1MB, 1)
+          Write-Host "Lite zip size: $size MB"
+
+      - name: Upload lite portable zip
+        if: matrix.arch == 'x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lite-x64
+          path: TubaWinUi3_Lite_${{ inputs.version }}_x64.zip
+
+  generate-changelog:
+    needs: [build, build-tools]
+    runs-on: ubuntu-latest
+    outputs:
+      changelog: ${{ steps.ai-changelog.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve changelog start ref
+        id: prev-ref
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FROM_REF="${{ inputs.from_ref }}"
+
+          if [ -n "$FROM_REF" ]; then
+            echo "Using user-specified ref: $FROM_REF"
+            SHA=$(git rev-parse "$FROM_REF" 2>/dev/null || echo "")
+            if [ -z "$SHA" ]; then
+              echo "::error::Cannot resolve ref '$FROM_REF'"
+              exit 1
+            fi
+            echo "ref=$FROM_REF" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "No manual ref specified, querying last successful workflow run..."
+          LAST_RUN=$(gh run list \
+            --repo "${{ github.repository }}" \
+            --workflow "${{ github.workflow }}" \
+            --status success \
+            --limit 1 \
+            --json headSha \
+            --jq '.[0].headSha' 2>/dev/null || echo "")
+
+          if [ -n "$LAST_RUN" ]; then
+            SHORT_SHA=$(git rev-parse --short "$LAST_RUN" 2>/dev/null || echo "$LAST_RUN")
+            echo "Last successful run was at commit $LAST_RUN"
+            echo "ref=$LAST_RUN" >> "$GITHUB_OUTPUT"
+          else
+            echo "No previous successful run found, falling back to first commit"
+            FIRST_COMMIT=$(git rev-list --max-parents=0 HEAD)
+            echo "ref=$FIRST_COMMIT" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate changelog via DeepSeek
+        id: ai-changelog
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          PREV_REF="${{ steps.prev-ref.outputs.ref }}"
+          COMMIT_LOG=$(git log "$PREV_REF"..HEAD --pretty=format:"- %s (%h)" 2>/dev/null | head -100)
+          CODE_DIFF=$(git diff "$PREV_REF"..HEAD --stat 2>/dev/null | head -80)
+          CODE_DIFF_DETAIL=$(git diff "$PREV_REF"..HEAD -- '*.cs' '*.xaml' '*.csproj' '*.json' 2>/dev/null | head -3000)
+
+          if [ -z "$COMMIT_LOG" ]; then
+            COMMIT_LOG="- 首次发布"
+          fi
+
+          TMPDIR=$(mktemp -d)
+          printf '%s' "$COMMIT_LOG" > "$TMPDIR/commit_log.txt"
+          printf '%s' "$CODE_DIFF" > "$TMPDIR/code_diff.txt"
+          printf '%s' "$CODE_DIFF_DETAIL" > "$TMPDIR/code_diff_detail.txt"
+
+          python3 .github/generate-changelog.py "$TMPDIR"
+
+  release:
+    needs: [build, build-tools, generate-changelog]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: false
+
+      - name: Collect release files
+        run: |
+          mkdir -p release_files
+          find artifacts -type f \( -name '*.exe' -o -name '*.zip' \) -exec cp {} release_files/ \;
+          if [ -f artifacts/tools-zip/Tools.zip ]; then
+            cp artifacts/tools-zip/Tools.zip release_files/Tools.zip
+          fi
+
+      - name: Calculate file hashes
+        id: hashes
+        run: |
+          cd release_files
+          echo "## SHA256 哈希值" > ../hash_table.md
+          echo "" >> ../hash_table.md
+          echo "| 文件 | SHA256 |" >> ../hash_table.md
+          echo "|------|--------|" >> ../hash_table.md
+          for f in *.exe *.zip; do
+            [ -f "$f" ] || continue
+            HASH=$(sha256sum "$f" | awk '{print $1}')
+            echo "| \`$f\` | \`$HASH\` |" >> ../hash_table.md
+          done
+          cat ../hash_table.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: 图吧工具箱WinUI3 v${{ inputs.version }}
+          draft: ${{ inputs.draft }}
+          prerelease: ${{ inputs.prerelease }}
+          files: release_files/*
+          body: |
+            ## 图吧工具箱WinUI3 v${{ inputs.version }}
+
+            > **官方网站**：https://tubawinui3.cn
+            > **官方下载**：https://tubawinui3.cn/download
+            > **GitHub 仓库**：https://github.com/luolangaga/tubatool
+            >
+            > ⚠️ 请认准上述官方渠道下载。任何其他网站提供的所谓"破解版"、"绿色版"、"精简版"均非官方发布，可能包含恶意软件！
+
+            ---
+
+            ${{ needs.generate-changelog.outputs.changelog }}
+
+            ### 下载
+            | 文件 | 说明 |
+            |------|------|
+            | `TubaWinUi3_Setup_${{ inputs.version }}_x64.exe` | x64 安装包 |
+            | `TubaWinUi3_Setup_${{ inputs.version }}_arm64.exe` | ARM64 安装包 |
+            | `TubaWinUi3_Portable_${{ inputs.version }}_x64.zip` | x64 便携版（含工具） |
+            | `TubaWinUi3_Portable_${{ inputs.version }}_arm64.zip` | ARM64 便携版（含工具） |
+            | `TubaWinUi3_Lite_${{ inputs.version }}_x64.zip` | x64 精简版（不含工具，首次启动自动下载） |
+            | `Tools.zip` | 工具包（精简版/商店版首次启动下载） |
+
+            $(cat hash_table.md)

@@ -1,0 +1,1641 @@
+{
+  "$schema": "https://example.local/tubawinui3-tools.schema.json",
+  "tools": [
+    {
+      "match": "CPU-Z",
+      "order": 1,
+      "description": "处理器、主板、内存和显卡基础信息查看工具。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/cpu-z",
+      "publisher": "CPUID",
+      "tags": [
+        "CPU",
+        "主板",
+        "硬件检测"
+      ],
+      "downloadUrl": "gc:Tools/处理器工具/CPUZ",
+      "archVariants": [
+        {
+          "file": "cpuz_x32.exe",
+          "arch": "x86"
+        },
+        {
+          "file": "cpuz_x64.exe",
+          "arch": "x64"
+        },
+        {
+          "file": "cpuz_arm64.exe",
+          "arch": "ARM64"
+        }
+      ],
+      "version": 1
+    },
+    {
+      "match": "CoreTemp",
+      "order": 2,
+      "description": "CPU 温度实时监控工具，支持每个核心独立温度显示和系统托盘通知。",
+      "publisher": "ALCPU",
+      "tags": [
+        "CPU",
+        "温度监控"
+      ],
+      "downloadUrl": "gc:Tools/处理器工具/CoreTemp",
+      "archVariants": [
+        {
+          "file": "Core Temp x86.exe",
+          "arch": "x86"
+        },
+        {
+          "file": "Core Temp x64.exe",
+          "arch": "x64"
+        }
+      ],
+      "version": 1,
+      "category": "处理器工具",
+      "categories": [
+        "综合检测"
+      ]
+    },
+    {
+      "match": "C2CLatency",
+      "order": 3,
+      "description": "CPU 缓存到缓存延迟测试工具，测量 L1/L2/L3 缓存间通信延迟。",
+      "publisher": "",
+      "tags": [
+        "CPU",
+        "延迟测试"
+      ],
+      "downloadUrl": "gc:Tools/处理器工具/C2CLatency",
+      "version": 1
+    },
+    {
+      "match": "LinX",
+      "order": 4,
+      "description": "基于 Intel LINPACK 的 CPU 稳定性测试工具，用于极限烤机和超频验证。",
+      "publisher": "",
+      "tags": [
+        "CPU",
+        "烤机",
+        "稳定性测试"
+      ],
+      "downloadUrl": "gc:Tools/处理器工具/LinX",
+      "archVariants": [
+        {
+          "file": "32-bit\\linpack_xeon32.exe",
+          "arch": "x86"
+        },
+        {
+          "file": "64-bit\\linpack_xeon64.exe",
+          "arch": "x64"
+        }
+      ],
+      "version": 1,
+      "category": "处理器工具",
+      "categories": [
+        "烤鸡工具"
+      ]
+    },
+    {
+      "match": "Prime95",
+      "order": 5,
+      "description": "GIMPS 项目分布式计算客户端，广泛用于 CPU 稳定性测试和烤机。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/prime95",
+      "publisher": "GIMPS",
+      "tags": [
+        "CPU",
+        "烤机",
+        "稳定性测试"
+      ],
+      "downloadUrl": "gc:Tools/处理器工具/Prime95",
+      "version": 1,
+      "category": "处理器工具",
+      "categories": [
+        "烤鸡工具"
+      ]
+    },
+    {
+      "match": "SuperPI",
+      "order": 6,
+      "description": "CPU 圆周率计算性能测试工具，计算 π 的指定位数衡量 CPU 单核性能。",
+      "publisher": "",
+      "tags": [
+        "CPU",
+        "性能测试"
+      ],
+      "downloadUrl": "gc:Tools/处理器工具/superpi",
+      "version": 1,
+      "category": "处理器工具",
+      "categories": [
+        "烤鸡工具"
+      ]
+    },
+    {
+      "match": "ThrottleStop",
+      "order": 7,
+      "description": "CPU 降频监控和功耗控制工具，可解除笔记本 CPU 功耗限制。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/throttlestop",
+      "publisher": "uWebb Software",
+      "tags": [
+        "CPU",
+        "降频",
+        "功耗控制"
+      ],
+      "downloadUrl": "gc:Tools/处理器工具/ThrottleStop",
+      "version": 1
+    },
+    {
+      "match": "wPrime",
+      "order": 8,
+      "description": "多线程 CPU 性能测试工具，通过计算质数衡量多核计算能力。",
+      "publisher": "wPrime",
+      "tags": [
+        "CPU",
+        "性能测试"
+      ],
+      "downloadUrl": "gc:Tools/处理器工具/wPrime",
+      "version": 1,
+      "category": "处理器工具",
+      "categories": [
+        "烤鸡工具"
+      ]
+    },
+    {
+      "match": "xiangqi",
+      "order": 9,
+      "description": "Fritz 国际象棋基准测试，通过象棋算法评估 CPU 多核运算性能。",
+      "publisher": "ChessBase",
+      "tags": [
+        "CPU",
+        "性能测试"
+      ],
+      "downloadUrl": "gc:Tools/处理器工具/XIANGQI",
+      "version": 1,
+      "category": "处理器工具",
+      "categories": [
+        "烤鸡工具"
+      ]
+    },
+    {
+      "match": "GPU-Z",
+      "order": 10,
+      "description": "显卡型号、核心参数、显存、传感器和 BIOS 信息查看工具。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/gpu-z",
+      "publisher": "TechPowerUp",
+      "tags": [
+        "显卡",
+        "硬件检测"
+      ],
+      "downloadUrl": "gc:Tools/显卡工具/GPUZ",
+      "version": 2
+    },
+    {
+      "match": "DDU",
+      "order": 11,
+      "description": "显卡驱动彻底卸载工具，安全清除 AMD/NVIDIA/Intel 显卡驱动残留。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/ddu",
+      "publisher": "Wagnardsoft",
+      "tags": [
+        "显卡",
+        "驱动卸载"
+      ],
+      "downloadUrl": "gc:Tools/显卡工具/DDU",
+      "version": 1,
+      "category": "显卡工具",
+      "categories": [
+        "综合检测"
+      ]
+    },
+    {
+      "match": "DXVAChecker",
+      "order": 12,
+      "description": "DirectX 视频加速（DXVA）硬件解码能力检测工具。",
+      "publisher": "",
+      "tags": [
+        "显卡",
+        "解码检测"
+      ],
+      "downloadUrl": "gc:Tools/显卡工具/dxvachecker",
+      "version": 1
+    },
+    {
+      "match": "GpuTest",
+      "order": 13,
+      "description": "跨平台 GPU 基准测试工具，支持 OpenGL 压力测试和性能评分。",
+      "publisher": "Geeks3D",
+      "tags": [
+        "显卡",
+        "性能测试"
+      ],
+      "downloadUrl": "gc:Tools/显卡工具/GpuTest_Windows x64",
+      "archVariants": [
+        {
+          "dir": "GpuTest_Windows x64",
+          "arch": "x64"
+        }
+      ],
+      "version": 1,
+      "category": "显卡工具",
+      "categories": [
+        "烤鸡工具"
+      ]
+    },
+    {
+      "match": "nvidiaInspector",
+      "order": 14,
+      "description": "NVIDIA 显卡信息查看和超频工具，可调节电压、频率和风扇曲线。",
+      "publisher": "Orbmu2k",
+      "tags": [
+        "显卡",
+        "NVIDIA",
+        "超频"
+      ],
+      "downloadUrl": "gc:Tools/显卡工具/nvidiaInspector",
+      "version": 1,
+      "category": "显卡工具",
+      "categories": [
+        "烤鸡工具"
+      ]
+    },
+    {
+      "match": "nvidiaProfileInspector",
+      "order": 15,
+      "description": "NVIDIA 显卡驱动配置文件编辑器，可修改隐藏驱动设置和 SLI 配置。",
+      "publisher": "",
+      "tags": [
+        "显卡",
+        "NVIDIA",
+        "驱动配置"
+      ],
+      "downloadUrl": "gc:Tools/显卡工具/nvidiaProfileInspector",
+      "version": 1
+    },
+    {
+      "match": "AMD显卡驱动",
+      "order": 16,
+      "description": "AMD 显卡驱动程序官方下载入口。",
+      "publisher": "AMD",
+      "tags": [
+        "显卡",
+        "驱动下载"
+      ],
+      "downloadUrl": "gc:Tools/显卡工具/AMD显卡驱动下载",
+      "version": 1
+    },
+    {
+      "match": "Nvidia显卡驱动",
+      "order": 17,
+      "description": "NVIDIA 显卡驱动程序官方下载入口。",
+      "publisher": "NVIDIA",
+      "tags": [
+        "显卡",
+        "驱动下载"
+      ],
+      "downloadUrl": "gc:Tools/显卡工具/Nvidia显卡驱动下载",
+      "version": 1
+    },
+    {
+      "match": "FurMark_win64",
+      "order": 18,
+      "description": "FurMark 2（64 位）GPU 压力测试和烤机工具，支持 Vulkan 和 OpenGL，用于检测显卡稳定性。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/furmark",
+      "publisher": "Geeks3D",
+      "launchTarget": "FurMark_GUI.exe",
+      "tags": [
+        "烤机",
+        "显卡",
+        "稳定性测试",
+        "x64"
+      ],
+      "downloadUrl": "gc:Tools/烤鸡工具/FurMark_win64",
+      "version": 1,
+      "category": "烤鸡工具",
+      "categories": [
+        "显卡工具"
+      ]
+    },
+    {
+      "match": "CrystalDiskInfo",
+      "order": 19,
+      "description": "硬盘 SMART、健康状态、温度和通电时间查看工具。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/crystaldiskinfo",
+      "publisher": "Crystal Dew World",
+      "tags": [
+        "硬盘",
+        "SMART",
+        "健康检测"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/CrystalDiskInfo",
+      "archVariants": [
+        {
+          "file": "DiskInfo32.exe",
+          "arch": "x86"
+        },
+        {
+          "file": "DiskInfo64.exe",
+          "arch": "x64"
+        },
+        {
+          "file": "DiskInfoA64.exe",
+          "arch": "ARM64"
+        }
+      ],
+      "version": 1
+    },
+    {
+      "match": "CrystalDiskMark",
+      "order": 20,
+      "description": "硬盘读写速度基准测试工具，测量顺序和随机读写性能。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/crystaldiskmark",
+      "publisher": "Crystal Dew World",
+      "tags": [
+        "硬盘",
+        "速度测试"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/CrystalDiskMark",
+      "archVariants": [
+        {
+          "file": "DiskMark32.exe",
+          "arch": "x86"
+        },
+        {
+          "file": "DiskMark64.exe",
+          "arch": "x64"
+        },
+        {
+          "file": "DiskMarkA64.exe",
+          "arch": "ARM64"
+        }
+      ],
+      "version": 1
+    },
+    {
+      "match": "AS SSD",
+      "order": 21,
+      "description": "SSD 专用基准测试工具，测量顺序/随机读写速度和访问时间。",
+      "publisher": "Alex Schepeljanski",
+      "tags": [
+        "硬盘",
+        "SSD",
+        "速度测试"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/ASSSDBenchmark",
+      "version": 1
+    },
+    {
+      "match": "ATTO",
+      "order": 22,
+      "description": "ATTO 磁盘基准测试工具，测量不同块大小下的磁盘读写速度。",
+      "publisher": "ATTO Technology",
+      "tags": [
+        "硬盘",
+        "速度测试"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/ATTODISKBENCHMARK",
+      "version": 1
+    },
+    {
+      "match": "DiskGenius",
+      "order": 23,
+      "description": "磁盘分区、数据恢复、坏道检测和分区表维护工具。数据恢复功能对固态硬盘（SSD）成功率通常较低。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/diskgenius",
+      "publisher": "Eassos",
+      "tags": [
+        "硬盘",
+        "分区",
+        "数据恢复"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/DiskGenius",
+      "version": 1
+    },
+    {
+      "match": "Defraggler",
+      "order": 24,
+      "description": "磁盘碎片整理工具，支持按文件/文件夹级别整理碎片。",
+      "publisher": "Piriform",
+      "tags": [
+        "硬盘",
+        "碎片整理"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/Defraggler",
+      "version": 1
+    },
+    {
+      "match": "FinalData",
+      "order": 25,
+      "description": "数据恢复工具，恢复误删除、格式化或病毒破坏的文件。注意：固态硬盘（SSD）因 TRIM 自动清理数据，恢复成功率通常较低。",
+      "publisher": "FINALDATA Inc.",
+      "tags": [
+        "硬盘",
+        "数据恢复"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/finaldata",
+      "version": 1
+    },
+    {
+      "match": "H2testw",
+      "order": 26,
+      "description": "U盘/存储卡容量真实性检测工具，鉴别扩容盘和假容量存储设备。",
+      "publisher": "Harald Bögeholz",
+      "tags": [
+        "硬盘",
+        "U盘",
+        "真伪检测"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/H2testw",
+      "version": 1
+    },
+    {
+      "match": "HDTune",
+      "order": 27,
+      "description": "硬盘性能测试和健康检测工具，支持传输速率、存取时间和健康状态检测。",
+      "publisher": "EFD Software",
+      "tags": [
+        "硬盘",
+        "速度测试",
+        "健康检测"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/HDTune",
+      "version": 1
+    },
+    {
+      "match": "LLFTOOL",
+      "order": 28,
+      "description": "低级格式化工具，对磁盘进行彻底的底层擦除和格式化。",
+      "publisher": "",
+      "tags": [
+        "硬盘",
+        "格式化"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/LLFTOOL",
+      "version": 1
+    },
+    {
+      "match": "MyDiskTest",
+      "order": 29,
+      "description": "U盘/存储卡扩容检测和速度测试工具，可识别虚假容量存储设备。",
+      "publisher": "",
+      "tags": [
+        "硬盘",
+        "U盘",
+        "真伪检测"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/mydisktest",
+      "version": 1
+    },
+    {
+      "match": "SpaceSniffer",
+      "order": 30,
+      "description": "磁盘空间可视化分析工具，以树状图直观展示文件夹占用空间。",
+      "publisher": "Uderzo Software",
+      "tags": [
+        "硬盘",
+        "空间分析"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/SpaceSniffer",
+      "version": 1
+    },
+    {
+      "match": "SSD utils",
+      "order": 31,
+      "description": "SSD 固态硬盘在线工具入口，提供 SSD 相关在线检测和优化。",
+      "publisher": "",
+      "tags": [
+        "硬盘",
+        "SSD"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/SSD utils",
+      "version": 1
+    },
+    {
+      "match": "SSDZ",
+      "order": 32,
+      "description": "SSD 固态硬盘信息查看和健康检测工具。",
+      "publisher": "",
+      "tags": [
+        "硬盘",
+        "SSD",
+        "健康检测"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/SSDZ",
+      "version": 1
+    },
+    {
+      "match": "TxBENCH",
+      "order": 33,
+      "description": "SSD 存储设备基准测试工具，支持多种读写模式性能评估。",
+      "publisher": "Texim Corporation",
+      "tags": [
+        "硬盘",
+        "SSD",
+        "速度测试"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/TxBENCH",
+      "version": 1
+    },
+    {
+      "match": "URWTEST",
+      "order": 34,
+      "description": "U盘读写速度测试工具，检测 U盘实际读写性能。",
+      "publisher": "",
+      "tags": [
+        "硬盘",
+        "U盘",
+        "速度测试"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/URWTEST",
+      "version": 1
+    },
+    {
+      "match": "WinDirStat",
+      "order": 35,
+      "description": "磁盘空间使用统计工具，以彩色方块图展示文件类型和空间占用。",
+      "publisher": "Seifert",
+      "tags": [
+        "硬盘",
+        "空间分析"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/windirstat",
+      "version": 1
+    },
+    {
+      "match": "WizTree",
+      "order": 36,
+      "description": "超快磁盘空间分析工具，使用 MFT 快速扫描 NTFS 分区文件占用。",
+      "publisher": "Antibody Software",
+      "tags": [
+        "硬盘",
+        "空间分析"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/WizTree",
+      "version": 1
+    },
+    {
+      "match": "FlashMaster",
+      "order": 37,
+      "description": "U盘量产工具，用于 U盘芯片检测和量产修复。",
+      "publisher": "",
+      "tags": [
+        "硬盘",
+        "U盘",
+        "量产"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/FlashMaster",
+      "version": 1
+    },
+    {
+      "match": "魔方数据恢复",
+      "order": 38,
+      "description": "文件数据恢复工具，支持误删除、格式化和分区丢失的数据恢复。注意：固态硬盘（SSD）因 TRIM 自动清理数据，恢复成功率通常较低。",
+      "publisher": "青岛软媒",
+      "tags": [
+        "硬盘",
+        "数据恢复"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/魔方数据恢复",
+      "version": 1
+    },
+    {
+      "match": "memtest",
+      "order": 39,
+      "description": "内存稳定性测试工具，通过反复读写检测内存错误。",
+      "publisher": "",
+      "tags": [
+        "内存",
+        "稳定性测试"
+      ],
+      "downloadUrl": "gc:Tools/内存工具/memtest",
+      "archVariants": [
+        {
+          "dir": "memtest64",
+          "arch": "x64"
+        }
+      ],
+      "version": 1,
+      "category": "内存工具",
+      "categories": [
+        "烤鸡工具"
+      ]
+    },
+    {
+      "match": "MemTest64",
+      "order": 40,
+      "description": "64 位内存稳定性测试工具，支持大容量内存的错误检测。",
+      "publisher": "TechPowerUp",
+      "tags": [
+        "内存",
+        "稳定性测试"
+      ],
+      "downloadUrl": "gc:Tools/内存工具/memtest64",
+      "version": 1,
+      "category": "内存工具",
+      "categories": [
+        "烤鸡工具"
+      ]
+    },
+    {
+      "match": "memtestpro",
+      "order": 41,
+      "description": "专业版内存测试工具，支持多线程和更全面的内存错误检测。",
+      "publisher": "",
+      "tags": [
+        "内存",
+        "稳定性测试"
+      ],
+      "downloadUrl": "gc:Tools/内存工具/memtestpro",
+      "version": 1,
+      "category": "内存工具",
+      "categories": [
+        "烤鸡工具"
+      ]
+    },
+    {
+      "match": "Thaiphoon",
+      "order": 42,
+      "description": "内存 SPD 信息读取工具，查看内存条制造商、时序、频率等详细参数。",
+      "publisher": "",
+      "tags": [
+        "内存",
+        "SPD",
+        "硬件检测"
+      ],
+      "downloadUrl": "gc:Tools/内存工具/Thaiphoon",
+      "version": 1
+    },
+    {
+      "match": "TestMem5",
+      "order": 43,
+      "description": "第五代内存稳定性测试工具（TM5），支持多种测试配置和极限压力测试。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/testmem5",
+      "publisher": "",
+      "tags": [
+        "内存",
+        "稳定性测试"
+      ],
+      "downloadUrl": "gc:Tools/内存工具/tm5",
+      "version": 1
+    },
+    {
+      "match": "魔方内存盘",
+      "order": 44,
+      "description": "虚拟内存盘（RAM Disk）创建工具，将部分内存虚拟为高速磁盘。",
+      "publisher": "青岛软媒",
+      "tags": [
+        "内存",
+        "虚拟磁盘"
+      ],
+      "downloadUrl": "gc:Tools/内存工具/魔方内存盘",
+      "version": 1
+    },
+    {
+      "match": "ZenTimings",
+      "order": 45,
+      "description": "AMD Zen 架构内存时序和频率实时查看工具，支持 DDR4/DDR5 时序、子时序和电压监控。",
+      "publisher": "ZenTimings",
+      "tags": [
+        "内存",
+        "AMD",
+        "时序",
+        "硬件检测"
+      ],
+      "downloadUrl": "gc:Tools/内存工具/ZenTimings",
+      "version": 1
+    },
+    {
+      "match": "monitorinfo",
+      "order": 46,
+      "description": "显示器色域检测工具，查看显示器色域覆盖率和面板信息。",
+      "publisher": "",
+      "tags": [
+        "显示器",
+        "色域检测"
+      ],
+      "downloadUrl": "gc:Tools/显示器工具/色域检测",
+      "version": 1
+    },
+    {
+      "match": "UFO",
+      "order": 47,
+      "description": "UFO Test 在线显示器刷新率和运动模糊测试工具。",
+      "publisher": "",
+      "tags": [
+        "显示器",
+        "刷新率测试"
+      ],
+      "downloadUrl": "gc:Tools/显示器工具/UFO测试",
+      "version": 1
+    },
+    {
+      "match": "Windows HDR Calibration",
+      "order": 48,
+      "description": "微软官方 HDR 校准工具，用于校准显示器 HDR 亮度和色彩表现，通过 Microsoft Store 安装。",
+      "publisher": "Microsoft",
+      "tags": [
+        "显示器",
+        "HDR",
+        "校准"
+      ],
+      "wingetId": "9N7F2SM5D1LR",
+      "version": 1
+    },
+    {
+      "match": "AresonMouseTest",
+      "order": 49,
+      "description": "鼠标按键和滚轮测试工具，检测鼠标各按键是否正常响应。",
+      "publisher": "Areson",
+      "tags": [
+        "外设",
+        "鼠标测试"
+      ],
+      "downloadUrl": "gc:Tools/外设工具/AresonMouseTest",
+      "version": 1
+    },
+    {
+      "match": "Keyboard Test Utility",
+      "order": 50,
+      "description": "键盘按键测试工具，逐键检测键盘每个按键是否正常工作。",
+      "publisher": "Javad Taheri",
+      "tags": [
+        "外设",
+        "键盘测试"
+      ],
+      "downloadUrl": "gc:Tools/外设工具/Keyboard Test Utility",
+      "version": 1
+    },
+    {
+      "match": "KeyTweak",
+      "order": 51,
+      "description": "键盘按键重映射工具，可自定义修改键盘按键映射关系。",
+      "publisher": "Travis Krumsick",
+      "tags": [
+        "外设",
+        "键盘",
+        "按键映射"
+      ],
+      "downloadUrl": "gc:Tools/外设工具/KeyTweak",
+      "version": 1
+    },
+    {
+      "match": "MOUSERATE",
+      "order": 52,
+      "description": "鼠标回报率检测工具，实时测量鼠标 USB 报告速率（Hz）。",
+      "publisher": "",
+      "tags": [
+        "外设",
+        "鼠标",
+        "回报率"
+      ],
+      "downloadUrl": "gc:Tools/外设工具/MOUSERATE",
+      "version": 1
+    },
+    {
+      "match": "MouseTester",
+      "order": 53,
+      "description": "鼠标性能测试工具，检测鼠标移动轨迹、抖动和按键延迟。",
+      "publisher": "",
+      "tags": [
+        "外设",
+        "鼠标测试"
+      ],
+      "downloadUrl": "gc:Tools/外设工具/MouseTester",
+      "version": 1
+    },
+    {
+      "match": "鼠标单击变双击",
+      "order": 54,
+      "description": "鼠标微动故障检测工具，识别鼠标单击变双击的微动老化问题。",
+      "publisher": "",
+      "tags": [
+        "外设",
+        "鼠标测试"
+      ],
+      "downloadUrl": "gc:Tools/外设工具/鼠标单机变双击测试器",
+      "version": 1
+    },
+    {
+      "match": "在线外设测试",
+      "order": 55,
+      "description": "在线外设综合测试中心，通过浏览器测试鼠标、键盘和显示器。",
+      "publisher": "",
+      "tags": [
+        "外设",
+        "在线测试"
+      ],
+      "downloadUrl": "gc:Tools/外设工具/在线外设测试中心",
+      "version": 1
+    },
+    {
+      "match": "AIDA64",
+      "order": 56,
+      "description": "系统硬件信息、传感器监控和稳定性测试工具。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/aida64",
+      "publisher": "FinalWire",
+      "tags": [
+        "综合检测",
+        "传感器"
+      ],
+      "downloadUrl": "gc:Tools/综合检测/AIDA64",
+      "version": 1,
+      "category": "综合检测",
+      "categories": [
+        "处理器工具",
+        "显卡工具"
+      ]
+    },
+    {
+      "match": "HWiNFO",
+      "order": 57,
+      "description": "专业硬件信息读取、传感器监控和日志记录工具。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/hwinfo",
+      "publisher": "REALiX",
+      "tags": [
+        "综合检测",
+        "传感器"
+      ],
+      "downloadUrl": "gc:Tools/综合检测/hwinfo",
+      "launchTarget": "HWiNFO64.exe",
+      "archVariants": [
+        {
+          "file": "HWiNFO32.exe",
+          "arch": "x86"
+        },
+        {
+          "file": "HWiNFO64.exe",
+          "arch": "x64"
+        },
+        {
+          "file": "HWiNFO_ARM64.exe",
+          "arch": "ARM64"
+        }
+      ],
+      "version": 3,
+      "category": "综合检测",
+      "categories": [
+        "处理器工具",
+        "显卡工具"
+      ]
+    },
+    {
+      "match": "HWMonitor",
+      "order": 58,
+      "description": "硬件温度、电压和风扇转速监控工具，实时显示传感器数据。",
+      "publisher": "CPUID",
+      "tags": [
+        "综合检测",
+        "温度监控"
+      ],
+      "downloadUrl": "gc:Tools/综合检测/HWMonitor",
+      "archVariants": [
+        {
+          "file": "HWMonitor_x32.exe",
+          "arch": "x86"
+        },
+        {
+          "file": "HWMonitor_x64.exe",
+          "arch": "x64"
+        },
+        {
+          "file": "hwmonitor_arm64.exe",
+          "arch": "ARM64"
+        }
+      ],
+      "version": 1
+    },
+    {
+      "match": "RWEverything",
+      "order": 59,
+      "description": "硬件寄存器读写工具，可访问 PCI、SMBus、Super I/O 等底层硬件信息。",
+      "publisher": "",
+      "tags": [
+        "综合检测",
+        "底层读写"
+      ],
+      "downloadUrl": "gc:Tools/综合检测/RWEverything",
+      "version": 1
+    },
+    {
+      "match": "Speccy",
+      "order": 60,
+      "description": "系统硬件信息快速查看工具，提供简洁的硬件配置摘要。",
+      "publisher": "Piriform",
+      "tags": [
+        "综合检测",
+        "硬件信息"
+      ],
+      "downloadUrl": "gc:Tools/综合检测/speccy",
+      "archVariants": [
+        {
+          "file": "Speccy64.exe",
+          "arch": "x64"
+        }
+      ],
+      "version": 1
+    },
+    {
+      "match": "LatencyMon",
+      "order": 61,
+      "description": "系统实时音频延迟检测工具，分析 DPC/ISR 延迟和硬页面错误，排查音频卡顿和爆音。",
+      "publisher": "Resplendence Software",
+      "tags": [
+        "其他",
+        "延迟检测",
+        "DPC"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/LatencyMon",
+      "version": 1,
+      "category": "其他工具",
+      "categories": [
+        "处理器工具"
+      ]
+    },
+    {
+      "match": "BatteryInfoView",
+      "order": 62,
+      "description": "笔记本电池容量、循环、损耗和实时状态查看工具。",
+      "publisher": "NirSoft",
+      "tags": [
+        "电池",
+        "硬件检测"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/BatteryInfoView",
+      "version": 1
+    },
+    {
+      "match": "BlueScreenView",
+      "order": 63,
+      "description": "蓝屏崩溃转储分析工具，查看 BSOD 错误代码和导致崩溃的驱动。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/bluescreenview",
+      "publisher": "NirSoft",
+      "tags": [
+        "系统",
+        "蓝屏分析"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/bluescreenview",
+      "archVariants": [
+        {
+          "file": "BlueScreenViewx86.exe",
+          "arch": "x86"
+        },
+        {
+          "file": "BlueScreenViewx64.exe",
+          "arch": "x64"
+        }
+      ],
+      "version": 1
+    },
+    {
+      "match": "DesktopOK",
+      "order": 64,
+      "description": "桌面图标位置保存和恢复工具，防止分辨率变化后图标排列混乱。",
+      "publisher": "SoftwareOK",
+      "tags": [
+        "系统",
+        "桌面管理"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/DesktopOK",
+      "version": 1
+    },
+    {
+      "match": "DirectX Repair",
+      "order": 65,
+      "description": "DirectX 修复工具，自动检测和修复 DirectX 组件缺失或损坏问题。",
+      "publisher": "",
+      "tags": [
+        "系统",
+        "DirectX",
+        "修复"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/DirectX_Repair",
+      "version": 1,
+      "category": "其他工具",
+      "categories": [
+        "显卡工具"
+      ]
+    },
+    {
+      "match": "Dism++",
+      "order": 66,
+      "description": "Windows 系统精简和优化工具，基于 DISM 的图形化系统管理工具。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/dism-plus-plus",
+      "publisher": "Chuyu Team",
+      "tags": [
+        "系统",
+        "系统优化",
+        "精简"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/Dism++",
+      "archVariants": [
+        {
+          "file": "Dism++x86.exe",
+          "arch": "x86"
+        },
+        {
+          "file": "Dism++x64.exe",
+          "arch": "x64"
+        },
+        {
+          "file": "Dism++ARM64.exe",
+          "arch": "ARM64"
+        }
+      ],
+      "version": 2
+    },
+    {
+      "match": "Everything",
+      "order": 67,
+      "description": "超快文件搜索工具，基于 NTFS USN 日志实现瞬间文件名搜索。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/everything",
+      "publisher": "voidtools",
+      "tags": [
+        "系统",
+        "文件搜索"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/Everything",
+      "version": 1
+    },
+    {
+      "match": "HiBit Uninstaller",
+      "order": 68,
+      "description": "强大的软件卸载工具，支持强制卸载、批量卸载和清理残留注册表。",
+      "publisher": "HiBitSoft",
+      "tags": [
+        "系统",
+        "软件卸载"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/HiBit Uninstaller",
+      "version": 1
+    },
+    {
+      "match": "GifCam",
+      "order": 69,
+      "description": "GIF 动画录制工具，通过窗口框选区域直接录制 GIF 图片。",
+      "publisher": "Bahraniapps",
+      "tags": [
+        "系统",
+        "GIF录制"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/gifcam",
+      "version": 1
+    },
+    {
+      "match": "MSIAfterburner",
+      "order": 70,
+      "description": "MSI Afterburner 显卡超频监控工具下载入口，支持所有品牌显卡。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/msi-afterburner",
+      "publisher": "MSI",
+      "tags": [
+        "显卡",
+        "超频",
+        "监控"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/MSIAfterburnerSetup",
+      "version": 1,
+      "category": "其他工具",
+      "categories": [
+        "显卡工具"
+      ]
+    },
+    {
+      "match": "next_itellyou",
+      "order": 71,
+      "description": "MSDN I Tell You 在线系统镜像下载入口，提供微软原版系统镜像。",
+      "publisher": "",
+      "tags": [
+        "系统",
+        "系统镜像"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/next_itellyou",
+      "version": 1
+    },
+    {
+      "match": "Process Explorer",
+      "order": 72,
+      "description": "高级进程管理工具，以树状结构显示进程关系和详细系统资源占用。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/process-explorer",
+      "publisher": "Sysinternals",
+      "tags": [
+        "系统",
+        "进程管理"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/procexp",
+      "version": 1
+    },
+    {
+      "match": "Rufus",
+      "order": 73,
+      "description": "U盘启动盘制作工具，快速创建可引导 USB 安装盘。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/u-disk-boot",
+      "publisher": "Akeo Consulting",
+      "tags": [
+        "系统",
+        "U盘启动"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/rufus",
+      "version": 1
+    },
+    {
+      "match": "UltraISO",
+      "order": 74,
+      "description": "光盘映像文件制作和编辑工具，支持 ISO 创建、编辑和刻录。",
+      "publisher": "EZB Systems",
+      "tags": [
+        "系统",
+        "ISO",
+        "光盘映像"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/ULTRAISO",
+      "version": 1
+    },
+    {
+      "match": "Ventoy",
+      "order": 75,
+      "description": "多系统 U盘启动制作工具，直接拷贝 ISO 文件即可启动，无需反复格式化。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/u-disk-boot",
+      "publisher": "",
+      "tags": [
+        "系统",
+        "U盘启动"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/ventoy",
+      "archVariants": [
+        {
+          "file": "Ventoy2Disk.exe",
+          "arch": "x86"
+        },
+        {
+          "file": "altexe\\Ventoy2Disk_X64.exe",
+          "arch": "x64"
+        },
+        {
+          "file": "altexe\\Ventoy2Disk_ARM.exe",
+          "arch": "ARM"
+        },
+        {
+          "file": "altexe\\Ventoy2Disk_ARM64.exe",
+          "arch": "ARM64"
+        }
+      ],
+      "version": 1
+    },
+    {
+      "match": "WinDbg",
+      "order": 76,
+      "description": "微软官方内核级调试器，用于驱动和系统级问题的深度调试分析。",
+      "publisher": "Microsoft",
+      "tags": [
+        "系统",
+        "调试"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/WinDbg",
+      "version": 1
+    },
+    {
+      "match": "fptw64",
+      "order": 77,
+      "description": "Intel Flash Programming Tool 64 位版，用于刷写和备份 Intel 主板 BIOS/ME 固件。",
+      "publisher": "Intel",
+      "tags": [
+        "主板",
+        "BIOS刷写",
+        "Intel"
+      ],
+      "downloadUrl": "gc:Tools/显卡工具/FPT64",
+      "version": 1
+    },
+    {
+      "match": "FanControl",
+      "order": 78,
+      "description": "开源风扇曲线控制工具，支持自定义风扇转速策略和多风扇联动控制。",
+      "publisher": "Rem0o",
+      "tags": [
+        "风扇",
+        "温控",
+        "开源"
+      ],
+      "downloadUrl": "gh:Rem0o/FanControl.Releases",
+      "downloadFilter": "FanControl*_net_10_0.zip",
+      "version": 1
+    },
+    {
+      "match": "PowerToys",
+      "order": 79,
+      "description": "微软官方系统增强工具集，包含窗口管理、颜色拾取、批量重命名、快捷键指南等实用功能。",
+      "publisher": "Microsoft",
+      "tags": [
+        "系统",
+        "系统增强",
+        "微软官方"
+      ],
+      "downloadUrl": "gh:microsoft/PowerToys",
+      "downloadFilter": "PowerToysUserSetup*-x64.exe",
+      "version": 1
+    },
+    {
+      "match": "USBDeview",
+      "order": 80,
+      "description": "USB 设备历史记录查看和管理工具，可查看所有曾连接的 USB 设备详情和供电信息。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/usbdeview",
+      "publisher": "NirSoft",
+      "tags": [
+        "USB",
+        "设备管理",
+        "硬件检测"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/USBDeview",
+      "version": 1
+    },
+    {
+      "match": "USBTreeView",
+      "order": 81,
+      "description": "USB 控制器拓扑结构查看工具，以树状图展示 USB 控制器、集线器和设备层级关系。",
+      "publisher": "Uwe Sieber",
+      "tags": [
+        "USB",
+        "拓扑",
+        "硬件检测"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/USBTreeView",
+      "version": 1
+    },
+    {
+      "match": "RAMMap",
+      "order": 82,
+      "description": "物理内存分配详细查看工具，以多种视图展示内存使用、缓存和进程占用。",
+      "publisher": "Sysinternals",
+      "tags": [
+        "内存",
+        "内存分析",
+        "系统工具"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/RAMMap",
+      "version": 1,
+      "category": "其他工具",
+      "categories": [
+        "内存工具"
+      ]
+    },
+    {
+      "match": "Autoruns",
+      "order": 83,
+      "description": "开机启动项和自注册管理工具，可管理所有自启动位置包括驱动、服务和计划任务。",
+      "tutorialUrl": "https://tubawinui3.cn/tutorials/autoruns",
+      "publisher": "Sysinternals",
+      "tags": [
+        "系统",
+        "启动项",
+        "系统优化"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/Autoruns",
+      "version": 1
+    },
+    {
+      "match": "Procmon",
+      "order": 84,
+      "description": "实时进程活动监控工具，监控文件、注册表、网络和进程/线程活动，排查系统问题利器。",
+      "publisher": "Sysinternals",
+      "tags": [
+        "系统",
+        "进程监控",
+        "系统诊断"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/ProcessMonitor",
+      "archVariants": [
+        {
+          "file": "Procmon.exe",
+          "arch": "x86"
+        },
+        {
+          "file": "Procmon64.exe",
+          "arch": "x64"
+        },
+        {
+          "file": "Procmon64a.exe",
+          "arch": "ARM64"
+        }
+      ],
+      "version": 1
+    },
+    {
+      "match": "BOOTICE",
+      "order": 85,
+      "description": "磁盘引导扇区管理工具，支持 MBR/GPT 分区表编辑、引导记录备份恢复和 U盘启动制作。",
+      "publisher": "Pauly",
+      "tags": [
+        "硬盘",
+        "引导扇区",
+        "MBR",
+        "GPT"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/BOOTICE",
+      "archVariants": [
+        {
+          "file": "BOOTICEx86_2016.06.17_v1.3.4.0.exe",
+          "arch": "x86"
+        },
+        {
+          "file": "BOOTICEx64_2016.06.17_v1.3.4.0.exe",
+          "arch": "x64"
+        }
+      ],
+      "version": 1
+    },
+    {
+      "match": "FreeMove",
+      "order": 86,
+      "description": "已安装程序移动工具，可将已安装的软件从 C 盘移动到其他分区而不破坏快捷方式和注册表链接。",
+      "publisher": "ImbaSoft",
+      "tags": [
+        "硬盘",
+        "软件迁移",
+        "分区"
+      ],
+      "downloadUrl": "gc:Tools/硬盘工具/FreeMove",
+      "version": 1
+    },
+    {
+      "match": "卡巴斯基",
+      "order": 87,
+      "description": "目前最厉害的杀毒软件",
+      "publisher": "Kaspersky",
+      "tags": [
+        "杀毒",
+        "安全"
+      ],
+      "downloadUrl": "gc:Tools/其他工具/卡巴斯基",
+      "version": 1
+    },
+    {
+      "match": "RoboCopyEx",
+      "order": 88,
+      "description": "取代 Windows 自带复制和粘贴的高性能文件复制工具",
+      "publisher": "RoboCopyEx",
+      "tags": [
+        "文件复制",
+        "文件管理"
+      ],
+      "version": 1
+    },
+    {
+      "match": "360驱动大师",
+      "order": 89,
+      "description": "360 驱动大师纯净版，自动检测、安装和更新电脑硬件驱动。",
+      "publisher": "奇虎360",
+      "tags": [
+        "驱动",
+        "驱动更新",
+        "硬件检测"
+      ],
+      "version": 1
+    },
+    {
+      "match": ".NET环境补全",
+      "builtin": "dotnet-completion",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "AI助手",
+      "builtin": "ai-assistant",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "Hosts编辑器",
+      "builtin": "hosts-editor",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "UniGetUI包管理器",
+      "builtin": "unigetui",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "WiFi密码查看",
+      "builtin": "wifi-password",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "Windows常规优化",
+      "builtin": "windows-optimize",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "Windows激活",
+      "builtin": "windows-activation",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "Windows镜像",
+      "builtin": "windows-image",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "优化鸭",
+      "builtin": "optimizer-duck",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "右键菜单管理",
+      "builtin": "context-menu-mgr",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "后台节流省电",
+      "builtin": "energy-star",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "垃圾清理",
+      "builtin": "junk-cleaner",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "局域网文件分享",
+      "builtin": "lan-file-share",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "常用软件",
+      "builtin": "common-software",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "服务网点查询",
+      "builtin": "service-center",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "游戏防晕3D",
+      "builtin": "anti-motion-sickness",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "电池分析",
+      "builtin": "battery-analyzer",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "电脑使用教程",
+      "builtin": "pc-tutorial",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "硬件伪装",
+      "builtin": "hardware-spoofer",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "社区工具",
+      "builtin": "community-tools",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "端口查看器",
+      "builtin": "port-viewer",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "网络测速",
+      "builtin": "speed-test",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "网络调度器",
+      "builtin": "network-adapter-proxy",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "视频处理",
+      "builtin": "video-processor",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "证书禁用",
+      "builtin": "cert-block",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "键盘测试",
+      "builtin": "keyboard-test",
+      "categories": [
+        "其他工具"
+      ]
+    },
+    {
+      "match": "CPU排行",
+      "builtin": "cpu-ranking",
+      "categories": [
+        "处理器工具"
+      ]
+    },
+    {
+      "match": "y-cruncher",
+      "category": "烤鸡工具",
+      "categories": [
+        "处理器工具"
+      ]
+    },
+    {
+      "match": "性能跑分",
+      "builtin": "performance-benchmark",
+      "categories": [
+        "处理器工具"
+      ]
+    },
+    {
+      "match": "GPU排行",
+      "builtin": "gpu-ranking",
+      "categories": [
+        "显卡工具"
+      ]
+    },
+    {
+      "match": "屏幕坏点检测",
+      "builtin": "screen-test",
+      "categories": [
+        "显示器工具"
+      ]
+    },
+    {
+      "match": "tm5",
+      "category": "内存工具",
+      "categories": [
+        "烤鸡工具"
+      ]
+    },
+    {
+      "match": "一键双烤",
+      "builtin": "stress-test",
+      "categories": [
+        "烤鸡工具"
+      ]
+    },
+    {
+      "match": "快速验机",
+      "builtin": "quick-device-check",
+      "categories": [
+        "综合检测"
+      ]
+    },
+    {
+      "match": "硬件评分",
+      "builtin": "rating-system",
+      "categories": [
+        "综合检测"
+      ]
+    },
+    {
+      "match": "跑分排行",
+      "builtin": "benchmark-cloud",
+      "categories": [
+        "综合检测"
+      ]
+    }
+  ]
+}

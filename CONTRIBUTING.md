@@ -1,0 +1,81 @@
+# 贡献指南（Contributing）
+
+感谢你愿意为 **图吧工具箱 TubaWinUi3** 贡献！无论是提交 Issue、改进代码、补充文档还是新增工具，我们都欢迎。
+
+- 遇到问题请先阅读 [Issue 模板](.github/ISSUE_TEMPLATE/bug_report.yml) 与 [SECURITY.md](SECURITY.md)
+- 想提交工具（无需写代码）？请阅读 [社区贡献指南](https://tubawinui3.cn/guide/contribute-tools)（软件内"社区 → 提交工具"）
+- 想直接贡献代码？继续阅读本文档
+
+---
+
+## 仓库结构
+
+| 目录 | 说明 |
+|---|---|
+| `TubaWinUi3.WinUI3/` | 主程序（WinUI 3 / .NET 10），绝大多数开发都在这里 |
+| `TubaWinUi3.Compatible/` | .NET Framework 4.5 WinForms 兼容版（独立工具链，勿混用其模式） |
+| `TubaWinUi3.Tests/` | xUnit 单元测试 |
+| `src/docs/` | VitePress 文档站点源码 |
+| `website-winui3/` | 新官网（Vue 3 + WinUIonWeb） |
+| `Tools/` | 第三方诊断工具目录（打包进安装包） |
+
+## 开发环境
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [Visual Studio 2022 17.14+](https://visualstudio.microsoft.com/)（含 WinUI 3 工作负载）或 VS Code + C# Dev Kit
+- 最低支持 Windows 10 1809；支持 x86 / x64 / ARM64
+- **注意**：应用启动时会自动请求管理员权限（`runas`），部分功能（内核监控、ETW 追踪、WMI）需要管理员
+
+## 构建与测试
+
+```bash
+dotnet build        # Debug 编译（自动检测当前架构）
+dotnet run          # 运行（Unpackaged 模式）
+dotnet test         # 运行全部测试
+dotnet test --filter "FullyQualifiedName~ToolCatalogTests"   # 只跑某个测试类
+```
+
+发布时 `dotnet publish` 会自动生成图标缓存（`build-icon-cache.ps1`），`TubaWinUi3.pri` 需从发布目录复制到输出（CI 已处理，本地打包注意）。
+
+## 代码规范
+
+请遵循既有代码风格（多数规则也记录在 [AGENTS.md](AGENTS.md)）：
+
+- 命名空间：`TubaWinUi3` / `.Pages` / `.Services` / `.Models`；类型、成员使用 PascalCase；XAML 与 code-behind 成对命名
+- 所有服务为静态类、无 DI，从页面直接调用（唯一例外：`LiteMonitorService` 为单例 `Instance`）
+- 新增内置工具：在 `TubaWinUi3.WinUI3/Services/BuiltinTools/` 下新建类实现 `IBuiltinTool`，在 `BuiltinToolRegistry.RegisterDefaults()` 注册（**重复 ID 会抛异常**），详情见[内置工具开发文档](https://tubawinui3.cn/dev/builtin-tools.html)
+- 对话框请通过 `context.CreateDialog(...)` 创建，使其跟随应用主题
+- UI 字符串为硬编码中文（当前无本地化系统），改动文案请保持中文，并同步更新英文文档/说明
+
+## 提交规范
+
+提交信息使用 Conventional Commits 前缀，正文可用中文：
+
+```
+feat: 新增xxx功能
+fix: 修复xxx问题
+docs: 更新文档
+refactor: 重构xxx
+test: 补充测试
+chore: 构建/工具链改动
+```
+
+**禁止提交**：`bin/`、`obj/`、`.pfx`、`.cer`（已在 .gitignore 中）。
+
+## 提交流程（Pull Request）
+
+1. **Fork** 本仓库（`luolangaga/tubatool`）到你的账号
+2. 创建功能分支：`git checkout -b feat/your-feature`
+3. 修改代码，本地通过 `dotnet build` 与 `dotnet test`
+4. 提交并推送到你的 Fork，然后向主仓库发起 Pull Request
+5. 在 PR 描述中说明改动目的、影响范围与测试情况（见 [pull_request_template.md](.github/pull_request_template.md)）
+
+## Issue 规范
+
+- 提交 Bug 前请先搜索是否已存在相同问题
+- Bug 报告请尽量包含：系统版本 / CPU / GPU / 驱动版本 / 图吧工具箱版本 / 复现步骤 / 截图或日志（参考 [bug_report 模板](.github/ISSUE_TEMPLATE/bug_report.yml)）
+- 安全漏洞**请勿在 Issue 公开**，按 [SECURITY.md](SECURITY.md) 私密上报
+
+## 许可证
+
+本项目采用 **GPL-3.0** 开源协议（详见 [LICENSE](LICENSE)）。你的贡献将基于 GPL-3.0 授权，提交即表示你同意你的代码以此协议发布。
