@@ -33,7 +33,7 @@ namespace TubaWinUi3.Compatible
 
         public MainForm()
         {
-            Text = "图吧工具箱 · 兼容版";
+            Text = "图吧工具箱CE · 兼容版";
             Size = new Size(1200, 800);
             MinimumSize = new Size(920, 620);
             StartPosition = FormStartPosition.CenterScreen;
@@ -62,7 +62,7 @@ namespace TubaWinUi3.Compatible
             _topBar.Controls.Add(logoDot);
 
             _titleLabel = new Label();
-            _titleLabel.Text = "图吧工具箱";
+            _titleLabel.Text = "图吧工具箱CE";
             _titleLabel.Font = ThemeService.UiFont(12.5f, bold: true);
             _titleLabel.ForeColor = ThemeService.Colors.TextPrimary;
             _titleLabel.BackColor = Color.Transparent;

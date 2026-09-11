@@ -1,3 +1,4 @@
+using TubaWinUi3.Models;
 using TubaWinUi3.Services;
 
 namespace TubaWinUi3.Tests;
@@ -28,6 +29,7 @@ public class ToolCategoryCopyTests : IDisposable
           "tools": [
             { "match": "AIDA64", "category": "综合检测", "categories": ["处理器工具", "显卡工具"], "order": 1, "description": "测试AIDA64", "downloadUrl": "gc:Tools/综合检测/AIDA64" },
             { "match": "memtest", "category": "内存工具", "categories": ["烤鸡工具"] },
+            { "match": "monitorinfo", "category": "显示器工具" },
             { "match": "一键双烤", "builtin": "stress-test", "categories": ["烤鸡工具"] }
           ]
         }
@@ -96,6 +98,21 @@ public class ToolCategoryCopyTests : IDisposable
     }
 
     [Fact]
+    public void ReorderByName_DuplicateNamesInSavedOrder_NoDuplicateItems()
+    {
+        // 用户真实 settings.json 的 ToolOrder_烤鸡工具 曾含重复的 "memtest"，
+        // 旧实现按名字 First 选取会把同一工具返回两次（页面出现重复卡片）
+        var memtest = new ToolItem { Name = "memtest", Category = "烤鸡工具", Path = "p1", RelativePath = "r1", Extension = "exe" };
+        var builtin = new ToolItem { Name = "一键三烤", Category = "烤鸡工具", Path = "p2", RelativePath = "r2", Extension = "内置" };
+
+        var reordered = ToolCatalog.ReorderByName([memtest, builtin], ["memtest", "memtest", "一键三烤"]);
+
+        Assert.Equal(2, reordered.Count);
+        Assert.Same(memtest, reordered[0]);
+        Assert.Same(builtin, reordered[1]);
+    }
+
+    [Fact]
     public void BuiltinPlacement_AppearsWithVirtualDirKey()
     {
         var items = ToolCatalog.GetTools("烤鸡工具");
@@ -119,5 +136,33 @@ public class ToolCategoryCopyTests : IDisposable
         var aida = items.Where(t => t.Name!.Equals("AIDA", StringComparison.OrdinalIgnoreCase)).ToList();
         Assert.Single(aida); // 只保留 tools.json 副本合成条目，占位条目被避让
         Assert.True(aida[0].IsLinked);
+    }
+
+    [Fact]
+    public void UncataloguedDir_WithExecutable_IsExcludedFromList()
+    {
+        // 列表以 tools.json 为准：Tools 文件夹里未收录的目录（如 ViveTool）即使有
+        // 可执行文件也不再出现在列表（此前目录扫描会把它带出来）
+        Directory.CreateDirectory(Path.Combine(_tools, "其他工具", "ViveTool"));
+        File.WriteAllBytes(Path.Combine(_tools, "其他工具", "ViveTool", "ViVeTool.exe"), [0x4D, 0x5A, 0x00, 0x00]);
+        ToolCatalog.OnToolsChanged(); // 清内存缓存，强制重扫
+
+        var items = ToolCatalog.GetTools("其他工具");
+
+        Assert.DoesNotContain(items, t => t.Name!.Equals("ViveTool", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void CataloguedDir_ByFileNameMatch_IsIncluded()
+    {
+        // 目录名与 match 不同、但目录内 exe 文件名命中条目（如 色域检测/monitorinfo.exe
+        // 命中 match "monitorinfo"）仍应收录，过滤不能只看目录名
+        Directory.CreateDirectory(Path.Combine(_tools, "显示器工具", "色域检测"));
+        File.WriteAllBytes(Path.Combine(_tools, "显示器工具", "色域检测", "monitorinfo.exe"), [0x4D, 0x5A, 0x00, 0x00]);
+        ToolCatalog.OnToolsChanged();
+
+        var items = ToolCatalog.GetTools("显示器工具");
+
+        Assert.Contains(items, t => t.Path!.EndsWith("monitorinfo.exe"));
     }
 }

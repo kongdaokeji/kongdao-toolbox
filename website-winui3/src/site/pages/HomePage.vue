@@ -69,7 +69,7 @@
             </div>
           </div>
           <div class="site-hero-art">
-            <img class="site-hero-screenshot" :src="screenshotTools" alt="图吧工具箱主界面截图" />
+            <img class="site-hero-screenshot" :src="screenshotTools" alt="图吧工具箱CE主界面截图" />
           </div>
           <p class="site-hero-license">
             <span class="icon" aria-hidden="true">&#xE8A1;</span>

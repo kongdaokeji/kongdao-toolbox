@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using TubaWinUi3.Models;
@@ -15,13 +15,17 @@ public sealed partial class WindowsImagePage : Page
     private string _langFilter = "全部语言";
     private WindowsImageEntry? _msResolvedEntry;
 
-    private List<UupBuildInfo>? _uupBuilds;
-    private UupBuildInfo? _selectedUupBuild;
-    private List<UupLanguageInfo>? _uupLanguages;
-    private List<UupEditionInfo>? _uupEditions;
-    private string _uupSelectedLanguage = "";
-    private string _uupCategoryFilter = "全部";
-    private CancellationTokenSource? _uupCts;
+    // ===== UUP Dump（JSON API 三步向导） =====
+    private List<UupBuildInfo>? _uupAllBuilds;
+    private UupBuildInfo? _uupSelectedBuild;
+    private UupLanguageInfo? _uupSelectedLanguage;
+    private UupEditionInfo? _uupSelectedEdition;
+    private UupFileSetInfo? _uupFilePreview;
+    private List<UupVirtualEditionInfo>? _uupVirtualEditions;
+    private int _uupPreviewSeq;
+    private CancellationTokenSource? _uupBuildCts;
+    private CancellationTokenSource? _uupLangCts;
+    private CancellationTokenSource? _uupEditionCts;
     private bool _isPageAlive = true;
 
     public WindowsImagePage()
@@ -31,19 +35,20 @@ public sealed partial class WindowsImagePage : Page
         HeaderBorder.Background = new SolidColorBrush(ThemeColors.HeaderBg);
         ListBorder.BorderBrush = new SolidColorBrush(ThemeColors.BorderColor);
 
-        UupBuildHeaderBorder.Background = new SolidColorBrush(ThemeColors.HeaderBg);
-        UupBuildListBorder.BorderBrush = new SolidColorBrush(ThemeColors.BorderColor);
-
-        InitUupQuickGrid();
+        InitUupArchCombo();
+        UpdateUupLocationText();
 
         Unloaded += (_, _) =>
         {
             _isPageAlive = false;
-            _uupCts?.Cancel();
+            _uupBuildCts?.Cancel();
+            _uupLangCts?.Cancel();
+            _uupEditionCts?.Cancel();
         };
 
         LoadMsEditions();
         _ = LoadDataAsync();
+        _ = LoadUupBuildsAsync(null);
     }
 
 
@@ -53,6 +58,19 @@ public sealed partial class WindowsImagePage : Page
         var editions = MicrosoftOfficialService.GetAvailableEditions();
         MsEditionCombo.ItemsSource = editions;
         MsEditionCombo.DisplayMemberPath = "Name";
+    }
+
+    /// <summary>把底层英文异常（超时/域名解析失败等）转成对用户友好的中文描述。</summary>
+    private static string FriendlyTimeoutMessage(Exception ex, string fallback)
+    {
+        var msg = ex.Message;
+        if (ex is TaskCanceledException || msg.Contains("HttpClient.Timeout", StringComparison.OrdinalIgnoreCase))
+            return $"{fallback}：请求超时，请检查网络连接后重试。";
+        if (msg.Contains("No such host", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("not resolved", StringComparison.OrdinalIgnoreCase) ||
+            msg.Contains("远程名称无法解析", StringComparison.OrdinalIgnoreCase))
+            return $"{fallback}：无法解析服务器地址，请检查网络或 DNS 设置。";
+        return $"{fallback}：{msg}";
     }
 
     private async Task LoadDataAsync()
@@ -71,7 +89,7 @@ public sealed partial class WindowsImagePage : Page
         catch (Exception ex)
         {
             StatusInfoBar.Title = "加载失败";
-            StatusInfoBar.Message = ex.Message;
+            StatusInfoBar.Message = FriendlyTimeoutMessage(ex, "获取镜像列表失败");
             StatusInfoBar.Severity = InfoBarSeverity.Error;
             StatusInfoBar.IsOpen = true;
         }
@@ -411,7 +429,7 @@ public sealed partial class WindowsImagePage : Page
         }
         catch (Exception ex)
         {
-            MsStatusText.Text = $"获取语言列表失败: {ex.Message}";
+            MsStatusText.Text = FriendlyTimeoutMessage(ex, "获取语言列表失败");
         }
         finally
         {
@@ -448,7 +466,7 @@ public sealed partial class WindowsImagePage : Page
         }
         catch (Exception ex)
         {
-            MsStatusText.Text = $"获取失败: {ex.Message}";
+            MsStatusText.Text = FriendlyTimeoutMessage(ex, "获取下载链接失败");
         }
         finally
         {
@@ -490,506 +508,453 @@ public sealed partial class WindowsImagePage : Page
         catch { }
     }
 
-    private void InitUupQuickGrid()
+    // ==================== UUP Dump：三步向导 ====================
+
+    /// <summary>刷新「保存位置」显示；该设置对本页全部下载（微软官方/社区镜像/UUP）生效。</summary>
+    private void UpdateUupLocationText()
     {
-        var options = UupDumpService.GetQuickFetchOptions();
-        UupQuickGrid.ItemsSource = options;
+        var custom = AppSettings.Get("WindowsImageDownloadDir");
+        var isCustom = !string.IsNullOrWhiteSpace(custom);
+
+        UupSaveLocationText.Text = UupDumpService.GetDownloadDir();
+        ToolTipService.SetToolTip(UupSaveLocationText,
+            "微软官方与社区镜像直接保存到所选目录；UUP 下载包保存在其中的 UUPDump 子目录。\n" +
+            $"当前保存根目录：{(isCustom ? custom!.Trim() : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"))}");
+        UupResetDirBtn.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private async void UupQuickGrid_ItemClick(object sender, ItemClickEventArgs e)
+    private void UupBrowseDirBtn_Click(object sender, RoutedEventArgs e)
     {
-        if (e.ClickedItem is not UupQuickFetchOption option) return;
+        var dir = Win32Dialogs.PickFolder();
+        if (string.IsNullOrEmpty(dir)) return;
 
-        UupQuickProgress.Visibility = Visibility.Visible;
-        UupQuickProgress.IsActive = true;
+        AppSettings.Set("WindowsImageDownloadDir", dir);
+        UpdateUupLocationText();
+
+        StatusInfoBar.Title = "保存位置已更改";
+        StatusInfoBar.Message = $"此页面所有下载（微软官方/社区镜像/UUP）将保存到 {dir}";
+        StatusInfoBar.Severity = InfoBarSeverity.Success;
+        StatusInfoBar.IsOpen = true;
+    }
+
+    private void UupResetDirBtn_Click(object sender, RoutedEventArgs e)
+    {
+        AppSettings.Remove("WindowsImageDownloadDir");
+        UpdateUupLocationText();
+    }
+
+    private void InitUupArchCombo()
+    {
+        var suggested = UupDumpService.GetSuggestedArch();
+        List<ComboBoxItem> archItems =
+        [
+            new ComboBoxItem { Content = $"跟随系统 ({suggested})", Tag = suggested },
+            new ComboBoxItem { Content = "全部架构", Tag = "" },
+            new ComboBoxItem { Content = "amd64 (x64)", Tag = "amd64" },
+            new ComboBoxItem { Content = "arm64", Tag = "arm64" },
+            new ComboBoxItem { Content = "x86 (32 位)", Tag = "x86" },
+        ];
+        UupArchCombo.ItemsSource = archItems;
+        UupArchCombo.SelectedIndex = 0;
+    }
+
+    private async Task LoadUupBuildsAsync(string? search)
+    {
+        _uupBuildCts?.Cancel();
+        _uupBuildCts = new CancellationTokenSource();
+        var ct = _uupBuildCts.Token;
+
+        UupBuildLoadingPanel.Visibility = Visibility.Visible;
+        UupBuildStatusText.Visibility = Visibility.Visible;
+        UupBuildStatusText.Text = "正在获取构建列表（网络较慢时首次可能需要数秒）…";
+        UupBuildList.ItemsSource = null;
+        ResetUupSelection();
 
         try
         {
-            _uupCts?.Cancel();
-            _uupCts = new CancellationTokenSource();
+            var builds = await UupDumpService.GetKnownBuildsAsync(search, ct);
+            if (ct.IsCancellationRequested || !_isPageAlive) return;
+            _uupAllBuilds = builds;
+            ApplyUupBuildFilter();
 
-            var builds = await UupDumpService.FetchLatestBuildsAsync(option.Ring, option.Arch, _uupCts.Token);
-            _uupBuilds = builds;
-            RenderUupBuilds(builds);
+            if (builds.Count == 0)
+                ShowUupBuildStatus("没有找到匹配的构建。试试其他关键词，例如 26100 或 24H2。");
         }
         catch (OperationCanceledException) { }
+        catch (UupDumpApiException ex)
+        {
+            ShowUupBuildStatus(ex.Message);
+        }
         catch (Exception ex)
         {
-            StatusInfoBar.Title = "获取失败";
-            StatusInfoBar.Message = ex.Message;
-            StatusInfoBar.Severity = InfoBarSeverity.Error;
-            StatusInfoBar.IsOpen = true;
+            ShowUupBuildStatus(FriendlyTimeoutMessage(ex, "获取构建列表失败"));
         }
         finally
         {
-            UupQuickProgress.Visibility = Visibility.Collapsed;
-            UupQuickProgress.IsActive = false;
+            if (!ct.IsCancellationRequested && _isPageAlive)
+                UupBuildLoadingPanel.Visibility = Visibility.Collapsed;
         }
+    }
+
+    private void ShowUupBuildStatus(string message)
+    {
+        UupBuildStatusText.Text = message;
+        UupBuildStatusText.Visibility = Visibility.Visible;
+        UupBuildLoadingPanel.Visibility = Visibility.Collapsed;
+    }
+
+    private void ApplyUupBuildFilter()
+    {
+        if (_uupAllBuilds is null) return;
+
+        var channel = (UupChannelCombo.SelectedItem as string) ?? "全部";
+        var arch = (UupArchCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+
+        var filtered = _uupAllBuilds.AsEnumerable();
+        if (channel != "全部")
+            filtered = filtered.Where(b => b.Channel == channel);
+        if (!string.IsNullOrEmpty(arch))
+            filtered = filtered.Where(b => b.Architecture == arch);
+
+        var list = filtered.ToList();
+        UupBuildList.ItemsSource = list;
+
+        // 保留仍可见的已选构建，避免切换筛选时丢失选择状态
+        if (_uupSelectedBuild is not null)
+        {
+            var match = list.FirstOrDefault(b => b.UpdateId == _uupSelectedBuild.UpdateId);
+            if (match is not null)
+                UupBuildList.SelectedItem = match;
+            else
+                ResetUupSelection();
+        }
+
+        if (list.Count == 0 && UupBuildStatusText.Visibility != Visibility.Visible)
+            ShowUupBuildStatus("当前筛选条件下没有构建，可把架构切换为「全部架构」。");
+        else if (list.Count > 0)
+            UupBuildStatusText.Visibility = Visibility.Collapsed;
+    }
+
+    private void ResetUupSelection()
+    {
+        _uupSelectedBuild = null;
+        _uupSelectedLanguage = null;
+        _uupSelectedEdition = null;
+        _uupFilePreview = null;
+        _uupVirtualEditions = null;
+
+        UupSelectedBuildText.Text = "请先在上方第 1 步中选择一个系统版本";
+        UupLangCombo.ItemsSource = null;
+        UupLangCombo.IsEnabled = false;
+        UupEditionRadio.ItemsSource = null;
+        UupVirtualEditionPanel.Children.Clear();
+        UupVirtualEditionExpander.Visibility = Visibility.Collapsed;
+        UupStartBtn.IsEnabled = false;
+        UupSummaryText.Text = "完成前两步后，这里会显示下载内容摘要。";
+    }
+
+    private async void UupBuildList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (UupBuildList.SelectedItem is not UupBuildInfo build) return;
+        if (build.UpdateId == _uupSelectedBuild?.UpdateId) return;
+        await UupSelectBuildAsync(build);
+    }
+
+    private async Task UupSelectBuildAsync(UupBuildInfo build)
+    {
+        _uupLangCts?.Cancel();
+        _uupEditionCts?.Cancel();
+        _uupLangCts = new CancellationTokenSource();
+        var ct = _uupLangCts.Token;
+
+        _uupSelectedBuild = build;
+        _uupSelectedLanguage = null;
+        _uupSelectedEdition = null;
+        _uupFilePreview = null;
+
+        UupSelectedBuildText.Text = $"已选择：{build.Title}";
+        UupLangCombo.ItemsSource = null;
+        UupLangCombo.IsEnabled = false;
+        UupEditionRadio.ItemsSource = null;
+        UupStartBtn.IsEnabled = false;
+        UupSummaryText.Text = "正在获取语言列表...";
+        UupLangProgress.Visibility = Visibility.Visible;
+
+        try
+        {
+            var langs = await UupDumpService.GetLanguagesAsync(build.UpdateId, ct);
+            if (!_isPageAlive) return;
+            if (_uupSelectedBuild?.UpdateId != build.UpdateId) return;
+
+            UupLangCombo.ItemsSource = langs;
+            UupLangCombo.IsEnabled = langs.Count > 0;
+            if (langs.Count > 0)
+            {
+                // 默认选中简体中文（无则选第一个）；SelectedItem 触发的
+                // SelectionChanged 会接着加载该语言的版本列表
+                UupLangCombo.SelectedItem = langs.FirstOrDefault(l => l.Code == "zh-cn") ?? langs[0];
+            }
+            else
+            {
+                UupSummaryText.Text = "该构建没有可选语言。";
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (UupDumpApiException ex)
+        {
+            UupSummaryText.Text = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            UupSummaryText.Text = FriendlyTimeoutMessage(ex, "获取语言列表失败");
+        }
+        finally
+        {
+            if (_isPageAlive)
+                UupLangProgress.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private async void UupLangCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (UupLangCombo.SelectedItem is not UupLanguageInfo lang) return;
+        await UupLoadEditionsAsync(lang);
+    }
+
+    private async Task UupLoadEditionsAsync(UupLanguageInfo lang)
+    {
+        var build = _uupSelectedBuild;
+        if (build is null) return;
+
+        _uupEditionCts?.Cancel();
+        _uupEditionCts = new CancellationTokenSource();
+        var ct = _uupEditionCts.Token;
+
+        _uupSelectedLanguage = lang;
+        _uupSelectedEdition = null;
+        _uupFilePreview = null;
+
+        UupEditionRadio.ItemsSource = null;
+        UupStartBtn.IsEnabled = false;
+        UupSummaryText.Text = $"正在获取「{lang.DisplayName}」的可用版本...";
+        UupEditionProgress.Visibility = Visibility.Visible;
+
+        try
+        {
+            var editions = await UupDumpService.GetEditionsAsync(build.UpdateId, lang.Code, ct);
+            if (!_isPageAlive) return;
+            if (_uupSelectedBuild?.UpdateId != build.UpdateId || _uupSelectedLanguage?.Code != lang.Code) return;
+
+            UupEditionRadio.ItemsSource = editions;
+            if (editions.Count > 0)
+            {
+                UupEditionRadio.SelectedItem = editions.FirstOrDefault(x => x.Id == "PROFESSIONAL") ?? editions[0];
+            }
+            else
+            {
+                UupSummaryText.Text = "该语言下没有可用版本。";
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (UupDumpApiException ex)
+        {
+            UupSummaryText.Text = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            UupSummaryText.Text = FriendlyTimeoutMessage(ex, "获取版本列表失败");
+        }
+        finally
+        {
+            if (_isPageAlive)
+                UupEditionProgress.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private async void UupEditionRadio_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (UupEditionRadio.SelectedItem is not UupEditionInfo edition) return;
+        _uupSelectedEdition = edition;
+        _uupFilePreview = null;
+        UupStartBtn.IsEnabled = true;
+        UupRenderVirtualEditions(edition.Id);
+        UpdateUupSummary();
+        await UupLoadFilePreviewAsync();
+    }
+
+    /// <summary>根据基础版本渲染可合成的附加版本勾选项；无可用附加版本时隐藏该区域。</summary>
+    private void UupRenderVirtualEditions(string baseEditionId)
+    {
+        UupVirtualEditionPanel.Children.Clear();
+        _uupVirtualEditions = UupDumpService.GetVirtualEditionsForBase(baseEditionId);
+
+        if (_uupVirtualEditions.Count == 0)
+        {
+            UupVirtualEditionExpander.Visibility = Visibility.Collapsed;
+            UupVirtualEditionExpander.IsExpanded = false;
+            return;
+        }
+
+        UupVirtualEditionExpander.Visibility = Visibility.Visible;
+        foreach (var ve in _uupVirtualEditions)
+        {
+            var cb = new CheckBox
+            {
+                Content = ve.DisplayName,
+                Tag = ve.Name,
+                Margin = new Thickness(0, 2, 0, 2)
+            };
+            cb.Checked += (_, _) => UpdateUupSummary();
+            cb.Unchecked += (_, _) => UpdateUupSummary();
+            UupVirtualEditionPanel.Children.Add(cb);
+        }
+    }
+
+    private List<string> CollectUupVirtualEditions()
+    {
+        var selected = new List<string>();
+        foreach (var child in UupVirtualEditionPanel.Children)
+        {
+            if (child is CheckBox { IsChecked: true, Tag: string name })
+                selected.Add(name);
+        }
+        return selected;
+    }
+
+    private string GetVirtualEditionDisplayName(string name)
+    {
+        return _uupVirtualEditions?.FirstOrDefault(v => v.Name == name)?.DisplayName ?? name;
+    }
+
+    private async Task UupLoadFilePreviewAsync()
+    {
+        var build = _uupSelectedBuild;
+        var lang = _uupSelectedLanguage;
+        var edition = _uupSelectedEdition;
+        if (build is null || lang is null || edition is null) return;
+
+        // noLinks 通道不触发接口限流，仅用于展示文件数与总大小；结果过期直接丢弃
+        var seq = ++_uupPreviewSeq;
+        try
+        {
+            var preview = await UupDumpService.GetFilesAsync(build.UpdateId, lang.Code, edition.Id, withLinks: false);
+            if (!_isPageAlive || seq != _uupPreviewSeq) return;
+            if (_uupSelectedBuild?.UpdateId != build.UpdateId ||
+                _uupSelectedLanguage?.Code != lang.Code ||
+                _uupSelectedEdition?.Id != edition.Id) return;
+
+            _uupFilePreview = preview;
+            UpdateUupSummary();
+        }
+        catch
+        {
+            // 大小预览失败不影响主流程，摘要保持现状
+        }
+    }
+
+    private void UpdateUupSummary()
+    {
+        var build = _uupSelectedBuild;
+        var lang = _uupSelectedLanguage;
+        var edition = _uupSelectedEdition;
+        if (build is null || lang is null || edition is null) return;
+
+        var summary = $"{build.Title}\n{lang.DisplayName} · {edition.DisplayName} · {build.Architecture}";
+
+        var ves = CollectUupVirtualEditions();
+        if (ves.Count > 0)
+            summary += $"\n附加版本：{string.Join("、", ves.Select(GetVirtualEditionDisplayName))}";
+
+        if (_uupFilePreview is { } p && p.Files.Count > 0)
+            summary += $"\n共 {p.Files.Count} 个文件，约 {DownloadQueueService.FormatSize(p.TotalSize)}（下载时间取决于网速）";
+
+        UupSummaryText.Text = summary;
+    }
+
+    private void UupChannelCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        ApplyUupBuildFilter();
+    }
+
+    private void UupArchCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        ApplyUupBuildFilter();
     }
 
     private async void UupSearchBtn_Click(object sender, RoutedEventArgs e)
     {
-        UupSearchProgress.Visibility = Visibility.Visible;
-        UupSearchProgress.IsActive = true;
-
-        try
-        {
-            _uupCts?.Cancel();
-            _uupCts = new CancellationTokenSource();
-
-            var search = UupSearchBox.Text.Trim();
-            var category = _uupCategoryFilter != "全部" ? _uupCategoryFilter : null;
-
-            var builds = await UupDumpService.GetKnownBuildsAsync(
-                string.IsNullOrEmpty(search) ? null : search,
-                category,
-                _uupCts.Token);
-
-            _uupBuilds = builds;
-            RenderUupBuilds(builds);
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception ex)
-        {
-            StatusInfoBar.Title = "搜索失败";
-            StatusInfoBar.Message = ex.Message;
-            StatusInfoBar.Severity = InfoBarSeverity.Error;
-            StatusInfoBar.IsOpen = true;
-        }
-        finally
-        {
-            UupSearchProgress.Visibility = Visibility.Collapsed;
-            UupSearchProgress.IsActive = false;
-        }
+        await LoadUupBuildsAsync(string.IsNullOrWhiteSpace(UupSearchBox.Text) ? null : UupSearchBox.Text.Trim());
     }
 
-    private void UupCategoryCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void UupSearchBox_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
     {
-        if (UupCategoryCombo.SelectedItem is string s)
-            _uupCategoryFilter = s;
+        await LoadUupBuildsAsync(string.IsNullOrWhiteSpace(sender.Text) ? null : sender.Text.Trim());
     }
 
-    private async void UupFetchBuildBtn_Click(object sender, RoutedEventArgs e)
+    private void UupNoConvertCheck_Changed(object sender, RoutedEventArgs e)
     {
-        var buildNum = UupBuildNumber.Text.Trim();
-        if (string.IsNullOrEmpty(buildNum))
-        {
-            StatusInfoBar.Title = "请输入构建号";
-            StatusInfoBar.Message = "请输入 Windows 构建号，如 26100.1";
-            StatusInfoBar.Severity = InfoBarSeverity.Warning;
-            StatusInfoBar.IsOpen = true;
-            return;
-        }
-
-        UupNewBuildProgress.Visibility = Visibility.Visible;
-        UupNewBuildProgress.IsActive = true;
-
-        try
-        {
-            _uupCts?.Cancel();
-            _uupCts = new CancellationTokenSource();
-
-            var arch = (UupNewArchCombo.SelectedItem as string) ?? "amd64";
-            var ring = (UupNewRingCombo.SelectedItem as string) ?? "WIF";
-            var skuItem = UupNewSkuCombo.SelectedItem as ComboBoxItem;
-            var sku = skuItem?.Tag is string tag ? int.Parse(tag) : 48;
-
-            var parts = buildNum.Split('.');
-            var major = parts[0];
-            var minor = parts.Length > 1 && int.TryParse(parts[1], out var m) ? m : 0;
-
-            var req = new UupNewBuildRequest
-            {
-                Arch = arch,
-                Ring = ring,
-                Flight = "Mainline",
-                Build = $"{major}.{minor}",
-                Minor = 0,
-                Sku = sku
-            };
-
-            var builds = await UupDumpService.FetchNewBuildAsync(req, _uupCts.Token);
-            _uupBuilds = builds;
-            RenderUupBuilds(builds);
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception ex)
-        {
-            StatusInfoBar.Title = "查找失败";
-            StatusInfoBar.Message = ex.Message;
-            StatusInfoBar.Severity = InfoBarSeverity.Error;
-            StatusInfoBar.IsOpen = true;
-        }
-        finally
-        {
-            UupNewBuildProgress.Visibility = Visibility.Collapsed;
-            UupNewBuildProgress.IsActive = false;
-        }
+        // 仅下载文件集时不涉及转换，附加版本与转换选项一并禁用
+        var converting = UupNoConvertCheck.IsChecked != true;
+        UupVirtualEditionExpander.IsEnabled = converting;
+        UupOptAddUpdates.IsEnabled = converting;
+        UupOptCleanup.IsEnabled = converting;
+        UupOptNetFx3.IsEnabled = converting;
+        UupOptEsd.IsEnabled = converting;
+        UupOptApps.IsEnabled = converting;
     }
 
-    private void RenderUupBuilds(List<UupBuildInfo> builds)
+    private void UupStartBtn_Click(object sender, RoutedEventArgs e)
     {
-        UupBuildListContainer.Children.Clear();
+        var build = _uupSelectedBuild;
+        var lang = _uupSelectedLanguage;
+        var edition = _uupSelectedEdition;
+        if (build is null || lang is null || edition is null) return;
 
-        if (builds.Count == 0)
+        var noConvert = UupNoConvertCheck.IsChecked == true;
+        var (pkgDir, uupsDir) = UupDumpService.GetPackageDirs(build.Build, lang.Code, edition.Id);
+        var title = $"{build.Title} {lang.DisplayName} {edition.DisplayName}";
+
+        var virtualEditions = CollectUupVirtualEditions();
+        var options = new UupConvertOptions
         {
-            UupBuildEmptyPanel.Visibility = Visibility.Visible;
-            UupBuildHeaderBorder.Visibility = Visibility.Collapsed;
-            UupBuildListBorder.Visibility = Visibility.Collapsed;
-            UupBuildCountText.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        UupBuildEmptyPanel.Visibility = Visibility.Collapsed;
-        UupBuildHeaderBorder.Visibility = Visibility.Visible;
-        UupBuildListBorder.Visibility = Visibility.Visible;
-        UupBuildCountText.Visibility = Visibility.Visible;
-        UupBuildCountText.Text = $"共 {builds.Count} 个构建";
-
-        foreach (var build in builds)
-            UupBuildListContainer.Children.Add(CreateUupBuildRow(build));
-    }
-
-    private Border CreateUupBuildRow(UupBuildInfo build)
-    {
-        var titleText = new TextBlock
-        {
-            Text = build.Title,
-            FontSize = 12,
-            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-            Foreground = new SolidColorBrush(ThemeColors.PrimaryText),
-            VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis
+            AddUpdates = UupOptAddUpdates.IsChecked == true,
+            Cleanup = UupOptCleanup.IsChecked == true,
+            NetFx3 = UupOptNetFx3.IsChecked == true,
+            Wim2Esd = UupOptEsd.IsChecked == true,
+            SkipApps = UupOptApps.IsChecked != true,
+            VirtualEditions = noConvert ? [] : virtualEditions,
         };
 
-        var archBadge = MakeBadge(build.Architecture, ThemeColors.AccentOrange);
-        var channelBadge = MakeBadge(
-            string.IsNullOrEmpty(build.Channel) ? "正式版" : build.Channel,
-            string.IsNullOrEmpty(build.Channel) ? ThemeColors.AccentGreen :
-                build.Channel == "Canary" ? ThemeColors.AccentRed :
-                build.Channel == "Dev" ? ThemeColors.AccentPurple :
-                build.Channel == "Beta" ? ThemeColors.AccentBlue :
-                ThemeColors.AccentOrange);
-        var categoryBadge = MakeBadge(build.Category, ThemeColors.AccentPurple);
+        // 入队时按所选选项生成官方格式的 ConvertConfig.ini；
+        // 下载期间用户可手动编辑，转换脚本启动时以该文件为准
+        if (!noConvert)
+            UupDumpService.WriteConvertConfigIni(pkgDir, options);
 
-        var selectBtn = new Button
-        {
-            Content = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Spacing = 4,
-                Children =
-                {
-                    new FontIcon { Glyph = "\uE896", FontSize = 11 },
-                    new TextBlock { Text = "选择", FontSize = 12 }
-                }
-            },
-            Padding = new Thickness(10, 4, 10, 4),
-            Tag = build
-        };
-        selectBtn.Click += UupSelectBuild_Click;
+        var resolver = UupDumpService.CreateMultiFileResolver(build.UpdateId, lang.Code, edition.Id);
+        IDownloadPostProcessor? post = noConvert ? null : UupDumpService.CreateIsoPostProcessor(title);
 
-        var grid = new Grid { ColumnSpacing = 8 };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var sizeDesc = _uupFilePreview is { } p && p.Files.Count > 0
+            ? $"约 {DownloadQueueService.FormatSize(p.TotalSize)}"
+            : "文件较多，耗时取决于网速";
+        var editionDesc = options.HasVirtualEditions
+            ? $"{edition.DisplayName} + 附加版本（{string.Join("、", virtualEditions.Select(GetVirtualEditionDisplayName))}）"
+            : edition.DisplayName;
+        var displayName = noConvert
+            ? $"{build.Title} UUP 文件集"
+            : $"{build.Title} ISO（{edition.DisplayName}）";
 
-        grid.Children.Add(titleText); Grid.SetColumn(titleText, 0);
-        grid.Children.Add(archBadge); Grid.SetColumn(archBadge, 1);
-        grid.Children.Add(channelBadge); Grid.SetColumn(channelBadge, 2);
-        grid.Children.Add(categoryBadge); Grid.SetColumn(categoryBadge, 3);
-        grid.Children.Add(selectBtn); Grid.SetColumn(selectBtn, 4);
-
-        var tip = new ToolTip { Content = $"{build.Title}\n构建: {build.Build}\n架构: {build.Architecture}\n渠道: {build.Channel}" };
-        ToolTipService.SetToolTip(grid, tip);
-
-        return new Border
-        {
-            Padding = new Thickness(12, 8, 12, 8),
-            BorderBrush = new SolidColorBrush(ThemeColors.BorderColor),
-            BorderThickness = new Thickness(0, 0, 0, 1),
-            Child = grid
-        };
-    }
-
-    private async void UupSelectBuild_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { Tag: UupBuildInfo build } btn) return;
-
-        btn.IsEnabled = false;
-        var origContent = btn.Content;
-        btn.Content = new ProgressRing { Width = 16, Height = 16, IsActive = true };
-
-        _selectedUupBuild = build;
-        UupLangBuildInfo.Text = $"{build.Title}\n架构: {build.Architecture} | 渠道: {build.Channel} | 构建: {build.Build}";
-        UupLangListView.ItemsSource = null;
-        UupLangProgress.Visibility = Visibility.Visible;
-        UupLangProgress.IsActive = true;
-
-        try
-        {
-            _uupCts?.Cancel();
-            _uupCts = new CancellationTokenSource();
-
-            var langs = await UupDumpService.GetLanguagesAsync(build.UpdateId, _uupCts.Token);
-            _uupLanguages = langs;
-
-            UupLangListView.ItemsSource = langs;
-            UupLangListView.DisplayMemberPath = "DisplayName";
-
-            if (langs.Count > 0)
-            {
-                var zhCn = langs.FirstOrDefault(l => l.Code == "zh-cn");
-                if (zhCn is not null)
-                    UupLangListView.SelectedItem = zhCn;
-                else
-                    UupLangListView.SelectedIndex = 0;
-            }
-        }
-        catch (Exception ex)
-        {
-            StatusInfoBar.Title = "获取语言失败";
-            StatusInfoBar.Message = ex.Message;
-            StatusInfoBar.Severity = InfoBarSeverity.Error;
-            StatusInfoBar.IsOpen = true;
-            return;
-        }
-        finally
-        {
-            UupLangProgress.Visibility = Visibility.Collapsed;
-            UupLangProgress.IsActive = false;
-            btn.Content = origContent;
-            btn.IsEnabled = true;
-        }
-
-        if (!_isPageAlive) return;
-        try
-        {
-            UupLanguageDialog.XamlRoot = Content.XamlRoot;
-        }
-        catch { return; }
-        UupLanguageDialog.RequestedTheme = ThemeService.CurrentElementTheme;
-        await UupLanguageDialog.ShowAsync();
-    }
-
-    private async void UupLanguageDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
-    {
-        if (UupLangListView.SelectedItem is not UupLanguageInfo lang)
-        {
-            args.Cancel = true;
-            return;
-        }
-
-        _uupSelectedLanguage = lang.Code;
-        sender.Hide();
-
-        await ShowUupEditionDialog();
-    }
-
-    private async Task ShowUupEditionDialog()
-    {
-        if (_selectedUupBuild is null || !_isPageAlive) return;
-
-        UupEditionBuildInfo.Text = $"{_selectedUupBuild.Title}\n语言: {UupDumpService.GetLanguageDisplayName(_uupSelectedLanguage)} ({_uupSelectedLanguage})";
-        UupBaseEditionPanel.Children.Clear();
-        UupVirtualEditionPanel.Children.Clear();
-        UupVirtualEditionLabel.Visibility = Visibility.Collapsed;
-        UupVirtualEditionPanel.Visibility = Visibility.Collapsed;
-        UupEditionProgress.Visibility = Visibility.Visible;
-        UupEditionProgress.IsActive = true;
-
-        try
-        {
-            UupEditionDialog.XamlRoot = Content.XamlRoot;
-        }
-        catch { return; }
-        UupEditionDialog.RequestedTheme = ThemeService.CurrentElementTheme;
-
-        var showTask = UupEditionDialog.ShowAsync();
-
-        try
-        {
-            _uupCts?.Cancel();
-            _uupCts = new CancellationTokenSource();
-
-            var editions = await UupDumpService.GetEditionsAsync(_selectedUupBuild.UpdateId, _uupSelectedLanguage, _uupCts.Token);
-            _uupEditions = editions;
-
-            foreach (var ed in editions.Where(e => e.IsBaseEdition))
-            {
-                var cb = new CheckBox
-                {
-                    Content = ed.DisplayName,
-                    Tag = ed.Id,
-                    IsChecked = ed.Id is "PROFESSIONAL" or "CORE",
-                    Margin = new Thickness(0, 2, 0, 2)
-                };
-                UupBaseEditionPanel.Children.Add(cb);
-            }
-
-            var virtualEditions = editions.Where(e => !e.IsBaseEdition).ToList();
-            if (virtualEditions.Count > 0)
-            {
-                UupVirtualEditionLabel.Visibility = Visibility.Visible;
-                UupVirtualEditionPanel.Visibility = Visibility.Visible;
-
-                foreach (var ed in virtualEditions)
-                {
-                    var cb = new CheckBox
-                    {
-                        Content = ed.DisplayName,
-                        Tag = ed.Id,
-                        IsChecked = false,
-                        Margin = new Thickness(0, 2, 0, 2)
-                    };
-                    UupVirtualEditionPanel.Children.Add(cb);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            StatusInfoBar.Title = "获取版本失败";
-            StatusInfoBar.Message = ex.Message;
-            StatusInfoBar.Severity = InfoBarSeverity.Error;
-            StatusInfoBar.IsOpen = true;
-        }
-        finally
-        {
-            UupEditionProgress.Visibility = Visibility.Collapsed;
-            UupEditionProgress.IsActive = false;
-        }
-
-        await showTask;
-    }
-
-    private async void UupEditionDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
-    {
-        var selectedEditions = new List<string>();
-        foreach (var child in UupBaseEditionPanel.Children)
-        {
-            if (child is CheckBox { IsChecked: true, Tag: string id })
-                selectedEditions.Add(id);
-        }
-
-        if (selectedEditions.Count == 0)
-        {
-            args.Cancel = true;
-            StatusInfoBar.Title = "请选择版本";
-            StatusInfoBar.Message = "至少需要选择一个基础版本";
-            StatusInfoBar.Severity = InfoBarSeverity.Warning;
-            StatusInfoBar.IsOpen = true;
-            return;
-        }
-
-        var virtualEditions = new List<string>();
-        foreach (var child in UupVirtualEditionPanel.Children)
-        {
-            if (child is CheckBox { IsChecked: true, Tag: string id })
-                virtualEditions.Add(id);
-        }
-
-        var methodItem = UupDownloadMethodCombo.SelectedItem as ComboBoxItem;
-        var autoDl = methodItem?.Tag is string tag ? int.Parse(tag) : 2;
-
-        if (virtualEditions.Count > 0 && autoDl < 3)
-            autoDl = 3;
-
-        var info = new UupDownloadInfo
-        {
-            UpdateId = _selectedUupBuild!.UpdateId,
-            Language = _uupSelectedLanguage,
-            Editions = selectedEditions,
-            AutoDl = autoDl,
-            VirtualEditions = virtualEditions
-        };
-
-        sender.Hide();
-
-        var editionNames = string.Join(", ", selectedEditions.Select(UupDumpService.GetEditionDisplayName));
-        var displayName = $"{_selectedUupBuild.Title} - {editionNames}";
-        var destDir = UupDumpService.GetDownloadDir();
-
-        var downloadInfo = info;
-
-        var postProcessor = new DelegatePostProcessor("UUP 转 ISO", async (downloadedFile, dest, progress, ct) =>
-        {
-            progress?.Report("正在解压转换包...");
-
-            var extractDir = Path.Combine(dest, $"uup_convert_{DateTime.Now:yyyyMMdd_HHmmss}");
-            Directory.CreateDirectory(extractDir);
-
-            try
-            {
-                System.IO.Compression.ZipFile.ExtractToDirectory(downloadedFile, extractDir, true);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException($"解压失败: {ex.Message}", ex);
-            }
-
-            try { File.Delete(downloadedFile); } catch { }
-
-            var cmdFile = Directory.GetFiles(extractDir, "aria2_download_windows.cmd", SearchOption.TopDirectoryOnly)
-                .Concat(Directory.GetFiles(extractDir, "aria2_download_windows.cmd", SearchOption.AllDirectories))
-                .FirstOrDefault();
-
-            if (cmdFile is null)
-                cmdFile = Directory.GetFiles(extractDir, "*.cmd", SearchOption.AllDirectories).FirstOrDefault();
-
-            if (cmdFile is null)
-                throw new InvalidOperationException("未找到转换脚本，请手动运行解压目录中的 .cmd 文件。");
-
-            progress?.Report("正在启动转换脚本...");
-
-            App.MainWindow?.DispatcherQueue.TryEnqueue(() =>
-            {
-                ScriptRunnerWindow.ShowAndRun(
-                    $"cmd.exe /c \"{cmdFile}\"",
-                    workingDir: Path.GetDirectoryName(cmdFile),
-                    title: $"UUP 转 ISO - {_selectedUupBuild?.Title}");
-            });
-        });
-
-        var resolverInfo = downloadInfo;
-        Func<CancellationToken, Task<ResolvedDownloadUrl>> urlResolver = async ct =>
-        {
-            var url = UupDumpService.BuildGetUrl(resolverInfo);
-
-            if (resolverInfo.AutoDl == 3 && resolverInfo.VirtualEditions.Count > 0)
-            {
-                using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
-                var content = new FormUrlEncodedContent(
-                    resolverInfo.VirtualEditions.Select(ve => new KeyValuePair<string, string>("virtualEditions[]", ve)));
-                var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, url) { Content = content };
-                using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-                response.EnsureSuccessStatusCode();
-
-                var disposition = response.Content.Headers.ContentDisposition;
-                var fileName = "uup_dlp.zip";
-                if (disposition is not null)
-                {
-                    var fn = disposition.FileName?.Trim('"');
-                    if (!string.IsNullOrEmpty(fn)) fileName = fn;
-                }
-
-                return new ResolvedDownloadUrl(url, fileName);
-            }
-
-            return new ResolvedDownloadUrl(url, $"uup_{resolverInfo.UpdateId[..8]}.zip");
-        };
-
-        DownloadQueueService.EnqueueWithResolver(
+        DownloadQueueService.EnqueueMultiFile(
             displayName,
-            urlResolver,
-            destDir,
-            postProcessor,
-            description: $"UUP Dump | {UupDumpService.GetLanguageDisplayName(_uupSelectedLanguage)} | {string.Join(", ", selectedEditions)}",
+            resolver,
+            uupsDir,
+            post,
+            description: $"{lang.DisplayName} · {editionDesc} · {build.Architecture} · {sizeDesc}",
             glyph: "\uE896");
 
         StatusInfoBar.Title = "已加入下载队列";
-        StatusInfoBar.Message = $"{displayName} 下载完成后将自动解压并运行转换脚本";
+        StatusInfoBar.Message = noConvert
+            ? $"{displayName} 开始下载，文件保存在 {uupsDir}"
+            : $"{displayName} 下载完成后将自动转换为 ISO，最终文件位于 {pkgDir}";
         StatusInfoBar.Severity = InfoBarSeverity.Success;
         StatusInfoBar.IsOpen = true;
 

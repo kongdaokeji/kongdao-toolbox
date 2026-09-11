@@ -27,7 +27,7 @@
               </li>
             </ul>
             <div class="why-card-img">
-              <img src="/comparison/winui3-download.png" alt="图吧工具箱WinUI3下载方式" loading="lazy" />
+              <img src="/comparison/winui3-download.png" alt="图吧工具箱CE下载方式" loading="lazy" />
             </div>
           </div>
           <div class="why-card why-card-legacy">
@@ -67,7 +67,7 @@
               </li>
             </ul>
             <div class="why-card-img">
-              <img :src="screenshotTools" alt="图吧工具箱WinUI3界面" loading="lazy" />
+              <img :src="screenshotTools" alt="图吧工具箱CE界面" loading="lazy" />
             </div>
           </div>
           <div class="why-card why-card-legacy">

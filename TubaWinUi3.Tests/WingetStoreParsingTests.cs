@@ -114,13 +114,13 @@ public class WingetStoreParsingTests
     [Fact]
     public void ParseWingetSearchOutput_OverflowRow_SingleSpaceSeparators_StillParses()
     {
-        // 长中文名（图吧工具箱winui3，12 字符/显示宽 18）超过"名称"列宽时，
+        // 长中文名（图吧工具箱Winui3兼容版，14 字符/显示宽 22）超过"名称"列宽时，
         // winget 输出退化为单空格分隔、不再补空格对齐 —— 宽空格切分会把整行
         // 合并成一个 token，必须走 ID 正则回退解析。（真实输出样式）
         const string overflowOutput = """
             名称             ID                  版本           匹配
             -----------------------------------------------------------------------------------------------------------------------------
-            图吧工具箱winui3 luolangaga.tubatools 1.5.3
+            图吧工具箱Winui3兼容版 luolangaga.tubatools 1.5.3
 
             """;
 
@@ -128,7 +128,7 @@ public class WingetStoreParsingTests
 
         Assert.Single(results);
         Assert.Equal("luolangaga.tubatools", results[0].PackageIdentifier);
-        Assert.Equal("图吧工具箱winui3", results[0].PackageName);
+        Assert.Equal("图吧工具箱Winui3兼容版", results[0].PackageName);
         Assert.Equal("1.5.3", results[0].LatestVersion);
     }
 
@@ -159,7 +159,7 @@ public class WingetStoreParsingTests
             名称             ID                  版本           匹配
             -----------------------------------------------------------------------------------------------------------------------------
             Google Chrome                                    Google.Chrome                      152.0.7977.65  Moniker: chrome
-            图吧工具箱winui3 luolangaga.tubatools 1.5.3
+            图吧工具箱Winui3兼容版 luolangaga.tubatools 1.5.3
 
             """;
 
@@ -167,7 +167,7 @@ public class WingetStoreParsingTests
 
         Assert.Equal(2, results.Count);
         Assert.Contains(results, r => r.PackageIdentifier == "Google.Chrome" && r.LatestVersion == "152.0.7977.65");
-        Assert.Contains(results, r => r.PackageIdentifier == "luolangaga.tubatools" && r.PackageName == "图吧工具箱winui3");
+        Assert.Contains(results, r => r.PackageIdentifier == "luolangaga.tubatools" && r.PackageName == "图吧工具箱Winui3兼容版");
     }
 
     /// <summary>

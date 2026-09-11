@@ -20,6 +20,16 @@ public partial class App : Application
     public App()
     {
         Environment.SetEnvironmentVariable("MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY", AppContext.BaseDirectory);
+
+        // WebView2 用户数据目录固定到 %LocalAppData%\TubaWinUi3\WebView2。该环境变量优先级
+        // 高于 CreateWithOptionsAsync 的 userDataFolder 参数，能兜住三方库内部不传环境直接
+        // 初始化 WebView2 的情况（如 FieldCure ChatPanel）——否则装在 Program Files 等受保护
+        // 目录时，默认目录（exe 旁 *.exe.WebView2）创建失败会弹「无法读取和写入其数据目录」。
+        Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER",
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "TubaWinUi3", "WebView2"));
+
         InitializeComponent();
 
         // 空岛品牌：应用级深空主题。必须在此处（窗口创建前）设置——只改元素级
@@ -309,13 +319,22 @@ public partial class App : Application
                 AppSettings.Set("SetupCompleted", true);
         }
 
-        if (RuntimeHelper.IsMsixPackaged || RuntimeHelper.IsLiteBuild)
+        if (RuntimeHelper.IsMsixPackaged)
         {
             if (!ToolsBundleService.IsToolsBundleReady())
             {
                 await ShowToolsBundleDownloadDialogAsync();
             }
             _ = CheckForToolsUpdateSilentAsync();
+        }
+        else if (RuntimeHelper.IsLiteBuild)
+        {
+            // 精简版随包内置必要工具，首启无需下载内核包；
+            // 仅当用户此前通过内核包安装过（有版本记录）才静默检查更新。
+            if (ToolsBundleService.GetCurrentVersion() is not null)
+            {
+                _ = CheckForToolsUpdateSilentAsync();
+            }
         }
 
         if (!RuntimeHelper.IsMsixPackaged)
@@ -414,7 +433,15 @@ public partial class App : Application
     {
         try
         {
-            if (!ToolsBundleService.IsToolsBundleReady()) return;
+            // 精简版（Lite）便携：内置工具不经 LocalAppData 内核目录，以是否下载过内核包为准
+            if (RuntimeHelper.IsLiteBuild)
+            {
+                if (ToolsBundleService.GetCurrentVersion() is null) return;
+            }
+            else if (!ToolsBundleService.IsToolsBundleReady())
+            {
+                return;
+            }
 
             var info = await ToolsBundleService.CheckForToolsUpdateAsync();
             if (info is null || !info.HasUpdate) return;

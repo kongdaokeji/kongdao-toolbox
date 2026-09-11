@@ -233,7 +233,7 @@ internal sealed class BackendTrayHost : IDisposable
             uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP,
             uCallbackMessage = (uint)WM_TRAYCALLBACK,
             hIcon = _hicon,
-            szTip = string.IsNullOrWhiteSpace(_tip) ? "图吧工具箱 · 主动拦截" : (_tip.Length > 63 ? _tip[..63] : _tip),
+            szTip = string.IsNullOrWhiteSpace(_tip) ? "图吧工具箱CE · 主动拦截" : (_tip.Length > 63 ? _tip[..63] : _tip),
         };
         return nid;
     }

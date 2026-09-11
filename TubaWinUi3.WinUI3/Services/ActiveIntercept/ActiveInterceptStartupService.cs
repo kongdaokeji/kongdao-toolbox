@@ -56,7 +56,7 @@ public static class ActiveInterceptStartupService
             <?xml version="1.0" encoding="UTF-16"?>
             <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
             <RegistrationInfo>
-                <Description>登录时启动图吧工具箱主动拦截后端（流氓软件拦截器），需管理员权限以屏蔽第三方右键菜单。</Description>
+                <Description>登录时启动图吧工具箱CE主动拦截后端（流氓软件拦截器），需管理员权限以屏蔽第三方右键菜单。</Description>
                 <URI>\{{ScheduleTaskName}}</URI>
             </RegistrationInfo>
             <Triggers>

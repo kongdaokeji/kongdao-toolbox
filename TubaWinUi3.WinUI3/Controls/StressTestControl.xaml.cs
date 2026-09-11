@@ -848,7 +848,7 @@ h1{{font-size:28px;font-weight:600;margin-bottom:4px}}
 </style></head><body>
 <div class=""container"">
 <h1>烤机报告</h1>
-<div class=""subtitle"">{mode} · 由图吧工具箱 WinUI3 生成</div>
+<div class=""subtitle"">{mode} · 由图吧工具箱CE 生成</div>
 <div class=""info-bar"">
 <div class=""info-tag"">测试模式 <strong>{mode}</strong></div>
 <div class=""info-tag"">运行时长 <strong>{(int)elapsed.TotalMinutes}分{elapsed.Seconds}秒</strong></div>
@@ -891,7 +891,7 @@ h1{{font-size:28px;font-weight:600;margin-bottom:4px}}
 <div><div class=""chart-label"">发送速率 (MB/s)</div><div class=""chart-box""><canvas id=""netTxChart""></canvas></div></div>
 <div><div class=""chart-label"">接收速率 (MB/s)</div><div class=""chart-box""><canvas id=""netRxChart""></canvas></div></div>
 </div></div>
-<div class=""footer"">图吧工具箱 WinUI3 · 数据来源: LibreHardwareMonitor 传感器（与「游戏监控」同引擎）· {DateTime.Now:yyyy/MM/dd}</div>
+<div class=""footer"">图吧工具箱CE · 数据来源: LibreHardwareMonitor 传感器（与「游戏监控」同引擎）· {DateTime.Now:yyyy/MM/dd}</div>
 </div>
 <script>{charts}</script></body></html>";
     }

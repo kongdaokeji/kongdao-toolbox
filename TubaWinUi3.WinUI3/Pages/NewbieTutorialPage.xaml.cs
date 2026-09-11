@@ -95,7 +95,7 @@ public sealed partial class NewbieTutorialPage : Page
 
         host.Children.Add(new TextBlock
         {
-            Text = "欢迎使用图吧工具箱",
+            Text = "欢迎使用图吧工具箱CE",
             FontSize = 26,
             FontWeight = Microsoft.UI.Text.FontWeights.Bold
         });

@@ -11,7 +11,7 @@
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="图吧工具箱安装助手"
+        android:label="图吧工具箱CE安装助手"
         android:supportsRtl="true"
         android:theme="@style/Theme.TubaInstaller">
         <activity

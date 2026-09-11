@@ -1,6 +1,6 @@
 export default {
-  "app.title": "TubaWinUi3 Official Website",
-  "app.shortTitle": "TubaWinUi3",
+  "app.title": "TubaWinUi3 CE Official Website",
+  "app.shortTitle": "TubaWinUi3 CE",
   "app.version": "1.5.6",
   "app.author": "Luolan Gaga",
   "app.copyright": "© 2026 Luolan Gaga · Open source under GPL-3.0",
@@ -22,12 +22,12 @@ export default {
   "docs.cat-tutorials": "Tutorials",
   "docs.cat-dev": "Developer Docs",
 
-  "home.hero.badge": "Native WinUI 3 · Free · Open Source",
+  "home.hero.badge": "Community Edition · Native WinUI 3 · Free · Open Source",
   "home.hero.title": "The PC Hardware Testing Toolkit",
   "home.hero.subtitle": "82 professional tools included. Launch CPU-Z, GPU-Z, CrystalDiskMark with one click. Completely free, offline, zero data collection.",
-  "home.hero.download": "Get TubaWinUi3",
+  "home.hero.download": "Get TubaWinUi3 CE",
   "home.hero.view-github": "View on GitHub",
-  "home.hero.why-choose": "Why WinUI3?",
+  "home.hero.why-choose": "Why TubaWinUi3 CE?",
   "home.hero.license": "This project is open source under GPL-3.0 and may be freely redistributed. Modified versions must remain open source and must not bundle malware.",
   "home.hero.license-link": "View statement",
   "home.hero.store-tip": "Worried about malware? Get it from the",
@@ -38,13 +38,13 @@ export default {
   "home.features.subtitle": "Hardware detection, system maintenance and performance testing in one place",
 
   "home.section1.title": "Open source and completely free",
-  "home.section1.text1": "TubaWinUi3 is a free, open source and privacy-focused PC hardware toolkit for Windows! No untrusted websites needed to handle your data.",
+  "home.section1.text1": "TubaWinUi3 CE is a community rebuild (Community Edition) of the original toolbox — a free, open source and privacy-focused PC hardware toolkit for Windows! No untrusted websites needed to handle your data.",
   "home.section1.text2": "It ships with 82 external tools and 20 built-in tools, including:",
   "home.section1.items": "CPU-Z processor details|GPU-Z GPU info|CrystalDiskMark disk benchmark|FurMark GPU stress test|AIDA64 system diagnostics",
   "home.section1.text3": "The toolkit is extensible - submit new tools right from the app!",
 
   "home.section2.title": "Hardware info at a glance",
-  "home.section2.text1": "TubaWinUi3 queries CPU, motherboard, memory, GPU, disk and monitor data in real time via WMI on background threads - never blocking the UI.",
+  "home.section2.text1": "TubaWinUi3 CE queries CPU, motherboard, memory, GPU, disk and monitor data in real time via WMI on background threads - never blocking the UI.",
   "home.section2.items": "CPU model, cores/threads, frequency|GPU model, VRAM, driver version|Memory capacity, frequency, slots|Disk model, capacity, health|Monitor resolution, refresh rate",
   "home.section2.text2": "CPU-Z report overlay verification keeps the data accurate.",
 
@@ -60,7 +60,7 @@ export default {
   "home.tools.more": "and more…",
 
   "home.support.title": "Support us!",
-  "home.support.text1": "If you like TubaWinUi3, feel free to",
+  "home.support.text1": "If you like TubaWinUi3 CE, feel free to",
   "home.support.star": "star the repo",
   "home.support.feedback": "submit feedback",
   "home.support.contribute": "contribute code",
@@ -70,7 +70,7 @@ export default {
   "home.footer.credit2": "UI controls powered by",
   "home.footer.credit-link": "WinUIonWeb",
 
-  "download.title": "Download TubaWinUi3",
+  "download.title": "Download TubaWinUi3 CE",
   "download.subtitle": "Free · Offline · Auto-detects your architecture",
   "download.version": "Latest version",
   "download.loading": "Loading…",
@@ -109,9 +109,9 @@ export default {
   "download.sys-disk": "Disk space",
   "download.sys-disk-value": "About 500 MB",
 
-  "thanks.title": "Thank you for downloading TubaWinUi3",
+  "thanks.title": "Thank you for downloading TubaWinUi3 CE",
   "thanks.subtitle": "Download started",
-  "thanks.heading": "Thanks for using TubaWinUi3!",
+  "thanks.heading": "Thanks for using TubaWinUi3 CE!",
   "thanks.desc": "We hope this toolkit helps you understand your PC better. If you like it, consider starring the repo on GitHub.",
   "thanks.download-started": "Download started",
   "thanks.download-started-desc": "Your browser opened the download task and the file is being transferred.",
@@ -126,8 +126,8 @@ export default {
   "thanks.again": "Download again",
   "thanks.back-home": "Back to home",
 
-  "about.title": "About TubaWinUi3",
-  "about.subtitle": "A free, open source, privacy-focused PC hardware toolkit",
+  "about.title": "About TubaWinUi3 CE",
+  "about.subtitle": "Community Edition of the original toolbox — a free, open source, privacy-focused PC hardware toolkit",
   "about.appearance": "Appearance",
   "about.theme": "Theme",
   "about.theme-desc": "Choose the site display mode",
@@ -158,8 +158,8 @@ export default {
   "search.no-results": "No results found",
   "search.no-results-desc": "Try different keywords, e.g. CPU-Z, disk, blue screen, hardware info",
 
-  "why.title": "Why Choose TubaWinUi3?",
-  "why.subtitle": "Comprehensive comparison against the original toolbox — WinUI3 leads in download experience, UI design, compatibility, features, and AI capabilities",
+  "why.title": "Why Choose TubaWinUi3 CE?",
+  "why.subtitle": "Comprehensive comparison against the original toolbox — TubaWinUi3 CE leads in download experience, UI design, compatibility, features, and AI capabilities",
   "why.winner": "Better",
   "why.legacy": "Original",
 
@@ -188,14 +188,14 @@ export default {
   "why.ai.winItems": "Built-in AI agent for hardware and system questions|Support for multiple AI model integrations|Natural language interaction, lower barrier to entry|Continuously iterated AI capabilities",
   "why.ai.legacyItems": "No AI features|Must search and troubleshoot issues manually",
 
-  "why.summary.title": "TubaWinUi3 — The Next-Gen PC Hardware Toolkit",
-  "why.summary.text": "From download experience to daily use, the WinUI3 version brings a quantum leap in every dimension. If you're still using the original, it's time to upgrade.",
-  "why.summary.download": "Download WinUI3 Now",
+  "why.summary.title": "TubaWinUi3 CE — The Next-Gen PC Hardware Toolkit",
+  "why.summary.text": "From download experience to daily use, TubaWinUi3 CE brings a quantum leap in every dimension. If you're still using the original, it's time to upgrade.",
+  "why.summary.download": "Download TubaWinUi3 CE Now",
 
   "rank.title": "Benchmark Ranking",
-  "rank.subtitle": "Community-submitted performance benchmarks from the TubaWinUi3 community — compare your PC with users worldwide",
+  "rank.subtitle": "Community-submitted performance benchmarks from the TubaWinUi3 CE community — compare your PC with users worldwide",
   "rank.info-title": "How to submit your score?",
-  "rank.info-message": "Download and install TubaWinUi3, run the built-in \"Performance Test\" to complete all test items, then click \"Upload Ranking\" to submit your data to the community leaderboard.",
+  "rank.info-message": "Download and install TubaWinUi3 CE, run the built-in \"Performance Test\" to complete all test items, then click \"Upload Ranking\" to submit your data to the community leaderboard.",
   "rank.sort.gaming": "Gaming",
   "rank.sort.office": "Office",
   "rank.sort.cpu": "CPU Multi-core",

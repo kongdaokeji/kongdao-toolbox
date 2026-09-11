@@ -16,7 +16,7 @@ class ReleaseJsonTest {
           "tag_name": "v1.5.7",
           "draft": false,
           "prerelease": false,
-          "name": "图吧工具箱WinUI3 v1.5.7",
+          "name": "图吧工具箱CE v1.5.7",
           "assets": [
             {
               "name": "TubaWinUi3_Setup_1.5.7_x64.exe",

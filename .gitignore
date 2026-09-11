@@ -1294,8 +1294,3 @@ optimizerDuck-temp/
 .DS_Store
 .commandcode/ 
 .workbuddy/
-
-# 商业/共享软件不入公开仓库（版权限制）
-TubaWinUi3.WinUI3/Tools/综合检测/AIDA64/
-TubaWinUi3.WinUI3/Tools/硬盘工具/DiskGenius/
-TubaWinUi3.WinUI3/Tools/其他工具/ULTRAISO/

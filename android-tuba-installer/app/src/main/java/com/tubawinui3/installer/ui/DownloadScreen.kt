@@ -58,7 +58,7 @@ fun DownloadScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("图吧工具箱安装助手") })
+            TopAppBar(title = { Text("图吧工具箱CE安装助手") })
         },
     ) { padding ->
         Column(

@@ -1636,6 +1636,22 @@
       "categories": [
         "综合检测"
       ]
+    },
+    {
+      "match": "Geek Uninstaller",
+      "category": "其他工具"
+    },
+    {
+      "match": "procexp",
+      "category": "其他工具"
+    },
+    {
+      "match": "游戏加加",
+      "category": "其他工具"
+    },
+    {
+      "match": "皮肤编辑器",
+      "category": "其他工具"
     }
   ]
 }

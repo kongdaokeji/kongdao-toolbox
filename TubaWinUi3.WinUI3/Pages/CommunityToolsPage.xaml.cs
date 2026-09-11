@@ -587,7 +587,7 @@ public sealed partial class CommunityToolsPage : Page
 
         var warningText = new TextBlock
         {
-            Text = $"社区包无法保证其安全性，图吧工具箱不对社区包负责，但会尽量避免违规工具。如果你信任 {authorName} 可以开始下载。",
+            Text = $"社区包无法保证其安全性，图吧工具箱CE不对社区包负责，但会尽量避免违规工具。如果你信任 {authorName} 可以开始下载。",
             FontSize = 12,
             Opacity = 0.8,
             TextWrapping = TextWrapping.Wrap,

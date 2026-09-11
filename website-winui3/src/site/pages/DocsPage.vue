@@ -195,15 +195,15 @@ watch(route, () => {
   }
 }, { immediate: true });
 
-/* 文档页 SEO：标题 = 文档标题——图吧工具箱WinUI3文档 */
+/* 文档页 SEO：标题 = 文档标题——图吧工具箱CE文档 */
 watch([currentDocTitle, currentCatTitle], ([title]) => {
-  document.title = `${title}——图吧工具箱WinUI3文档`;
+  document.title = `${title}——图吧工具箱CE文档`;
   const setMeta = (name, content) => {
     const el = document.head.querySelector(`meta[name="${name}"], meta[property="${name}"]`);
     if (el) el.setAttribute('content', content);
   };
-  setMeta('description', `图吧工具箱WinUI3文档：${title}`);
-  setMeta('og:title', `${title}——图吧工具箱WinUI3文档`);
+  setMeta('description', `图吧工具箱CE文档：${title}`);
+  setMeta('og:title', `${title}——图吧工具箱CE文档`);
   setMeta('og:url', `https://tubawinui3.cn/${currentCat.value}/${currentFile.value}`);
   const canonical = document.head.querySelector('link[rel="canonical"]');
   if (canonical) canonical.setAttribute('href', `https://tubawinui3.cn/${currentCat.value}/${currentFile.value}`);

@@ -1,7 +1,11 @@
+using System.Net;
 using System.Net.Http;
-using System.Net.Http.Headers;
+using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.RegularExpressions;
+using System.Text.Json;
+using TubaWinUi3.Models;
+using TubaWinUi3.Pages;
 
 namespace TubaWinUi3.Services;
 
@@ -9,11 +13,21 @@ public sealed class UupBuildInfo
 {
     public string UpdateId { get; set; } = "";
     public string Title { get; set; } = "";
-    public string Architecture { get; set; } = "";
-    public string Channel { get; set; } = "";
     public string Build { get; set; } = "";
-    public DateTime DateAdded { get; set; }
-    public string Category { get; set; } = "";
+    public string Architecture { get; set; } = "";
+    public DateTime? DateAdded { get; set; }
+    public string Channel { get; set; } = "";
+
+    public string DateDisplay => DateAdded?.ToLocalTime().ToString("yyyy-MM-dd") ?? "";
+
+    public string DetailsDisplay
+    {
+        get
+        {
+            var parts = new[] { Build, Architecture, Channel, DateDisplay }.Where(s => !string.IsNullOrEmpty(s));
+            return string.Join(" · ", parts);
+        }
+    }
 }
 
 public sealed class UupLanguageInfo
@@ -26,47 +40,99 @@ public sealed class UupEditionInfo
 {
     public string Id { get; set; } = "";
     public string DisplayName { get; set; } = "";
-    public bool IsBaseEdition { get; set; }
-    public List<string> RequiredBaseEditions { get; set; } = [];
 }
 
-public sealed class UupDownloadInfo
+public sealed class UupFileEntry
+{
+    public string Name { get; set; } = "";
+    public string Url { get; set; } = "";
+    public long Size { get; set; }
+    public string Sha1 { get; set; } = "";
+}
+
+public sealed class UupFileSetInfo
 {
     public string UpdateId { get; set; } = "";
     public string Language { get; set; } = "";
-    public List<string> Editions { get; set; } = [];
-    public int AutoDl { get; set; } = 2;
-    public List<string> VirtualEditions { get; set; } = [];
-}
-
-public sealed class UupQuickFetchOption
-{
-    public string DisplayName { get; set; } = "";
-    public string Ring { get; set; } = "";
-    public string Arch { get; set; } = "";
-}
-
-public sealed class UupNewBuildRequest
-{
-    public string Arch { get; set; } = "amd64";
-    public string Ring { get; set; } = "WIF";
-    public string Flight { get; set; } = "Mainline";
+    public string Edition { get; set; } = "";
+    public string UpdateName { get; set; } = "";
+    public string Architecture { get; set; } = "";
     public string Build { get; set; } = "";
-    public int Minor { get; set; }
-    public int Sku { get; set; } = 48;
+    public List<UupFileEntry> Files { get; set; } = [];
+
+    public long TotalSize => Files.Sum(f => f.Size);
 }
 
+/// <summary>UUP → ISO 转换选项（与 uupdump.net「Summary」页的 Conversion options 一致）。</summary>
+public sealed class UupConvertOptions
+{
+    /// <summary>集成更新（AddUpdates，官网默认勾选）。</summary>
+    public bool AddUpdates { get; set; } = true;
+
+    /// <summary>运行组件清理（Cleanup，减小体积但显著变慢）。</summary>
+    public bool Cleanup { get; set; }
+
+    /// <summary>集成 .NET Framework 3.5（NetFx3）。</summary>
+    public bool NetFx3 { get; set; }
+
+    /// <summary>使用 solid (ESD) 压缩（wim2esd + vwim2esd）。</summary>
+    public bool Wim2Esd { get; set; }
+
+    /// <summary>跳过商店应用完整版集成（SkipApps，默认跳过以加快转换）。</summary>
+    public bool SkipApps { get; set; } = true;
+
+    /// <summary>附加版本（虚拟版本）列表，使用转换器命名（如 Enterprise / CoreSingleLanguage）。</summary>
+    public List<string> VirtualEditions { get; set; } = [];
+
+    public bool HasVirtualEditions => VirtualEditions.Count > 0;
+}
+
+/// <summary>附加版本定义：转换器内部名 + 中文显示名。</summary>
+public sealed record UupVirtualEditionInfo(string Name, string DisplayName);
+
+/// <summary>官方转换工具清单条目：下载地址、本地文件名（清单 out=）、SHA-256。</summary>
+internal sealed record UupConverterFileInfo(string Url, string FileName, string Sha256);
+
+/// <summary>UUP dump JSON API 错误，ShortCode 为 API 返回的错误码（如 USER_RATE_LIMITED）。</summary>
+public sealed class UupDumpApiException : Exception
+{
+    public string ShortCode { get; }
+
+    public UupDumpApiException(string shortCode, string userMessage) : base(userMessage)
+    {
+        ShortCode = shortCode;
+    }
+}
+
+/// <summary>
+/// UUP dump 官方 JSON API（https://git.uupdump.net/uup-dump/json-api，部署于 api.uupdump.net）
+/// 的封装。所有数据（已知构建 / 语言 / 版本 / 文件直链）均来自 JSON API，
+/// 文件直链指向微软官方 CDN（*.delivery.mp.microsoft.com）。
+/// 注意：文件直链有效期仅约 15 分钟，长任务需重新调用 GetFilesAsync 刷新（见 DownloadQueueService 多文件自动重试）。
+/// </summary>
 public static class UupDumpService
 {
-    private const string BaseUrl = "https://uupdump.net";
-    private static readonly HttpClient _http = new()
-    {
-        Timeout = TimeSpan.FromMinutes(5),
-        DefaultRequestHeaders =
-        {
-            { "User-Agent", "TubaWinUi3-UupDump/1.0" }
-        }
-    };
+    private const string ApiHost = "api.uupdump.net";
+    private const string ApiBase = "https://api.uupdump.net";
+
+    // 转换器与解压器来自 UUP dump 官方 misc 仓库，与官网生成的下载包一致。
+    // 下载地址与 SHA-256 运行时从官方清单 autodl_files/converter_windows 获取
+    // （该清单即官网打包用的源文件，转换器升级时自动跟随），拉取失败时用下面的兜底值。
+    private const string ConverterManifestUrl =
+        "https://git.uupdump.net/uup-dump/misc/raw/branch/master/autodl_files/converter_windows";
+    private const string ConverterMirrorBase = "https://git.uupdump.net/uup-dump/misc/raw/branch/master/";
+    private const string SevenZipFileName = "7zr.exe";
+    private const string ConverterArchiveGlob = "uup-converter-wimlib*.7z";
+    private static readonly UupConverterFileInfo[] FallbackConverterFiles =
+    [
+        new("https://uupdump.net/misc/7zr.exe", SevenZipFileName,
+            "72c98287b2e8f85ea7bb87834b6ce1ce7ce7f41a8c97a81b307d4d4bf900922b"),
+        new("https://uupdump.net/misc/uup-converter-wimlib-v125r.7z", "uup-converter-wimlib.7z",
+            "bc2e7a45c6e8d3304da487d21d4e33c21d20cc39ae4725b4a378683e18356165"),
+    ];
+
+// IPv4 优先连接：见 HttpClientFactory（国内到国际 CDN 的 IPv6 路径常被静默丢弃）
+    private static readonly HttpClient _http = HttpClientFactory.CreateIpv4Preferred(TimeSpan.FromSeconds(60));
 
     private static readonly Dictionary<string, string> LanguageNames = new()
     {
@@ -126,22 +192,16 @@ public static class UupDumpService
         ["STARTERN"] = "Windows 入门版 N"
     };
 
-    private static readonly Dictionary<string, string> VirtualEditionNames = new()
-    {
-        ["PROFESSIONALWORKSTATION"] = "专业工作站版",
-        ["PROFESSIONALEDUCATION"] = "专业教育版",
-        ["EDUCATION"] = "教育版",
-        ["ENTERPRISE"] = "企业版",
-        ["SERVERRDSH"] = "企业多会话版",
-        ["IOTENTERPRISE"] = "IoT 企业版",
-        ["IOTENTERPRISEK"] = "IoT 企业版订阅",
-        ["IOTENTERPRISES"] = "IoT 企业版 S",
-        ["IOTENTERPRISESK"] = "IoT 企业版 S 订阅"
-    };
+    /// <summary>版本选择列表中的推荐顺序（越靠前越优先展示）。</summary>
+    private static readonly string[] EditionPreferenceOrder =
+    [
+        "PROFESSIONAL", "CORE", "CORECOUNTRYSPECIFIC", "CORESINGLELANGUAGE",
+        "ENTERPRISE", "EDUCATION", "PROFESSIONALWORKSTATION", "IOTENTERPRISE",
+        "SERVERRDSH", "SERVERSTANDARD", "SERVERDATACENTER",
+    ];
 
     public static IReadOnlyDictionary<string, string> GetLanguageNames() => LanguageNames;
     public static IReadOnlyDictionary<string, string> GetEditionNames() => EditionNames;
-    public static IReadOnlyDictionary<string, string> GetVirtualEditionNames() => VirtualEditionNames;
 
     public static string GetEditionDisplayName(string editionId) =>
         EditionNames.TryGetValue(editionId, out var name) ? name : editionId;
@@ -149,364 +209,689 @@ public static class UupDumpService
     public static string GetLanguageDisplayName(string code) =>
         LanguageNames.TryGetValue(code, out var name) ? name : code;
 
-    public static List<UupQuickFetchOption> GetQuickFetchOptions() =>
-    [
-        new() { DisplayName = "最新正式版 (x64)", Ring = "Retail", Arch = "amd64" },
-        new() { DisplayName = "最新正式版 (ARM64)", Ring = "Retail", Arch = "arm64" },
-        new() { DisplayName = "最新预览版 (x64)", Ring = "RP", Arch = "amd64" },
-        new() { DisplayName = "最新预览版 (ARM64)", Ring = "RP", Arch = "arm64" },
-        new() { DisplayName = "最新 Beta 版 (x64)", Ring = "WIS", Arch = "amd64" },
-        new() { DisplayName = "最新 Beta 版 (ARM64)", Ring = "WIS", Arch = "arm64" },
-        new() { DisplayName = "最新 Dev 版 (x64)", Ring = "WIF", Arch = "amd64" },
-        new() { DisplayName = "最新 Dev 版 (ARM64)", Ring = "WIF", Arch = "arm64" },
-        new() { DisplayName = "最新 Canary 版 (x64)", Ring = "Canary", Arch = "amd64" },
-        new() { DisplayName = "最新 Canary 版 (ARM64)", Ring = "Canary", Arch = "arm64" },
-    ];
+    // ==================== JSON API 调用 ====================
 
-    public static async Task<List<UupBuildInfo>> FetchLatestBuildsAsync(string ring, string arch, CancellationToken ct = default)
+    /// <summary>获取已知构建列表（对应官网「浏览已知构建」，无接口限流）。search 支持版本号/关键词。</summary>
+    public static async Task<List<UupBuildInfo>> GetKnownBuildsAsync(string? search = null, CancellationToken ct = default)
     {
-        var url = $"{BaseUrl}/fetchupd.php?arch={arch}&ring={ring}&flight=Mainline&build=26100.1";
-        var html = await _http.GetStringAsync(url, ct);
-        return ParseBuildListHtml(html);
+        var url = $"{ApiBase}/listid.php?sortByDate=1";
+        if (!string.IsNullOrWhiteSpace(search))
+            url += $"&search={Uri.EscapeDataString(search.Trim())}";
+
+        using var doc = await GetJsonAsync(url, ct);
+        return ParseBuildsJson(doc.RootElement.GetProperty("response"));
     }
 
-    public static async Task<List<UupBuildInfo>> FetchNewBuildAsync(UupNewBuildRequest req, CancellationToken ct = default)
-    {
-        var url = $"{BaseUrl}/fetchupd.php?arch={req.Arch}&ring={req.Ring}&flight={req.Flight}&build={req.Build}&minor={req.Minor}&sku={req.Sku}";
-        var html = await _http.GetStringAsync(url, ct);
-        return ParseBuildListHtml(html);
-    }
-
-    public static async Task<List<UupBuildInfo>> GetKnownBuildsAsync(string? search = null, string? category = null, CancellationToken ct = default)
-    {
-        var url = $"{BaseUrl}/known.php";
-        if (!string.IsNullOrEmpty(search))
-            url += $"?q={Uri.EscapeDataString(search)}";
-        if (!string.IsNullOrEmpty(category))
-        {
-            var sep = url.Contains('?') ? "&" : "?";
-            url += $"{sep}q=category:{Uri.EscapeDataString(category)}";
-        }
-
-        var html = await _http.GetStringAsync(url, ct);
-        return ParseKnownBuildsHtml(html);
-    }
-
+    /// <summary>获取某构建可选的语言列表。</summary>
     public static async Task<List<UupLanguageInfo>> GetLanguagesAsync(string updateId, CancellationToken ct = default)
     {
-        var url = $"{BaseUrl}/selectlang.php?id={Uri.EscapeDataString(updateId)}";
-        var html = await _http.GetStringAsync(url, ct);
-        return ParseLanguagesHtml(html);
+        var url = $"{ApiBase}/listlangs.php?id={Uri.EscapeDataString(updateId)}";
+        using var doc = await GetJsonAsync(url, ct);
+        return ParseLanguagesJson(doc.RootElement.GetProperty("response"));
     }
 
-    public static async Task<List<UupEditionInfo>> GetEditionsAsync(string updateId, string language, CancellationToken ct = default)
+    /// <summary>获取某构建在指定语言下的可用版本列表。</summary>
+    public static async Task<List<UupEditionInfo>> GetEditionsAsync(string updateId, string lang, CancellationToken ct = default)
     {
-        var url = $"{BaseUrl}/selectedition.php?id={Uri.EscapeDataString(updateId)}&pack={Uri.EscapeDataString(language)}";
-        var html = await _http.GetStringAsync(url, ct);
-        return ParseEditionsHtml(html);
+        var url = $"{ApiBase}/listeditions.php?id={Uri.EscapeDataString(updateId)}&lang={Uri.EscapeDataString(lang)}";
+        using var doc = await GetJsonAsync(url, ct);
+        return ParseEditionsJson(doc.RootElement.GetProperty("response"));
     }
 
-    public static string BuildGetUrl(UupDownloadInfo info)
+    /// <summary>
+    /// 获取某构建指定语言+版本的文件清单。
+    /// withLinks=false 时走 API 的 noLinks 快速通道（不触发限流），但不含下载直链。
+    /// </summary>
+    public static async Task<UupFileSetInfo> GetFilesAsync(string updateId, string lang, string edition, bool withLinks = true, CancellationToken ct = default)
     {
-        var editions = string.Join("&edition=", info.Editions.Select(Uri.EscapeDataString));
-        return $"{BaseUrl}/get.php?id={Uri.EscapeDataString(info.UpdateId)}&pack={Uri.EscapeDataString(info.Language)}&edition={editions}&autodl={info.AutoDl}";
+        var url = $"{ApiBase}/get.php?id={Uri.EscapeDataString(updateId)}&lang={Uri.EscapeDataString(lang)}&edition={Uri.EscapeDataString(edition)}&noLinks={(withLinks ? 0 : 1)}";
+        using var doc = await GetJsonAsync(url, ct);
+        var set = ParseFilesJson(doc.RootElement.GetProperty("response"));
+        set.UpdateId = updateId;
+        set.Language = lang;
+        set.Edition = edition;
+        return set;
     }
 
-    public static async Task<string> DownloadPackageAsync(UupDownloadInfo info, string destDir, IProgress<(int percent, string status)>? progress, CancellationToken ct = default)
+    /// <summary>检测当前系统适合的 UUP 架构标识（amd64 / arm64 / x86）。</summary>
+    public static string GetSuggestedArch()
     {
-        Directory.CreateDirectory(destDir);
-
-        if (info.AutoDl == 3 && info.VirtualEditions.Count > 0)
-            return await DownloadPackagePostAsync(info, destDir, progress, ct);
-
-        return await DownloadPackageGetAsync(info, destDir, progress, ct);
-    }
-
-    private static async Task<string> DownloadPackageGetAsync(UupDownloadInfo info, string destDir, IProgress<(int percent, string status)>? progress, CancellationToken ct)
-    {
-        var url = BuildGetUrl(info);
-        return await StreamZipToFileAsync(url, destDir, progress, ct);
-    }
-
-    private static async Task<string> DownloadPackagePostAsync(UupDownloadInfo info, string destDir, IProgress<(int percent, string status)>? progress, CancellationToken ct)
-    {
-        var getUrl = BuildGetUrl(info);
-        var content = new FormUrlEncodedContent(
-            info.VirtualEditions.Select(ve => new KeyValuePair<string, string>("virtualEditions[]", ve)));
-
-        var request = new HttpRequestMessage(HttpMethod.Post, getUrl) { Content = content };
-
-        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-        response.EnsureSuccessStatusCode();
-
-        var ctHeader = response.Content.Headers.ContentType;
-        if (ctHeader is not null && ctHeader.MediaType == "application/zip")
-            return await StreamResponseToFileAsync(response, destDir, progress, ct);
-
-        var html = await response.Content.ReadAsStringAsync(ct);
-        var redirectUrl = ExtractRedirectFromHtml(html);
-        if (!string.IsNullOrEmpty(redirectUrl))
-            return await StreamZipToFileAsync(redirectUrl, destDir, progress, ct);
-
-        throw new InvalidOperationException("服务器未返回 ZIP 文件。请尝试在浏览器中手动下载。");
-    }
-
-    private static async Task<string> StreamZipToFileAsync(string url, string destDir, IProgress<(int percent, string status)>? progress, CancellationToken ct)
-    {
-        progress?.Report((0, "正在连接服务器..."));
-
-        using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
-        response.EnsureSuccessStatusCode();
-
-        return await StreamResponseToFileAsync(response, destDir, progress, ct);
-    }
-
-    private static async Task<string> StreamResponseToFileAsync(HttpResponseMessage response, string destDir, IProgress<(int percent, string status)>? progress, CancellationToken ct)
-    {
-        var disposition = response.Content.Headers.ContentDisposition;
-        var fileName = "uup_dlp.zip";
-        if (disposition is not null)
+        return RuntimeInformation.OSArchitecture switch
         {
-            var fn = disposition.FileName?.Trim('"');
-            if (!string.IsNullOrEmpty(fn)) fileName = fn;
-        }
-
-        var destPath = Path.Combine(destDir, fileName);
-        var totalBytes = response.Content.Headers.ContentLength ?? 0;
-
-        progress?.Report((5, "正在下载 UUP 转换包..."));
-
-        using var stream = await response.Content.ReadAsStreamAsync(ct);
-        using var fs = File.Create(destPath);
-
-        var buffer = new byte[81920];
-        long bytesRead = 0;
-        int read;
-        while ((read = await stream.ReadAsync(buffer, ct)) > 0)
-        {
-            await fs.WriteAsync(buffer.AsMemory(0, read), ct);
-            bytesRead += read;
-            if (totalBytes > 0)
-            {
-                var pct = Math.Min((int)(bytesRead * 100 / totalBytes), 99);
-                progress?.Report((pct, $"正在下载转换包... {pct}%"));
-            }
-        }
-
-        progress?.Report((100, "下载完成"));
-        return destPath;
+            Architecture.Arm64 => "arm64",
+            Architecture.X86 => "x86",
+            _ => "amd64",
+        };
     }
 
-    private static string ExtractRedirectFromHtml(string html)
-    {
-        var metaMatch = Regex.Match(html, @"<meta[^>]*http-equiv=""refresh""[^>]*content=""[^;]*;url=([^""]+)""", RegexOptions.IgnoreCase);
-        if (metaMatch.Success) return metaMatch.Groups[1].Value;
-
-        var locMatch = Regex.Match(html, @"window\.location\s*=\s*'([^']+)'", RegexOptions.IgnoreCase);
-        if (locMatch.Success) return locMatch.Groups[1].Value;
-
-        var linkMatch = Regex.Match(html, @"href=""(get\.php[^""]*autodl=3[^""]*)""", RegexOptions.IgnoreCase);
-        if (linkMatch.Success)
-        {
-            var u = linkMatch.Groups[1].Value;
-            return u.StartsWith("http") ? u : $"{BaseUrl}/{u}";
-        }
-
-        var pkgMatch = Regex.Match(html, @"href=""([^""]*pack_[^""]*\.zip)""", RegexOptions.IgnoreCase);
-        if (pkgMatch.Success)
-        {
-            var u = pkgMatch.Groups[1].Value;
-            return u.StartsWith("http") ? u : $"{BaseUrl}/{u}";
-        }
-
-        return "";
-    }
-
+    /// <summary>
+    /// UUP 包根目录（每个下载占一个包子目录，内含 UUPs 文件集与转换产物）。
+    /// 用户未自定义「WindowsImageDownloadDir」时为 下载\UUPDump。
+    /// </summary>
     public static string GetDownloadDir()
     {
-        var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "UUPDump");
+        var custom = AppSettings.Get("WindowsImageDownloadDir");
+        var root = string.IsNullOrWhiteSpace(custom)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads")
+            : custom.Trim();
+        var dir = Path.Combine(root, "UUPDump");
         Directory.CreateDirectory(dir);
         return dir;
     }
 
-    private static List<UupBuildInfo> ParseBuildListHtml(string html)
+    /// <summary>某次 UUP 下载的包目录（UUPs/ 子目录存放文件集，转换脚本与 ISO 输出在包根目录）。同名目录复用，便于断点续传。</summary>
+    public static (string PackageDir, string UupsDir) GetPackageDirs(string build, string lang, string edition)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var name = new StringBuilder($"{build}_{lang}_{edition}").Replace(' ', '_');
+        for (var i = 0; i < name.Length; i++)
+        {
+            if (invalid.Contains(name[i])) name[i] = '_';
+        }
+
+        var packageDir = Path.Combine(GetDownloadDir(), name.ToString());
+        return (packageDir, Path.Combine(packageDir, "UUPs"));
+    }
+
+    /// <summary>
+    /// 可从指定基础版本合成的附加版本列表（对照 uupdump.net「Summary」页选项与官网 Required edition 映射）。
+    /// </summary>
+    public static List<UupVirtualEditionInfo> GetVirtualEditionsForBase(string baseEditionId)
+    {
+        return baseEditionId.ToUpperInvariant() switch
+        {
+            "PROFESSIONAL" =>
+            [
+                new UupVirtualEditionInfo("ProfessionalWorkstation", "专业工作站版"),
+                new UupVirtualEditionInfo("ProfessionalEducation", "专业教育版"),
+                new UupVirtualEditionInfo("Education", "教育版"),
+                new UupVirtualEditionInfo("Enterprise", "企业版"),
+                new UupVirtualEditionInfo("ServerRdsh", "企业多会话版"),
+                new UupVirtualEditionInfo("IoTEnterprise", "IoT 企业版"),
+                new UupVirtualEditionInfo("IoTEnterpriseK", "IoT 企业版订阅"),
+            ],
+            "PROFESSIONALN" =>
+            [
+                new UupVirtualEditionInfo("ProfessionalWorkstationN", "专业工作站版 N"),
+                new UupVirtualEditionInfo("ProfessionalEducationN", "专业教育版 N"),
+                new UupVirtualEditionInfo("EducationN", "教育版 N"),
+                new UupVirtualEditionInfo("EnterpriseN", "企业版 N"),
+            ],
+            "CORE" =>
+            [
+                new UupVirtualEditionInfo("CoreSingleLanguage", "家庭单语言版"),
+            ],
+            _ => [],
+        };
+    }
+
+    // ==================== 下载管线（文件集 + ISO 转换） ====================
+
+    /// <summary>构造多文件下载解析器：每次调用都重新请求文件列表，拿到新鲜的微软 CDN 直链。</summary>
+    public static Func<CancellationToken, Task<List<ResolvedDownloadUrl>>> CreateMultiFileResolver(string updateId, string lang, string edition)
+    {
+        return async ct =>
+        {
+            var set = await GetFilesAsync(updateId, lang, edition, withLinks: true, ct);
+            if (set.Files.Count == 0)
+                throw new UupDumpApiException("NO_FILES", "该版本没有可下载的文件，请尝试其他版本。");
+
+            return set.Files
+                .Select(f => new ResolvedDownloadUrl(f.Url, f.Name, f.Size))
+                .ToList();
+        };
+    }
+
+    /// <summary>构造「下载完成 → 自动转换为 ISO」的后处理器。destDir 为 UUPs 目录，包根目录是其上级。</summary>
+    public static IDownloadPostProcessor CreateIsoPostProcessor(string title)
+    {
+        return new DelegatePostProcessor("UUP 转 ISO", async (downloadedPath, destDir, progress, ct) =>
+        {
+            var root = Path.GetDirectoryName(destDir.TrimEnd(Path.DirectorySeparatorChar))
+                ?? throw new InvalidOperationException("无法确定转换目录。");
+            Directory.CreateDirectory(root);
+
+            progress?.Report("正在准备官方转换工具...");
+            var filesDir = Path.Combine(root, "files");
+            Directory.CreateDirectory(filesDir);
+            await EnsureConverterFilesAsync(filesDir, progress, ct);
+
+            // ConvertConfig.ini 在加入下载队列时已生成（下载期间用户可自行编辑，此处不覆盖）
+
+            progress?.Report("正在解压转换工具...");
+            await ExtractConverterAsync(root, ct);
+
+            var convertCmd = Path.Combine(root, "convert-UUP.cmd");
+            if (!File.Exists(convertCmd))
+                throw new InvalidOperationException("转换工具解压后缺少 convert-UUP.cmd，请重试。");
+
+            progress?.Report("正在启动转换脚本（ISO 生成约需 10~30 分钟，可在转换窗口查看进度）...");
+            App.MainWindow?.DispatcherQueue.TryEnqueue(() =>
+            {
+                ScriptRunnerWindow.ShowAndRun(
+                    "cmd.exe /c convert-UUP.cmd",
+                    workingDir: root,
+                    title: $"UUP 转 ISO - {title}");
+            });
+
+            // 转换脚本在独立窗口中运行，完成时 ISO 输出在 root 下
+            await Task.CompletedTask;
+        });
+    }
+
+    /// <summary>
+    /// 在包根目录生成 ConvertConfig.ini（与 uupdump.net 生成的官方包格式一致）。
+    /// 在加入下载队列时调用；下载期间用户可手动编辑，转换脚本启动时以该文件为准。
+    /// </summary>
+    public static void WriteConvertConfigIni(string packageDir, UupConvertOptions options)
+    {
+        Directory.CreateDirectory(packageDir);
+        File.WriteAllText(Path.Combine(packageDir, "ConvertConfig.ini"), BuildConvertConfigIni(options));
+    }
+
+    internal static string BuildConvertConfigIni(UupConvertOptions? options = null)
+    {
+        options ??= new UupConvertOptions();
+
+        string Flag(bool v) => v ? "1" : "0";
+
+        var sb = new StringBuilder();
+        sb.AppendLine("[convert-UUP]");
+        sb.AppendLine("AutoStart    =1");
+        sb.AppendLine($"AddUpdates   ={Flag(options.AddUpdates)}");
+        sb.AppendLine($"Cleanup      ={Flag(options.Cleanup)}");
+        sb.AppendLine("ResetBase    =0");
+        sb.AppendLine($"NetFx3       ={Flag(options.NetFx3)}");
+        sb.AppendLine($"StartVirtual ={Flag(options.HasVirtualEditions)}");
+        sb.AppendLine($"wim2esd      ={Flag(options.Wim2Esd)}");
+        sb.AppendLine("wim2swm      =0");
+        sb.AppendLine("SkipISO      =0");
+        sb.AppendLine("SkipWinRE    =0");
+        sb.AppendLine("LCUwinre     =0");
+        sb.AppendLine("LCUmsuExpand =0");
+        sb.AppendLine("UpdtBootFiles=0");
+        sb.AppendLine("ForceDism    =0");
+        sb.AppendLine("RefESD       =0");
+        sb.AppendLine("SkipLCUmsu   =0");
+        sb.AppendLine("SkipEdge     =0");
+        sb.AppendLine("AutoExit     =1");
+        sb.AppendLine("DisableUpdatingUpgrade=0");
+        sb.AppendLine("AddDrivers   =0");
+        sb.AppendLine("Drv_Source   =\\Drivers");
+        sb.AppendLine();
+        sb.AppendLine("[Store_Apps]");
+        sb.AppendLine($"SkipApps     ={Flag(options.SkipApps)}");
+        sb.AppendLine("AppsLevel    =0");
+        sb.AppendLine("StubAppsFull =0");
+        sb.AppendLine("CustomList   =0");
+        sb.AppendLine();
+        sb.AppendLine("[create_virtual_editions]");
+        sb.AppendLine("vUseDism     =1");
+        sb.AppendLine("vAutoStart   =1");
+        sb.AppendLine("vDeleteSource=0");
+        sb.AppendLine("vPreserve    =0");
+        sb.AppendLine($"vwim2esd     ={Flag(options.Wim2Esd)}");
+        sb.AppendLine("vwim2swm     =0");
+        sb.AppendLine("vSkipISO     =0");
+        sb.AppendLine($"vAutoEditions={string.Join(",", options.VirtualEditions)}");
+        sb.AppendLine("vSortEditions=");
+        return sb.ToString();
+    }
+
+    /// <summary>获取官方转换工具清单（aria2 格式）；拉取失败或解析为空时返回内置兜底列表。</summary>
+    internal static async Task<List<UupConverterFileInfo>> GetConverterFileListAsync(CancellationToken ct)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, ConverterManifestUrl);
+            request.Headers.UserAgent.ParseAdd("TubaWinUi3-UupDump/2.0");
+            using var response = await _http.SendAsync(request, ct);
+            if (response.IsSuccessStatusCode)
+            {
+                var text = await response.Content.ReadAsStringAsync(ct);
+                var parsed = ParseConverterManifest(text);
+                if (parsed.Count > 0) return parsed;
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch
+        {
+            // 清单拉取失败不影响流程，退回内置兜底列表
+        }
+
+        return FallbackConverterFiles.ToList();
+    }
+
+    /// <summary>解析官方 converter_windows 清单（aria2 输入格式：url 行 + out= + checksum=sha-256=）。</summary>
+    internal static List<UupConverterFileInfo> ParseConverterManifest(string text)
+    {
+        var result = new List<UupConverterFileInfo>();
+        string? url = null, outFile = null, hash = null;
+
+        void Flush()
+        {
+            if (url is not null && outFile is not null && hash is not null)
+                result.Add(new UupConverterFileInfo(url, outFile, hash));
+            url = outFile = hash = null;
+        }
+
+        foreach (var rawLine in text.Split('\n'))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0)
+            {
+                Flush();
+                continue;
+            }
+
+            if (url is null)
+            {
+                if (line.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                    url = line;
+                continue;
+            }
+
+            if (line.StartsWith("out=", StringComparison.Ordinal))
+                outFile = line["out=".Length..].Trim();
+            else if (line.StartsWith("checksum=sha-256=", StringComparison.OrdinalIgnoreCase))
+                hash = line["checksum=sha-256=".Length..].Trim();
+        }
+        Flush();
+
+        return result;
+    }
+
+    /// <summary>下载并校验转换工具文件（SHA-256 校验，官方地址 + git.uupdump.net raw 镜像双源回退，已存在且校验通过则跳过）。</summary>
+    private static async Task EnsureConverterFilesAsync(string filesDir, IProgress<string>? progress, CancellationToken ct)
+    {
+        var files = await GetConverterFileListAsync(ct);
+
+        foreach (var file in files)
+        {
+            var destPath = Path.Combine(filesDir, file.FileName);
+            var remoteName = Path.GetFileName(new Uri(file.Url).LocalPath);
+
+            if (File.Exists(destPath) && await VerifySha256Async(destPath, file.Sha256, ct))
+                continue;
+
+            // 远端文件名带版本号（如 uup-converter-wimlib-v125r.7z），
+            // 镜像地址按远端名拼接；本地保存名用清单的 out=
+            var sources = new[] { file.Url, ConverterMirrorBase + remoteName };
+
+            Exception? lastError = null;
+            var ok = false;
+            foreach (var source in sources)
+            {
+                for (var attempt = 0; attempt < 2 && !ok; attempt++)
+                {
+                    try
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        progress?.Report($"正在下载转换工具 {file.FileName}...");
+                        await DownloadToFileAsync(source, destPath, ct);
+                        if (await VerifySha256Async(destPath, file.Sha256, ct))
+                        {
+                            ok = true;
+                            break;
+                        }
+                        throw new InvalidDataException($"{file.FileName} SHA-256 校验不通过");
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex)
+                    {
+                        lastError = ex;
+                        try { File.Delete(destPath); } catch { }
+                    }
+                }
+                if (ok) break;
+            }
+
+            if (!ok)
+                throw new InvalidOperationException($"转换工具 {file.FileName} 下载失败：{lastError?.Message}", lastError);
+        }
+    }
+
+    private static async Task DownloadToFileAsync(string url, string destPath, CancellationToken ct)
+    {
+        using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+        response.EnsureSuccessStatusCode();
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        await using var fs = File.Create(destPath);
+        await stream.CopyToAsync(fs, ct);
+    }
+
+    internal static async Task<bool> VerifySha256Async(string filePath, string expectedSha256, CancellationToken ct)
+    {
+        try
+        {
+            await using var fs = File.OpenRead(filePath);
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            var hash = await sha.ComputeHashAsync(fs, ct);
+            var sb = new StringBuilder(hash.Length * 2);
+            foreach (var b in hash) sb.Append(b.ToString("x2"));
+            return sb.ToString().Equals(expectedSha256, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static async Task ExtractConverterAsync(string root, CancellationToken ct)
+    {
+        var filesDir = Path.Combine(root, "files");
+        var sevenZip = Path.Combine(filesDir, SevenZipFileName);
+        if (!File.Exists(sevenZip))
+            throw new InvalidOperationException("转换工具文件缺失，请重试。");
+
+        var archive = Directory.GetFiles(filesDir, ConverterArchiveGlob).FirstOrDefault()
+            ?? throw new InvalidOperationException("未找到转换工具压缩包，请重试。");
+
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = sevenZip,
+            Arguments = $"x \"{archive}\" -x!ConvertConfig.ini -y -o\"{root}\"",
+            WorkingDirectory = root,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        using var process = System.Diagnostics.Process.Start(psi)
+            ?? throw new InvalidOperationException("无法启动解压工具。");
+        await process.WaitForExitAsync(ct);
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException($"转换工具解压失败（退出码 {process.ExitCode}）。");
+    }
+
+    // ==================== JSON 解析（internal，供单元测试） ====================
+
+    internal static List<UupBuildInfo> ParseBuildsJson(JsonElement response)
     {
         var builds = new List<UupBuildInfo>();
-        var rows = Regex.Matches(html, @"<a[^>]*href=""selectlang\.php\?id=([a-f0-9\-]+)""[^>]*>(.*?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        if (!response.TryGetProperty("builds", out var buildsEl))
+            return builds;
 
-        foreach (Match m in rows)
+        // API 无 search 时返回数组；带 search 时 PHP 会输出以索引为键的对象，两种形态都兼容
+        IEnumerable<JsonElement> items = buildsEl.ValueKind == JsonValueKind.Array
+            ? buildsEl.EnumerateArray().ToList()
+            : buildsEl.EnumerateObject().Select(p => p.Value).ToList();
+
+        foreach (var v in items)
         {
-            var id = m.Groups[1].Value;
-            var title = StripTags(m.Groups[2].Value).Trim();
-            if (string.IsNullOrEmpty(title)) continue;
+            if (v.ValueKind != JsonValueKind.Object) continue;
 
-            var arch = "amd64";
-            if (title.Contains("arm64", StringComparison.OrdinalIgnoreCase)) arch = "arm64";
-            else if (title.Contains("x86", StringComparison.OrdinalIgnoreCase)) arch = "x86";
+            var title = GetString(v, "title");
+            var uuid = GetString(v, "uuid");
+            if (string.IsNullOrEmpty(title) || string.IsNullOrEmpty(uuid)) continue;
 
-            var channel = "";
-            if (title.Contains("Canary", StringComparison.OrdinalIgnoreCase)) channel = "Canary";
-            else if (title.Contains("Dev", StringComparison.OrdinalIgnoreCase)) channel = "Dev";
-            else if (title.Contains("Beta", StringComparison.OrdinalIgnoreCase)) channel = "Beta";
-            else if (title.Contains("Release Preview", StringComparison.OrdinalIgnoreCase) || title.Contains("RP", StringComparison.OrdinalIgnoreCase)) channel = "Release Preview";
-            else if (title.Contains("Retail", StringComparison.OrdinalIgnoreCase)) channel = "Retail";
-
-            var buildMatch = Regex.Match(title, @"(\d+\.\d+)");
-            var build = buildMatch.Success ? buildMatch.Groups[1].Value : "";
-
+            var created = GetInt64(v, "created");
             builds.Add(new UupBuildInfo
             {
-                UpdateId = id,
+                UpdateId = uuid,
                 Title = title,
-                Architecture = arch,
-                Channel = channel,
-                Build = build,
-                Category = DetermineCategory(title)
+                Build = GetString(v, "build"),
+                Architecture = GetString(v, "arch"),
+                DateAdded = created > 0 ? DateTimeOffset.FromUnixTimeSeconds(created).UtcDateTime : null,
+                Channel = DeriveChannel(title),
             });
         }
 
         return builds;
     }
 
-    private static List<UupBuildInfo> ParseKnownBuildsHtml(string html)
+    internal static List<UupLanguageInfo> ParseLanguagesJson(JsonElement response)
     {
-        var builds = new List<UupBuildInfo>();
-        var rows = Regex.Matches(html, @"<a[^>]*href=""selectlang\.php\?id=([a-f0-9\-]+)""[^>]*>(.*?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        var result = new List<UupLanguageInfo>();
 
-        foreach (Match m in rows)
+        var fancy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (response.TryGetProperty("langFancyNames", out var fancyEl) && fancyEl.ValueKind == JsonValueKind.Object)
         {
-            var id = m.Groups[1].Value;
-            var title = StripTags(m.Groups[2].Value).Trim();
-            if (string.IsNullOrEmpty(title)) continue;
-
-            var arch = "amd64";
-            if (title.Contains("arm64", StringComparison.OrdinalIgnoreCase)) arch = "arm64";
-            else if (title.Contains("x86", StringComparison.OrdinalIgnoreCase)) arch = "x86";
-
-            var channel = "";
-            if (title.Contains("Canary", StringComparison.OrdinalIgnoreCase)) channel = "Canary";
-            else if (title.Contains("Dev", StringComparison.OrdinalIgnoreCase)) channel = "Dev";
-            else if (title.Contains("Beta", StringComparison.OrdinalIgnoreCase)) channel = "Beta";
-            else if (title.Contains("Release Preview", StringComparison.OrdinalIgnoreCase)) channel = "Release Preview";
-
-            var buildMatch = Regex.Match(title, @"(\d+\.\d+)");
-            var build = buildMatch.Success ? buildMatch.Groups[1].Value : "";
-
-            builds.Add(new UupBuildInfo
-            {
-                UpdateId = id,
-                Title = title,
-                Architecture = arch,
-                Channel = channel,
-                Build = build,
-                Category = DetermineCategory(title)
-            });
+            foreach (var p in fancyEl.EnumerateObject())
+                fancy[p.Name] = p.Value.GetString() ?? "";
         }
 
-        return builds;
-    }
-
-    private static List<UupLanguageInfo> ParseLanguagesHtml(string html)
-    {
-        var langs = new List<UupLanguageInfo>();
-
-        var matches = Regex.Matches(html, @"href=""selectedition\.php\?id=[^""]*&pack=([a-z]{2}-[a-z]{2}|neutral)""[^>]*>(.*?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-        foreach (Match m in matches)
+        if (response.TryGetProperty("langList", out var listEl) && listEl.ValueKind == JsonValueKind.Array)
         {
-            var code = m.Groups[1].Value;
-            var name = StripTags(m.Groups[2].Value).Trim();
-            var displayName = LanguageNames.TryGetValue(code, out var dn) ? $"{dn} ({code})" : name;
-            if (string.IsNullOrEmpty(displayName)) displayName = code;
-            langs.Add(new UupLanguageInfo { Code = code, DisplayName = displayName });
-        }
-
-        if (langs.Count == 0)
-        {
-            var optMatches = Regex.Matches(html, @"<option[^>]*value=""([a-z]{2}-[a-z]{2}|neutral)""[^>]*>(.*?)</option>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            foreach (Match m in optMatches)
+            foreach (var v in listEl.EnumerateArray())
             {
-                var code = m.Groups[1].Value;
-                var name = StripTags(m.Groups[2].Value).Trim();
-                var displayName = LanguageNames.TryGetValue(code, out var dn) ? $"{dn} ({code})" : name;
-                if (string.IsNullOrEmpty(displayName)) displayName = code;
-                langs.Add(new UupLanguageInfo { Code = code, DisplayName = displayName });
-            }
-        }
-
-        return langs.DistinctBy(l => l.Code).ToList();
-    }
-
-    private static List<UupEditionInfo> ParseEditionsHtml(string html)
-    {
-        var editions = new List<UupEditionInfo>();
-
-        foreach (var pattern in new[]
-        {
-            @"name=""edition\[\]""[^>]*value=""([^""]+)""",
-            @"name=""edition[]""[^>]*value=""([^""]+)""",
-            @"<input[^>]*name=""edition[]""[^>]*value=""([^""]+)""",
-            @"<option[^>]*value=""([^""]+)""[^>]*>(?:All editions|全部版本)"
-        })
-        {
-            var matches = Regex.Matches(html, pattern, RegexOptions.IgnoreCase);
-            foreach (Match m in matches)
-            {
-                var id = m.Groups[1].Value;
-                if (editions.Any(e => e.Id == id)) continue;
-                editions.Add(new UupEditionInfo
+                var code = v.GetString();
+                if (string.IsNullOrEmpty(code)) continue;
+                result.Add(new UupLanguageInfo
                 {
-                    Id = id,
-                    DisplayName = GetEditionDisplayName(id),
-                    IsBaseEdition = true
-                });
-            }
-            if (editions.Count > 0) break;
-        }
-
-        var allEditionsMatch = Regex.Match(html, @"<option[^>]*value=""0""[^>]*>", RegexOptions.IgnoreCase);
-        if (allEditionsMatch.Success && editions.Count == 0)
-        {
-            editions.Add(new UupEditionInfo { Id = "0", DisplayName = "所有版本", IsBaseEdition = true });
-        }
-
-        foreach (var pattern in new[]
-        {
-            @"name=""virtEdition\[\]""[^>]*value=""([^""]+)""",
-            @"name=""virtualEditions\[\]""[^>]*value=""([^""]+)""",
-            @"name=""virtEdition[]""[^>]*value=""([^""]+)"""
-        })
-        {
-            var matches = Regex.Matches(html, pattern, RegexOptions.IgnoreCase);
-            foreach (Match m in matches)
-            {
-                var id = m.Groups[1].Value;
-                if (editions.Any(e => e.Id == id)) continue;
-                var vName = VirtualEditionNames.TryGetValue(id, out var vn) ? vn : id;
-                editions.Add(new UupEditionInfo
-                {
-                    Id = id,
-                    DisplayName = $"[虚拟] {vName}",
-                    IsBaseEdition = false
+                    Code = code,
+                    DisplayName = BuildLanguageDisplay(code, fancy),
                 });
             }
         }
 
-        return editions.DistinctBy(e => e.Id).ToList();
+        return result
+            .OrderBy(l => l.Code == "zh-cn" ? 0 : l.Code.StartsWith("zh") ? 1 : 2)
+            .ThenBy(l => l.Code, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
-    private static string DetermineCategory(string title)
+    internal static List<UupEditionInfo> ParseEditionsJson(JsonElement response)
+    {
+        var result = new List<UupEditionInfo>();
+
+        var fancy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (response.TryGetProperty("editionFancyNames", out var fancyEl) && fancyEl.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var p in fancyEl.EnumerateObject())
+                fancy[p.Name] = p.Value.GetString() ?? "";
+        }
+
+        if (response.TryGetProperty("editionList", out var listEl) && listEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var v in listEl.EnumerateArray())
+            {
+                var id = v.GetString();
+                if (string.IsNullOrEmpty(id)) continue;
+                var display = EditionNames.TryGetValue(id, out var zh) ? zh
+                    : fancy.TryGetValue(id, out var en) && !string.IsNullOrEmpty(en) ? en
+                    : id;
+                result.Add(new UupEditionInfo { Id = id, DisplayName = display });
+            }
+        }
+
+        return result
+            .OrderBy(e =>
+            {
+                var idx = Array.FindIndex(EditionPreferenceOrder, x => x.Equals(e.Id, StringComparison.OrdinalIgnoreCase));
+                return idx >= 0 ? idx : EditionPreferenceOrder.Length;
+            })
+            .ToList();
+    }
+
+    internal static UupFileSetInfo ParseFilesJson(JsonElement response)
+    {
+        var set = new UupFileSetInfo
+        {
+            UpdateName = GetString(response, "updateName"),
+            Architecture = GetString(response, "arch"),
+            Build = GetString(response, "build"),
+        };
+
+        if (response.TryGetProperty("files", out var filesEl) && filesEl.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var p in filesEl.EnumerateObject())
+            {
+                var v = p.Value;
+                var entry = new UupFileEntry
+                {
+                    Name = p.Name,
+                    Url = GetString(v, "url"),
+                    Size = GetInt64(v, "size"),
+                    Sha1 = GetString(v, "sha1"),
+                };
+                // noLinks=1 的响应没有直链；无直链且大小为 0 的条目（异常数据）跳过
+                if (entry.Size <= 0 && string.IsNullOrEmpty(entry.Url)) continue;
+                set.Files.Add(entry);
+            }
+        }
+
+        set.Files.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+        return set;
+    }
+
+    // ==================== 内部辅助 ====================
+
+    private static bool IsTransientError(UupDumpApiException ex)
+    {
+        // 网络抖动、超时、服务端 5xx 与限流可重试；业务错误（如 NO_UPDATE_FOUND）重试无意义
+        return ex.ShortCode is "NETWORK" or "TIMEOUT" or "HTTP_429"
+            || (ex.ShortCode.StartsWith("HTTP_5", StringComparison.Ordinal));
+    }
+
+    private static async Task<JsonDocument> GetJsonAsync(string url, CancellationToken ct)
+    {
+        // 网络层自动重试：IPv6 被丢弃/服务端抖动/限流时首次请求可能失败，
+        // 二次请求直接走已恢复的连接；限流按官方文档为同资源 1 秒、切资源 10 秒窗口，多等一会儿再试
+        UupDumpApiException? lastError = null;
+        const int maxAttempts = 3;
+        for (var attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            try
+            {
+                return await GetJsonOnceAsync(url, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (UupDumpApiException ex) when (IsTransientError(ex) && attempt < maxAttempts - 1)
+            {
+                lastError = ex;
+                var delay = ex.ShortCode == "HTTP_429" ? TimeSpan.FromSeconds(10) : TimeSpan.FromSeconds(2);
+                try { await Task.Delay(delay, ct).ConfigureAwait(false); }
+                catch (OperationCanceledException) { throw; }
+            }
+            catch (UupDumpApiException ex)
+            {
+                throw;
+            }
+        }
+
+        throw lastError ?? new UupDumpApiException("UNKNOWN", "UUP dump 服务请求失败，请稍后重试。");
+    }
+
+    private static async Task<JsonDocument> GetJsonOnceAsync(string url, CancellationToken ct)
+    {
+        // 每次请求独立 30 秒上限：单次坏请求不会拖住整个向导（连接层另有 9 秒预算）
+        using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        requestCts.CancelAfter(TimeSpan.FromSeconds(30));
+
+        HttpResponseMessage? response = null;
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.UserAgent.ParseAdd("TubaWinUi3-UupDump/2.0");
+            response = await _http.SendAsync(request, requestCts.Token);
+
+            var json = await response.Content.ReadAsStringAsync(requestCts.Token);
+            JsonDocument doc;
+            try
+            {
+                doc = JsonDocument.Parse(json);
+            }
+            catch (JsonException)
+            {
+                throw new UupDumpApiException("BAD_RESPONSE",
+                    $"UUP dump 服务返回了无法解析的数据（HTTP {(int)response.StatusCode}），请稍后重试。");
+            }
+
+            var root = doc.RootElement;
+            if (!root.TryGetProperty("response", out var resp))
+                throw new UupDumpApiException("BAD_RESPONSE", "UUP dump 服务响应格式异常，请稍后重试。");
+
+            if (resp.TryGetProperty("error", out var errEl))
+            {
+                var code = errEl.GetString() ?? "UNKNOWN";
+                throw new UupDumpApiException(code, GetFriendlyErrorMessage(code));
+            }
+
+            if (!response.IsSuccessStatusCode)
+                throw new UupDumpApiException("HTTP_" + (int)response.StatusCode,
+                    $"UUP dump 服务请求失败（HTTP {(int)response.StatusCode}），请稍后重试。");
+
+            return doc;
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new UupDumpApiException("NETWORK",
+                $"无法连接 UUP dump 服务器（{ApiHost}）：{ex.Message}\n" +
+                "请检查网络连接；若开启了代理/VPN，请确认其可用后再重试。");
+        }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // 30 秒请求上限到期（或底层连接中断）：不是用户取消，按超时处理
+            throw new UupDumpApiException("TIMEOUT", "UUP dump 服务响应过慢（30 秒未完成），请稍后重试。");
+        }
+        finally
+        {
+            response?.Dispose();
+        }
+    }
+
+    internal static string GetFriendlyErrorMessage(string code)
+    {
+        return code switch
+        {
+            "USER_RATE_LIMITED" => "请求过于频繁，UUP dump 服务暂时限制了本机访问，请等待约 10 秒后重试。",
+            "NO_UPDATE_FOUND" => "未在 Windows Update 服务器找到该构建，可能已被微软移除。",
+            "UNKNOWN_ARCH" => "不支持的架构类型。",
+            "UNKNOWN_RING" => "不支持的更新渠道。",
+            "ILLEGAL_BUILD" => "构建号格式不正确。",
+            "NO_FILES" => "该版本没有可下载的文件。",
+            "EMPTY_FILELIST" => "该构建的文件列表为空，可能已被微软移除。",
+            "UNSUPPORTED_COMBO" => "该构建与所选语言/版本组合不受支持。",
+            "KEY_NOT_IN_DB" => "该构建信息尚未收录，请稍后重试。",
+            _ => $"UUP dump 服务返回错误（{code}），请稍后重试。",
+        };
+    }
+
+    /// <summary>根据标题归类渠道。「更新包」是累积/预览/组件更新等非完整镜像条目，仅在全部分类中展示。</summary>
+    internal static string DeriveChannel(string title)
     {
         var t = title.ToLowerInvariant();
-        if (t.Contains("server")) return "Windows Server";
-        if (t.Contains("canary")) return "Canary";
-        if (t.Contains("2610") || t.Contains("2620") || t.Contains("2630") || t.Contains("26100") || t.Contains("26200") || t.Contains("26300")) return "Windows 11 24H2+";
-        if (t.Contains("22631")) return "Windows 11 23H2";
-        if (t.Contains("22621")) return "Windows 11 22H2";
-        if (t.Contains("22000")) return "Windows 11 21H2";
-        if (t.Contains("19045") || t.Contains("19044") || t.Contains("19043")) return "Windows 10 22H2";
-        if (t.Contains("1904")) return "Windows 10";
-        return "其他";
+        if (t.Contains("server") || t.Contains("azure stack")) return "Server";
+        if (t.Contains("insider") || t.Contains("canary") || t.Contains("dev channel")) return "预览体验版";
+        if (t.Contains("update") || t.Contains("experience pack") || t.Contains("language pack"))
+            return "更新包";
+        return "正式版";
     }
 
-    private static string StripTags(string html) => Regex.Replace(html, "<[^>]+>", "").Trim();
+    private static string BuildLanguageDisplay(string code, Dictionary<string, string> fancy)
+    {
+        var zh = LanguageNames.TryGetValue(code, out var z) ? z : null;
+        var en = fancy.TryGetValue(code, out var f) && !string.IsNullOrEmpty(f) ? f : null;
+        if (zh is not null && en is not null) return $"{zh} ({en})";
+        return zh ?? en ?? code;
+    }
+
+    private static string GetString(JsonElement el, string name)
+    {
+        if (el.ValueKind != JsonValueKind.Object) return "";
+        if (!el.TryGetProperty(name, out var v)) return "";
+        return v.ValueKind switch
+        {
+            JsonValueKind.String => v.GetString() ?? "",
+            JsonValueKind.Number => v.GetRawText(),
+            _ => "",
+        };
+    }
+
+    private static long GetInt64(JsonElement el, string name)
+    {
+        if (el.ValueKind != JsonValueKind.Object) return 0;
+        if (!el.TryGetProperty(name, out var v)) return 0;
+        return v.ValueKind switch
+        {
+            JsonValueKind.Number when v.TryGetInt64(out var i) => i,
+            JsonValueKind.String when long.TryParse(v.GetString(), out var i) => i,
+            _ => 0,
+        };
+    }
 }

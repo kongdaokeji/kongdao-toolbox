@@ -19,43 +19,6 @@
         <local:ZeroToIndeterminateConverter x:Key="ZeroIsIndeterminate" />
         <local:BoolToVisibilityConverter x:Key="BoolToVis" />
         <local:InvertBoolToVisibilityConverter x:Key="InvertBoolToVis2" />
-        <Style x:Key="TagRadioButtonStyle" TargetType="RadioButton">
-            <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
-            <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
-            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="10,4" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="RadioButton">
-                        <Border
-                            x:Name="RootBorder"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="{TemplateBinding CornerRadius}"
-                            Padding="{TemplateBinding Padding}">
-                            <VisualStateManager.VisualStateGroups>
-                                <VisualStateGroup x:Name="CheckStates">
-                                    <VisualState x:Name="Checked">
-                                        <VisualState.Setters>
-                                            <Setter Target="RootBorder.Background" Value="{ThemeResource AccentFillColorDefaultBrush}" />
-                                            <Setter Target="RootBorder.BorderBrush" Value="{ThemeResource AccentFillColorDefaultBrush}" />
-                                            <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                    <VisualState x:Name="Unchecked" />
-                                    <VisualState x:Name="Indeterminate" />
-                                </VisualStateGroup>
-                            </VisualStateManager.VisualStateGroups>
-                            <ContentPresenter x:Name="ContentPresenter" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
         <Style x:Key="CompactSearchBoxStyle" TargetType="AutoSuggestBox">
             <Setter Property="MinHeight" Value="28" />
             <Setter Property="MaxHeight" Value="32" />
@@ -236,53 +199,14 @@
         <Grid
             x:Name="TagBarArea"
             Grid.Row="1"
-            ColumnSpacing="8"
             Visibility="Collapsed">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
 
-            <!-- 单行模式：标签过多时可横向滚动，并显示滚动条提示可滚动 -->
-            <ScrollViewer
-                x:Name="TagBarScrollViewer"
-                Grid.Column="0"
-                HorizontalScrollBarVisibility="Auto"
-                HorizontalScrollMode="Enabled"
-                VerticalScrollBarVisibility="Disabled"
-                VerticalScrollMode="Disabled">
-                <StackPanel x:Name="TagBarPanel" Orientation="Horizontal" Spacing="6" />
-            </ScrollViewer>
-
-            <!-- 展开模式：标签多行换行显示，超高部分纵向滚动 -->
-            <ScrollViewer
-                x:Name="TagWrapScrollViewer"
-                Grid.Column="0"
-                MaxHeight="120"
-                HorizontalScrollBarVisibility="Disabled"
-                HorizontalScrollMode="Disabled"
-                VerticalScrollBarVisibility="Auto"
-                VerticalScrollMode="Enabled"
-                Visibility="Collapsed">
-                <!-- 内容在代码中注入（多行换行面板） -->
-            </ScrollViewer>
-
-            <Button
-                x:Name="TagExpandButton"
-                Grid.Column="1"
-                VerticalAlignment="Center"
-                Padding="10,4"
-                Click="TagExpandButton_Click"
-                ToolTipService.ToolTip="展开 / 收起全部标签"
-                Visibility="Collapsed">
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                    <FontIcon
-                        x:Name="TagExpandIcon"
-                        FontSize="11"
-                        Glyph="&#xE70D;" />
-                    <TextBlock x:Name="TagExpandText" Text="展开" />
-                </StackPanel>
-            </Button>
+            <!-- 分类标签：CommandBar 放不下的标签自动折叠进溢出菜单 -->
+            <CommandBar
+                x:Name="TagBarCommandBar"
+                Background="Transparent"
+                BorderBrush="Transparent"
+                DefaultLabelPosition="Right" />
         </Grid>
 
         <Grid Grid.Row="2">

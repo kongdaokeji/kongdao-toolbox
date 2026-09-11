@@ -142,7 +142,7 @@ internal static class Program
         BackendTrayHost? tray = null;
         if (!once)
         {
-            tray = new BackendTrayHost("图吧工具箱 · 主动拦截已开启", config.DataDir, () => SafeCancel(cts));
+            tray = new BackendTrayHost("图吧工具箱CE · 主动拦截已开启", config.DataDir, () => SafeCancel(cts));
             tray.Start();
         }
 

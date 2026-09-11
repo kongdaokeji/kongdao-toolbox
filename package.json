@@ -2,7 +2,7 @@
   "name": "tubawinui3-website",
   "version": "1.0.0",
   "type": "module",
-  "description": "图吧工具箱 TubaWinUi3 官方网站",
+  "description": "图吧工具箱CE TubaWinUi3 官方网站",
   "scripts": {
     "dev": "vitepress dev src/docs",
     "build": "vitepress build src/docs",

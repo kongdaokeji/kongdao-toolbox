@@ -83,7 +83,7 @@ body:
   - type: input
     id: app-version
     attributes:
-      label: 图吧工具箱版本
+      label: 图吧工具箱CE版本
       description: 关于/设置页中的版本号
       placeholder: 例如：1.5.11
     validations:

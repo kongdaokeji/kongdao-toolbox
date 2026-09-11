@@ -153,7 +153,7 @@ public static class NotificationHelper
             body += $"\n程序：{Truncate(exePath, 50)}";
         body += $"\n位置：{Truncate(subKey, 60)}";
         body += "\n点击查看详情并审核";
-        ShowToast(dataDir, "图吧工具箱 · 主动拦截", body);
+        ShowToast(dataDir, "图吧工具箱CE · 主动拦截", body);
     }
 
     /// <summary>纠偏重新拦截通知。</summary>
@@ -162,7 +162,7 @@ public static class NotificationHelper
         var body = $"被屏蔽项重新出现，已再次拦截：{itemName}" +
                    $"\n位置：{Truncate(subKey, 60)}" +
                    "\n点击查看详情";
-        ShowToast(dataDir, "图吧工具箱 · 主动拦截纠偏", body);
+        ShowToast(dataDir, "图吧工具箱CE · 主动拦截纠偏", body);
     }
 
     private static string Truncate(string value, int maxLen)

@@ -13,7 +13,7 @@ internal static class WindowsSearchIndexService
 {
     private static readonly string StartMenuFolder = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        @"Microsoft\Windows\Start Menu\Programs\图吧工具箱");
+        @"Microsoft\Windows\Start Menu\Programs\图吧工具箱CE");
 
     /// <summary>
     /// 将所有工具注册到 Windows 搜索索引（后台执行，不阻塞 UI）。

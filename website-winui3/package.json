@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "图吧工具箱 WinUI3 官方网站（基于 WinUIonWeb 构建）",
+  "description": "图吧工具箱CE WinUI3 官方网站（基于 WinUIonWeb 构建）",
   "scripts": {
     "dev": "vite . --host=0.0.0.0",
     "build": "run-p type-check \"build-only {@}\" --",

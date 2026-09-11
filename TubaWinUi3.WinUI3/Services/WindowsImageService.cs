@@ -31,7 +31,7 @@ public sealed class WindowsImageEntry
 public static class WindowsImageService
 {
     private const string ReadmeUrl = "https://raw.githubusercontent.com/ILLKX/Windows/master/README.md";
-    private static readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(30) };
+    private static readonly HttpClient _http = HttpClientFactory.CreateIpv4Preferred(TimeSpan.FromSeconds(30));
     private static List<WindowsImageEntry>? _cache;
     private static DateTime _cacheTime;
     private static readonly TimeSpan _cacheExpiry = TimeSpan.FromHours(1);
@@ -421,9 +421,16 @@ public static class WindowsImageService
         }, ct);
     }
 
+    /// <summary>
+    /// 镜像直接下载目录。用户未自定义时为 下载\WindowsImages；
+    /// 「WindowsImageDownloadDir」设置对本页所有下载（微软官方/社区镜像/UUP）生效。
+    /// </summary>
     public static string GetDownloadDir()
     {
-        var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "WindowsImages");
+        var custom = AppSettings.Get("WindowsImageDownloadDir");
+        var dir = string.IsNullOrWhiteSpace(custom)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads", "WindowsImages")
+            : custom.Trim();
         Directory.CreateDirectory(dir);
         return dir;
     }

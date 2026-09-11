@@ -49,7 +49,7 @@ public static class NetworkOptimizeService
     private const string TcpipInterfacesKey = @"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces";
     /// <summary>多媒体系统配置（网络节流 NetworkThrottlingIndex 所在，HKCU 无需管理员）。</summary>
     private const string MultimediaSystemProfileKey = @"Software\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile";
-    private const string NeedAdminMessage = "需要管理员权限，请以管理员身份运行图吧工具箱";
+    private const string NeedAdminMessage = "需要管理员权限，请以管理员身份运行图吧工具箱CE";
 
     /// <summary>DNS 延迟分档阈值（对照 nexbox 前端 latencyColor 逻辑）。</summary>
     public const double DnsLatencyGoodMs = 80;

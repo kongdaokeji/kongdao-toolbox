@@ -303,7 +303,7 @@ namespace TubaWinUi3.Compatible.Forms
                     // 右下角水印（对齐 WinUI3 版截图样式）
                     using (var g = Graphics.FromImage(bmp))
                     {
-                        const string watermark = "图吧工具箱";
+                        const string watermark = "图吧工具箱CE";
                         using (var font = ThemeService.UiFont(9f))
                         {
                             var size = g.MeasureString(watermark, font);

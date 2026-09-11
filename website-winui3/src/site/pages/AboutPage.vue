@@ -10,8 +10,9 @@
       <div class="site-card about-card about-app-card">
         <img class="about-app-logo" :src="logoUrl" alt="Logo" />
         <div class="about-app-info">
-          <h3>图吧工具箱 WinUI3</h3>
+          <h3>图吧工具箱CE</h3>
           <p class="about-app-version">v{{ t('app.version') }} · {{ t('app.author') }}</p>
+          <span class="about-ce-badge">社区重构版（Community Edition）</span>
           <p class="about-app-desc">{{ t('about.subtitle') }}</p>
           <WinButton
             :Content="t('about.open-repo')"
@@ -156,6 +157,17 @@ const openDmca = () => window.open('https://tubawinui3.cn/dmca', '_blank', 'noop
   margin: 0 0 6px 0;
   font-size: 13px;
   color: var(--text-secondary);
+}
+
+.about-ce-badge {
+  display: inline-block;
+  margin: 0 0 8px 0;
+  padding: 2px 10px;
+  font-size: 12px;
+  line-height: 18px;
+  border-radius: 10px;
+  color: var(--accent-base);
+  background: color-mix(in srgb, var(--accent-base) 10%, transparent);
 }
 
 .about-app-desc {

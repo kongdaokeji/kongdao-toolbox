@@ -1,7 +1,7 @@
-# 图吧工具箱 CLI 工具使用文档
+# 图吧工具箱CE CLI 工具使用文档
 
-> 本文档收录图吧工具箱 `Tools/` 目录下**所有支持命令行参数调用**的工具，并给出详细用法、参数表和可直接复制的示例。
-> 适用范围：图吧工具箱 v2026.01（`Tools/Version`）。文档中所有路径均以 `Tools\` 目录为基准。
+> 本文档收录图吧工具箱CE `Tools/` 目录下**所有支持命令行参数调用**的工具，并给出详细用法、参数表和可直接复制的示例。
+> 适用范围：图吧工具箱CE v2026.01（`Tools/Version`）。文档中所有路径均以 `Tools\` 目录为基准。
 
 ---
 
@@ -71,7 +71,7 @@
 ### Prime95 —— CPU 烤机
 
 - **路径**：`处理器工具\Prime95\prime95.exe`
-- **说明**：Mersenne 素数搜索程序，圈内最常用的 CPU 稳定性/散热测试工具。图吧工具箱的一键烤机脚本 `start.bat` 正是调用 `prime95.exe -t`。
+- **说明**：Mersenne 素数搜索程序，圈内最常用的 CPU 稳定性/散热测试工具。图吧工具箱CE的一键烤机脚本 `start.bat` 正是调用 `prime95.exe -t`。
 
 **常用参数**
 
@@ -167,7 +167,7 @@ furmark [--option [value]] ...
 ### FPT64 —— Intel 主板 BIOS 备份/刷写
 
 - **路径**：`显卡工具\FPT64\fptw64.exe`
-- **说明**：Intel Flash Programming Tool（FPT）64 位版，可备份/刷写 Intel 平台主板 BIOS。图吧工具箱自带的 `backup.cmd` / `flash.cmd` 即基于此工具。
+- **说明**：Intel Flash Programming Tool（FPT）64 位版，可备份/刷写 Intel 平台主板 BIOS。图吧工具箱CE自带的 `backup.cmd` / `flash.cmd` 即基于此工具。
 
 **核心参数（官方用法）**
 

@@ -135,7 +135,7 @@ public static class ToolMetadataService
             .ToList();
     }
 
-    private static JsonToolMetadata? FindJsonMetadata(string toolPath)
+    internal static JsonToolMetadata? FindJsonMetadata(string toolPath)
     {
         var metadata = LoadMetadata();
         var fileName = Path.GetFileNameWithoutExtension(toolPath);
@@ -298,7 +298,7 @@ public static class ToolMetadataService
         catch { return null; }
     }
 
-    private static JsonToolMetadata? FindJsonMetadataByDir(string toolDir)
+    internal static JsonToolMetadata? FindJsonMetadataByDir(string toolDir)
     {
         var metadata = LoadMetadata();
         var dirName = Path.GetFileName(toolDir);
@@ -497,7 +497,7 @@ public static class ToolMetadataService
         public List<JsonToolMetadata> Tools { get; set; } = [];
     }
 
-    private sealed class JsonToolMetadata
+    internal sealed class JsonToolMetadata
     {
         public string? Match { get; set; }
         public string? Description { get; set; }
@@ -523,7 +523,7 @@ public static class ToolMetadataService
         public string? Builtin { get; set; }
     }
 
-    private sealed class JsonArchVariant
+    internal sealed class JsonArchVariant
     {
         public string? File { get; set; }
 

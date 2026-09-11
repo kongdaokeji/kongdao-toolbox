@@ -129,7 +129,7 @@ $lines = @(
     '<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities" IgnorableNamespaces="uap rescap">'
     "  <Identity Name=`"$DevPkgName`" Publisher=`"$DevPublisher`" Version=`"$ver`" ProcessorArchitecture=`"$Arch`" />"
     '  <Properties>'
-    '    <DisplayName>图吧工具箱winui3 (Dev)</DisplayName>'
+    '    <DisplayName>图吧工具箱CE (Dev)</DisplayName>'
     '    <PublisherDisplayName>TubaDev</PublisherDisplayName>'
     '    <Logo>Assets\StoreLogo.png</Logo>'
     '  </Properties>'
@@ -142,7 +142,7 @@ $lines = @(
     '  </Resources>'
     '  <Applications>'
     "    <Application Id=`"$DevAppId`" Executable=`"TubaWinUi3.exe`" EntryPoint=`"Windows.FullTrustApplication`">"
-    '      <uap:VisualElements DisplayName="图吧工具箱winui3 (Dev)" Description="TubaWinUi3 packaged dev run" BackgroundColor="transparent" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png">'
+    '      <uap:VisualElements DisplayName="图吧工具箱CE (Dev)" Description="TubaWinUi3 packaged dev run" BackgroundColor="transparent" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png">'
     '        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />'
     '        <uap:SplashScreen Image="Assets\SplashScreen.png" />'
     '      </uap:VisualElements>'

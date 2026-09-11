@@ -53,8 +53,8 @@ $TempDir      = Join-Path $env:TEMP 'TubaWinUi3_MSIX_Build'
 $PackageName         = 'DA3D64F4.winui3'
 $Publisher           = 'CN=CC2339A5-C760-46C3-91D8-130408AF3528'
 $PublisherDisplayName = '罗澜嘎嘎'
-$DisplayName         = '图吧工具箱winui3'
-$Description         = '图吧工具箱winui3 - PC硬件检测与系统维护工具集'
+$DisplayName         = '图吧工具箱CE'
+$Description         = '图吧工具箱CE - PC硬件检测与系统维护工具集'
 
 # ── Signing ────────────────────────────────────────────────────
 # 签名证书与密码保存在仓库外：%LOCALAPPDATA%\TubaWinUi3-secrets\

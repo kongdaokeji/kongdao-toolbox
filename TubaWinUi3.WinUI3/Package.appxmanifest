@@ -9,7 +9,7 @@
   <Identity
     Name="DA3D64F4.winui3"
     Publisher="CN=CC2339A5-C760-46C3-91D8-130408AF3528"
-    Version="1.0.1.0" />
+    Version="1.6.1.0" />
 
   <Properties>
     <DisplayName>空岛图吧工具箱</DisplayName>

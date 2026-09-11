@@ -77,7 +77,7 @@ public sealed partial class GitHubDownloadWindow : Window
         InfoDescText.Text = tool.Description ?? "无描述";
         InfoDetailText.Text = $"分类：{tool.Category}  ·  版本：{versionText}  ·  提交者：{authorName}";
 
-        WarningText.Text = $"社区包无法保证其安全性，图吧工具箱不对社区包负责，但会尽量避免违规工具。如果你信任 {authorName} 可以开始下载。";
+        WarningText.Text = $"社区包无法保证其安全性，图吧工具箱CE不对社区包负责，但会尽量避免违规工具。如果你信任 {authorName} 可以开始下载。";
         WarningCard.Visibility = Visibility.Visible;
 
         InitWindow();
@@ -86,7 +86,7 @@ public sealed partial class GitHubDownloadWindow : Window
 
     private void InitWindow()
     {
-        AppWindow.Title = $"图吧工具箱 - 下载 {_toolName}";
+        AppWindow.Title = $"图吧工具箱CE - 下载 {_toolName}";
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
 
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);

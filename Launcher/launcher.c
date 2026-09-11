@@ -56,7 +56,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
         MessageBoxW(NULL,
             L"当前操作系统不支持 WinUI 3 版本（需要 Windows 10 及以上）。\n"
             L"兼容版程序也未找到，无法启动。",
-            L"图吧工具箱WinUI3", MB_OK | MB_ICONERROR);
+            L"图吧工具箱CE", MB_OK | MB_ICONERROR);
         return 1;
     }
 
@@ -67,7 +67,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
         }
         WCHAR msg[MAX_PATH + 64];
         wsprintfW(msg, L"找不到程序文件：\n%s", mainExe);
-        MessageBoxW(NULL, msg, L"图吧工具箱WinUI3", MB_OK | MB_ICONERROR);
+        MessageBoxW(NULL, msg, L"图吧工具箱CE", MB_OK | MB_ICONERROR);
         return 1;
     }
 
@@ -80,7 +80,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
         }
         WCHAR msg[128];
         wsprintfW(msg, L"启动失败，错误代码：%lu", err);
-        MessageBoxW(NULL, msg, L"图吧工具箱WinUI3", MB_OK | MB_ICONERROR);
+        MessageBoxW(NULL, msg, L"图吧工具箱CE", MB_OK | MB_ICONERROR);
         return 1;
     }
 

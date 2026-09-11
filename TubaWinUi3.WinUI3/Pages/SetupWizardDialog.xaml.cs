@@ -38,7 +38,7 @@ public sealed partial class SetupWizardDialog : ContentDialog
         switch (_currentStep)
         {
             case 0:
-                StepTitleText.Text = "欢迎使用图吧工具箱";
+                StepTitleText.Text = "欢迎使用图吧工具箱CE";
                 StepSubtitleText.Text = "请仔细阅读以下重要信息。";
                 PrimaryButtonText = "下一步";
                 SecondaryButtonText = "上一步";

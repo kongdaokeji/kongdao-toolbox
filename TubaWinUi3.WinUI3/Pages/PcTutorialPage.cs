@@ -1488,7 +1488,7 @@ public sealed partial class PcTutorialPage : Page
          [new ActionLink("打开磁盘管理", "\uEDA7", "open_system", "diskmgmt.msc")]),
 
         ("新电脑第一次开机要做什么？",
-         "①跳过捆绑软件（开箱时厂商预装的可选卸载）②连接网络完成系统更新 ③安装显卡驱动 ④激活 Windows ⑤安装常用软件。图吧工具箱里就能帮你完成驱动和硬件检测！",
+         "①跳过捆绑软件（开箱时厂商预装的可选卸载）②连接网络完成系统更新 ③安装显卡驱动 ④激活 Windows ⑤安装常用软件。图吧工具箱CE里就能帮你完成驱动和硬件检测！",
          [new ActionLink("查看硬件信息", "\uE950", "navigate_page", "HardwarePage")]),
 
         ("怎么激活 Windows？",
@@ -1574,7 +1574,7 @@ public sealed partial class PcTutorialPage : Page
     private static List<(string Q, string A, List<ActionLink>? Links)> GetModule3Data() =>
     [
         ("为什么要烤机？",
-         "烤机（压力测试）是在极限负载下运行 CPU/GPU，目的是：①验证新电脑硬件是否稳定（是否有暗病）②检查散热是否合格（温度是否过高）③确认供电是否足够（是否掉电降频）④新电脑建议至少烤 15 分钟，无蓝屏死机才算通过。图吧工具箱里就有烤机工具！",
+         "烤机（压力测试）是在极限负载下运行 CPU/GPU，目的是：①验证新电脑硬件是否稳定（是否有暗病）②检查散热是否合格（温度是否过高）③确认供电是否足够（是否掉电降频）④新电脑建议至少烤 15 分钟，无蓝屏死机才算通过。图吧工具箱CE里就有烤机工具！",
           [new ActionLink("CPU 烤鸡", "\uED56", "launch_builtin", "cpu-burn"), new ActionLink("硬件监控", "\uE9D9", "navigate_page", "HardwarePage")]),
 
         ("CPU 怎么烤机？",

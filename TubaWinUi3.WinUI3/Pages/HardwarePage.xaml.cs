@@ -700,7 +700,7 @@ public sealed partial class HardwarePage : Page
             var showWatermark = AppSettings.GetBool("ScreenshotWatermark", true);
             if (showWatermark)
             {
-                var watermarkText = AppSettings.Get("ScreenshotWatermarkText") ?? "图吧工具箱";
+                var watermarkText = AppSettings.Get("ScreenshotWatermarkText") ?? "图吧工具箱CE";
                 var watermarkFont = AppSettings.Get("ScreenshotWatermarkFont") ?? "微软雅黑";
                 DrawWatermark(g, totalW, totalH, watermarkText, watermarkFont, watermarkBarBg, watermarkTextColor);
             }

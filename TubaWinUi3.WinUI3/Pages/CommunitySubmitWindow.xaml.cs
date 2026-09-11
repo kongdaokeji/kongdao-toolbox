@@ -53,7 +53,7 @@ public sealed partial class CommunitySubmitWindow : Window
         _downloadUrl = downloadUrl;
         _downloadFilter = downloadFilter;
 
-        AppWindow.Title = "图吧工具箱 - 提交社区工具";
+        AppWindow.Title = "图吧工具箱CE - 提交社区工具";
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
 
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);

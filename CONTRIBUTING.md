@@ -1,6 +1,6 @@
 # 贡献指南（Contributing）
 
-感谢你愿意为 **图吧工具箱 TubaWinUi3** 贡献！无论是提交 Issue、改进代码、补充文档还是新增工具，我们都欢迎。
+感谢你愿意为 **图吧工具箱CE TubaWinUi3** 贡献！无论是提交 Issue、改进代码、补充文档还是新增工具，我们都欢迎。
 
 - 遇到问题请先阅读 [Issue 模板](.github/ISSUE_TEMPLATE/bug_report.yml) 与 [SECURITY.md](SECURITY.md)
 - 想提交工具（无需写代码）？请阅读 [社区贡献指南](https://tubawinui3.cn/guide/contribute-tools)（软件内"社区 → 提交工具"）
@@ -73,7 +73,7 @@ chore: 构建/工具链改动
 ## Issue 规范
 
 - 提交 Bug 前请先搜索是否已存在相同问题
-- Bug 报告请尽量包含：系统版本 / CPU / GPU / 驱动版本 / 图吧工具箱版本 / 复现步骤 / 截图或日志（参考 [bug_report 模板](.github/ISSUE_TEMPLATE/bug_report.yml)）
+- Bug 报告请尽量包含：系统版本 / CPU / GPU / 驱动版本 / 图吧工具箱CE版本 / 复现步骤 / 截图或日志（参考 [bug_report 模板](.github/ISSUE_TEMPLATE/bug_report.yml)）
 - 安全漏洞**请勿在 Issue 公开**，按 [SECURITY.md](SECURITY.md) 私密上报
 
 ## 许可证

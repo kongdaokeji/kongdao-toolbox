@@ -1,0 +1,232 @@
+name: Sync Release to GitCode
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.3, untagged-xxx for drafts)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release on GitCode'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
+jobs:
+  sync-to-gitcode:
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - name: Resolve release
+        id: release-info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          echo "Looking up release for tag: $INPUT_TAG"
+
+          RELEASE_ID=""
+
+          RESPONSE=$(gh api "repos/${{ github.repository }}/releases/tags/$INPUT_TAG" 2>/dev/null || true)
+          if [ -n "$RESPONSE" ] && echo "$RESPONSE" | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
+            RELEASE_ID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))")
+            echo "Found by tag API, id=$RELEASE_ID"
+          fi
+
+          if [ -z "$RELEASE_ID" ]; then
+            echo "Tag API failed, listing all releases (including drafts)..."
+            ALL_RELEASES=$(gh api "repos/${{ github.repository }}/releases?per_page=100" 2>/dev/null || echo "[]")
+            RELEASE_ID=$(echo "$ALL_RELEASES" | python3 -c "
+          import sys, json
+          tag = '$INPUT_TAG'
+          for r in json.load(sys.stdin):
+            if r.get('tag_name') == tag:
+              print(r['id'])
+              break
+          " 2>/dev/null || echo "")
+            if [ -n "$RELEASE_ID" ]; then
+              echo "Found in release list, id=$RELEASE_ID"
+            fi
+          fi
+
+          if [ -z "$RELEASE_ID" ]; then
+            echo "::error::Could not find release for '$INPUT_TAG'"
+            exit 1
+          fi
+
+          echo "release_id=$RELEASE_ID" >> "$GITHUB_OUTPUT"
+
+          RELEASE_JSON=$(gh api "repos/${{ github.repository }}/releases/$RELEASE_ID")
+          TAG=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tag_name',''))")
+          IS_DRAFT=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('draft',False))")
+          IS_PRERELEASE=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('prerelease',False))")
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "is_draft=$IS_DRAFT" >> "$GITHUB_OUTPUT"
+          echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ inputs.prerelease }}" = "true" ] || [ "$IS_PRERELEASE" = "True" ]; then
+            echo "release_status=pre" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_status=latest" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Release: tag=$TAG, id=$RELEASE_ID, draft=$IS_DRAFT, prerelease=$IS_PRERELEASE"
+
+      - name: Download release assets via API
+        id: download
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_ID="${{ steps.release-info.outputs.release_id }}"
+          mkdir -p release_files
+
+          ASSETS=$(gh api repos/${{ github.repository }}/releases/"$RELEASE_ID"/assets --paginate)
+          echo "$ASSETS" | python3 -c "
+          import sys, json, subprocess
+          assets = json.load(sys.stdin)
+          for a in assets:
+            name = a['name']
+            url = a['url']
+            print(f'Downloading {name} ...')
+            subprocess.run([
+              'curl', '-sL', '-o', f'release_files/{name}',
+              '-H', 'Accept: application/octet-stream',
+              '-H', f'Authorization: token $GH_TOKEN',
+              url
+            ], check=True)
+          "
+
+          ASSET_COUNT=$(find release_files -type f | wc -l)
+          echo "Downloaded $ASSET_COUNT assets"
+          echo "asset_count=$ASSET_COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Calculate file hashes
+        id: hashes
+        run: |
+          cd release_files
+          echo "## SHA256 哈希值" > ../hash_table.md
+          echo "" >> ../hash_table.md
+          echo "| 文件 | SHA256 |" >> ../hash_table.md
+          echo "|------|--------|" >> ../hash_table.md
+          for f in *.exe *.zip; do
+            [ -f "$f" ] || continue
+            HASH=$(sha256sum "$f" | awk '{print $1}')
+            echo "| \`$f\` | \`$HASH\` |" >> ../hash_table.md
+          done
+          cat ../hash_table.md
+
+      - name: Create or update GitCode Release
+        id: gitcode-create
+        env:
+          GITCODE_ACCESS_TOKEN: ${{ secrets.GITCODE_ACCESS_TOKEN }}
+          TAG: ${{ steps.release-info.outputs.tag }}
+          RELEASE_STATUS: ${{ steps.release-info.outputs.release_status }}
+          API_BASE: https://api.atomgit.com/api/v5/repos/luolangaga/tubatool
+        run: |
+          echo "Creating GitCode release for tag $TAG (status=$RELEASE_STATUS) ..."
+
+          python3 -c "
+          import json, urllib.request, urllib.error, os
+
+          tag = os.environ['TAG']
+          status = os.environ['RELEASE_STATUS']
+          token = os.environ['GITCODE_ACCESS_TOKEN']
+          api_base = os.environ['API_BASE']
+
+          with open('hash_table.md', 'r') as f:
+              body = f.read()
+
+          payload = {
+              'tag_name': tag,
+              'name': f'图吧工具箱CE {tag}',
+              'body': body,
+              'target_commitish': 'master',
+              'release_status': status
+          }
+
+          data = json.dumps(payload).encode('utf-8')
+          url = f'{api_base}/releases?access_token={token}'
+
+          req = urllib.request.Request(url, data=data, method='POST')
+          req.add_header('Content-Type', 'application/json')
+
+          try:
+              resp = urllib.request.urlopen(req)
+              print(f'GitCode release created for tag {tag} (HTTP {resp.status})')
+          except urllib.error.HTTPError as e:
+              if e.code == 409:
+                  print('Release already exists, updating...')
+                  update_url = f'{api_base}/releases/{tag}?access_token={token}'
+                  req2 = urllib.request.Request(update_url, data=data, method='PATCH')
+                  req2.add_header('Content-Type', 'application/json')
+                  try:
+                      resp2 = urllib.request.urlopen(req2)
+                      print(f'GitCode release updated for tag {tag} (HTTP {resp2.status})')
+                  except urllib.error.HTTPError as e2:
+                      body2 = e2.read().decode('utf-8', errors='replace')
+                      print(f'::warning::Failed to update GitCode release (HTTP {e2.code}): {body2}')
+              else:
+                  body2 = e.read().decode('utf-8', errors='replace')
+                  print(f'::error::Failed to create GitCode release (HTTP {e.code}): {body2}')
+                  raise
+          "
+
+      - name: Upload assets to GitCode
+        env:
+          GITCODE_ACCESS_TOKEN: ${{ secrets.GITCODE_ACCESS_TOKEN }}
+          TAG: ${{ steps.release-info.outputs.tag }}
+          API_BASE: https://api.atomgit.com/api/v5/repos/luolangaga/tubatool
+        run: |
+          python3 -c "
+          import json, urllib.request, urllib.error, os, glob
+
+          tag = os.environ['TAG']
+          token = os.environ['GITCODE_ACCESS_TOKEN']
+          api_base = os.environ['API_BASE']
+
+          files = glob.glob('release_files/*.exe') + glob.glob('release_files/*.zip')
+          for fpath in files:
+              fname = os.path.basename(fpath)
+              print(f'Uploading {fname} ...')
+
+              try:
+                  url = f'{api_base}/releases/{tag}/upload_url?access_token={token}&file_name={fname}'
+                  resp = urllib.request.urlopen(url)
+                  info = json.loads(resp.read().decode('utf-8'))
+                  upload_url = info.get('url', '')
+                  headers = info.get('headers', {})
+              except Exception as e:
+                  print(f'::warning::Failed to get upload URL for {fname}: {e}')
+                  continue
+
+              if not upload_url:
+                  print(f'::warning::No upload URL for {fname}')
+                  continue
+
+              with open(fpath, 'rb') as f:
+                  file_data = f.read()
+
+              req = urllib.request.Request(upload_url, data=file_data, method='PUT')
+              for k, v in headers.items():
+                  req.add_header(k, v)
+              if not any(h[0].lower() == 'content-type' for h in req.header_items()):
+                  req.add_header('Content-Type', 'application/octet-stream')
+
+              try:
+                  resp2 = urllib.request.urlopen(req)
+                  print(f'  OK (HTTP {resp2.status})')
+              except urllib.error.HTTPError as e:
+                  print(f'::warning::Upload {fname} failed (HTTP {e.code})')
+              except Exception as e:
+                  print(f'::warning::Upload {fname} failed: {e}')
+
+          print('GitCode release upload complete')
+          "

@@ -25,10 +25,7 @@ public static class MicrosoftOfficialService
     private const string OrgId = "y6jn8c31";
     private const string InstanceId = "560dc9f3-1aa5-4a2f-b63c-9e18f8d0e175";
 
-    private static readonly HttpClient _http = new()
-    {
-        Timeout = TimeSpan.FromSeconds(30)
-    };
+    private static readonly HttpClient _http = HttpClientFactory.CreateIpv4Preferred(TimeSpan.FromSeconds(30));
 
     static MicrosoftOfficialService()
     {

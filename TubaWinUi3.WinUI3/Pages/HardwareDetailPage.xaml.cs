@@ -282,7 +282,7 @@ public sealed partial class HardwareDetailPage : Page
         sb.AppendLine("<body>");
         sb.AppendLine("<div class=\"container\">");
         sb.AppendLine("<h1>硬件详细信息</h1>");
-        sb.AppendLine($"<div class=\"sub\">图吧工具箱 WinUI3 · 导出时间 {DateTime.Now:yyyy-MM-dd HH:mm:ss}</div>");
+        sb.AppendLine($"<div class=\"sub\">图吧工具箱CE · 导出时间 {DateTime.Now:yyyy-MM-dd HH:mm:ss}</div>");
         sb.AppendLine("<div class=\"grid\">");
 
         AppendSection(sb, "处理器", BuildCpuItems(data.Cpu));
@@ -297,7 +297,7 @@ public sealed partial class HardwareDetailPage : Page
         AppendSection(sb, "网卡", BuildNetworkItems(data.NetworkAdapters));
 
         sb.AppendLine("</div>");
-        sb.AppendLine("<div class=\"footer\">由图吧工具箱 WinUI3 自动生成</div>");
+        sb.AppendLine("<div class=\"footer\">由图吧工具箱CE 自动生成</div>");
         sb.AppendLine("</div>");
         sb.AppendLine("</body>");
         sb.AppendLine("</html>");

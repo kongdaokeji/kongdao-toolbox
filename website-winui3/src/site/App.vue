@@ -103,28 +103,28 @@ router.afterEach((to, from) => {
 /* 按原官网配置的页面级 SEO（title/description/og/canonical） */
 const pageSeo = {
   home: {
-    title: '图吧工具箱——PC硬件检测与系统维护工具集',
-    description: '图吧工具箱官方下载站。专业的PC硬件检测与系统维护工具集，收录82款专业工具，支持CPU-Z、GPU-Z、CrystalDiskMark等一键启动，WinUI 3原生界面，完全免费离线运行，零数据收集。',
+    title: '图吧工具箱CE——PC硬件检测与系统维护工具集',
+    description: '图吧工具箱CE官方下载站。原版图吧工具箱的社区重构版（Community Edition），专业的PC硬件检测与系统维护工具集，收录82款专业工具，支持CPU-Z、GPU-Z、CrystalDiskMark等一键启动，WinUI 3原生界面，完全免费离线运行，零数据收集。',
     url: 'https://tubawinui3.cn/'
   },
   download: {
-    title: '图吧工具箱下载——免费PC硬件检测与系统维护工具集',
-    description: '图吧工具箱官方下载页。下载最新版图吧工具箱，完全免费、纯离线运行，支持x64/ARM64全架构，一键安装即可使用82款专业硬件检测与系统维护工具。',
+    title: '图吧工具箱CE下载——免费PC硬件检测与系统维护工具集',
+    description: '图吧工具箱CE官方下载页。下载最新版图吧工具箱CE，完全免费、纯离线运行，支持x64/ARM64全架构，一键安装即可使用82款专业硬件检测与系统维护工具。',
     url: 'https://tubawinui3.cn/download'
   },
   about: {
-    title: '关于图吧工具箱——PC硬件检测与系统维护工具集',
-    description: '图吧工具箱——免费、开源、注重隐私的PC硬件检测与系统维护工具集，WinUI 3原生界面，完全免费离线运行。',
+    title: '关于图吧工具箱CE——PC硬件检测与系统维护工具集',
+    description: '图吧工具箱CE——原版图吧工具箱的社区重构版（Community Edition），免费、开源、注重隐私的PC硬件检测与系统维护工具集，WinUI 3原生界面，完全免费离线运行。',
     url: 'https://tubawinui3.cn/about'
   },
   why: {
-    title: '为什么选择图吧工具箱WinUI3？——全面对比原版工具箱',
-    description: '对比图吧工具箱WinUI3与原版：多渠道高速下载、WinUI3精美界面、完美UTF-8支持、20+FluentUI内置工具、AI智能体驱动。',
+    title: '为什么选择图吧工具箱CE？——全面对比原版工具箱',
+    description: '对比图吧工具箱CE与原版：多渠道高速下载、精美WinUI 3界面、完美UTF-8支持、20+FluentUI内置工具、AI智能体驱动。',
     url: 'https://tubawinui3.cn/why'
   },
   ranking: {
-    title: '跑分排行——图吧工具箱社区跑分排行榜',
-    description: '查看图吧工具箱社区用户上传的性能跑分排行榜，按游戏性能、办公性能、CPU、GPU、硬盘、浏览器等维度排序，与全球用户对比电脑性能。',
+    title: '跑分排行——图吧工具箱CE社区跑分排行榜',
+    description: '查看图吧工具箱CE社区用户上传的性能跑分排行榜，按游戏性能、办公性能、CPU、GPU、硬盘、浏览器等维度排序，与全球用户对比电脑性能。',
     url: 'https://tubawinui3.cn/ranking'
   },
   latency: {
@@ -133,13 +133,13 @@ const pageSeo = {
     url: 'https://tubawinui3.cn/latency'
   },
   thanks: {
-    title: '感谢下载图吧工具箱——免费PC硬件检测与系统维护工具集',
-    description: '感谢下载图吧工具箱，完全免费、纯离线运行，支持x64/ARM64全架构。',
+    title: '感谢下载图吧工具箱CE——免费PC硬件检测与系统维护工具集',
+    description: '感谢下载图吧工具箱CE，完全免费、纯离线运行，支持x64/ARM64全架构。',
     url: 'https://tubawinui3.cn/download/thanks'
   }
 };
 
-const siteName = '图吧工具箱';
+const siteName = '图吧工具箱CE';
 
 function setMeta(attr, name, content) {
   const selector = attr === 'meta'

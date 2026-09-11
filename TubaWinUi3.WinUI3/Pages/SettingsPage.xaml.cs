@@ -521,30 +521,43 @@ public sealed partial class SettingsPage : Page
 
     private void InitUpdateSection()
     {
-        if (RuntimeHelper.IsMsixPackaged)
+        if (RuntimeHelper.IsMsixPackaged || RuntimeHelper.IsLiteBuild)
         {
             SettingsUpdateCard.Visibility = Visibility.Collapsed;
             SettingsToolsBundleCard.Visibility = Visibility.Visible;
-
-            var currentVersion = ToolsBundleService.GetCurrentVersion();
-            if (currentVersion is not null)
-            {
-                ToolsBundleStatusText.Text = $"当前内核版本 v{currentVersion}";
-            }
-            else if (!ToolsBundleService.IsToolsBundleReady())
-            {
-                ToolsBundleStatusText.Text = "内核未下载";
-            }
-            else
-            {
-                ToolsBundleStatusText.Text = "内核已就绪（版本未知）";
-            }
+            ToolsBundleStatusText.Text = DescribeToolsBundleStatus();
         }
         else
         {
             SettingsUpdateCard.Visibility = Visibility.Visible;
             SettingsToolsBundleCard.Visibility = Visibility.Collapsed;
         }
+    }
+
+    /// <summary>按内核变种/来源生成状态文案（MSIX 商店版与精简版便携共用）。</summary>
+    private static string DescribeToolsBundleStatus()
+    {
+        var version = ToolsBundleService.GetCurrentVersion();
+        if (version is not null)
+        {
+            return ToolsBundleService.GetInstalledKind() == ToolsBundleService.KindLite
+                ? $"当前精简版内核 v{version}，可升级完整版"
+                : $"当前完整版内核 v{version}";
+        }
+
+        // 精简版便携随包内置工具（未通过内核包安装过）
+        if (RuntimeHelper.IsLiteBuild && Directory.Exists(
+                Path.Combine(ToolCatalog.AppDirectory, "Tools")))
+        {
+            return "已内置精简工具集，可下载完整版内核";
+        }
+
+        if (!ToolsBundleService.IsToolsBundleReady())
+        {
+            return "内核未下载";
+        }
+
+        return "内核已就绪（版本未知）";
     }
 
     private async void CheckToolsBundleButton_Click(object sender, RoutedEventArgs e)
@@ -556,63 +569,38 @@ public sealed partial class SettingsPage : Page
 
         try
         {
-            if (!ToolsBundleService.IsToolsBundleReady())
-            {
-                var dialog = new ToolsBundleDownloadDialog
-                {
-                    XamlRoot = XamlRoot,
-                    RequestedTheme = ThemeService.CurrentElementTheme
-                };
-                await dialog.ShowDownloadAsync();
+            var info = await ToolsBundleService.CheckForToolsUpdateAsync();
 
-                if (dialog.DownloadSucceeded)
-                {
-                    var v = ToolsBundleService.GetCurrentVersion();
-                    ToolsBundleStatusText.Text = v is not null
-                        ? $"当前内核版本 v{v}"
-                        : "内核已就绪";
-                }
-                else
-                {
-                ToolsBundleStatusText.Text = "内核未下载";
-                }
+            if (info is null)
+            {
+                ToolsBundleStatusText.Text = "检查失败，请稍后重试";
                 return;
             }
 
-            var info = await ToolsBundleService.CheckForToolsUpdateAsync();
-
-            if (info is not null && info.HasUpdate)
-            {
-                ToolsBundleStatusText.Text = $"发现新版本 v{info.Version}";
-                var dialog = new ToolsBundleDownloadDialog
-                {
-                    XamlRoot = XamlRoot,
-                    RequestedTheme = ThemeService.CurrentElementTheme
-                };
-                await dialog.ShowDownloadAsync(info);
-
-                if (dialog.DownloadSucceeded)
-                {
-                    var v = ToolsBundleService.GetCurrentVersion();
-                    ToolsBundleStatusText.Text = v is not null
-                        ? $"当前内核版本 v{v}"
-                        : "内核已就绪";
-                }
-                else
-                {
-                    ToolsBundleStatusText.Text = "点击检查内核是否有新版本";
-                }
-            }
-            else if (info is not null)
+            // 完整版已是最新：无事可做（不可降级精简版）；其余情况打开对话框
+            // （有新版本 → 选版本下载；无新版本且非完整版 → 升级完整版）。
+            if (!info.HasUpdate && ToolsBundleService.GetInstalledKind() == ToolsBundleService.KindFull)
             {
                 ToolsBundleStatusText.Text = $"当前内核已是最新版本 (v{info.Version})";
+                return;
+            }
+
+            ToolsBundleStatusText.Text = info.HasUpdate ? $"发现新版本 v{info.Version}" : DescribeToolsBundleStatus();
+
+            var dialog = new ToolsBundleDownloadDialog
+            {
+                XamlRoot = XamlRoot,
+                RequestedTheme = ThemeService.CurrentElementTheme
+            };
+            await dialog.ShowDownloadAsync(info);
+
+            if (dialog.DownloadSucceeded)
+            {
+                ToolsBundleStatusText.Text = DescribeToolsBundleStatus();
             }
             else
             {
-                var currentVersion = ToolsBundleService.GetCurrentVersion();
-                ToolsBundleStatusText.Text = currentVersion is not null
-                    ? $"当前内核版本 v{currentVersion}"
-                    : "检查失败，请稍后重试";
+                ToolsBundleStatusText.Text = info.HasUpdate ? "点击检查内核是否有新版本" : DescribeToolsBundleStatus();
             }
         }
         catch (Exception ex)
@@ -1036,7 +1024,7 @@ public sealed partial class SettingsPage : Page
         UpdateWatermarkDetailVisibility(watermarkOn);
 
         _watermarkTextInitializing = true;
-        WatermarkTextBox.Text = AppSettings.Get("ScreenshotWatermarkText") ?? "图吧工具箱";
+        WatermarkTextBox.Text = AppSettings.Get("ScreenshotWatermarkText") ?? "图吧工具箱CE";
         _watermarkTextInitializing = false;
 
         _watermarkFontInitializing = true;
@@ -1095,7 +1083,7 @@ public sealed partial class SettingsPage : Page
     {
         if (_watermarkTextInitializing) return;
         var text = WatermarkTextBox.Text.Trim();
-        AppSettings.Set("ScreenshotWatermarkText", string.IsNullOrEmpty(text) ? "图吧工具箱" : text);
+        AppSettings.Set("ScreenshotWatermarkText", string.IsNullOrEmpty(text) ? "图吧工具箱CE" : text);
     }
 
     private void WatermarkFontComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1121,7 +1109,7 @@ public sealed partial class SettingsPage : Page
     private void InitHardwareMultiDeviceNewLineToggle()
     {
         _hardwareMultiDeviceNewLineInitializing = true;
-        HardwareMultiDeviceNewLineToggle.IsOn = AppSettings.GetBool("HardwareMultiDeviceNewLine", false);
+        HardwareMultiDeviceNewLineToggle.IsOn = AppSettings.GetBool("HardwareMultiDeviceNewLine", true);
         _hardwareMultiDeviceNewLineInitializing = false;
     }
 
@@ -2268,7 +2256,7 @@ public sealed partial class SettingsPage : Page
 
         AppInfoCardScale.ScaleX = 0.95;
         AppInfoCardScale.ScaleY = 1.05;
-        AppTitleText.Text = "图吧工具箱";
+        AppTitleText.Text = "图吧工具箱CE";
         AppSubtitleText.Opacity = 1.0;
 
         var restore = new Storyboard();
@@ -2351,27 +2339,12 @@ public sealed partial class SettingsPage : Page
 
     private void HttpDownloadBrowseButton_Click(object sender, RoutedEventArgs e)
     {
-        var currentPath = GetHttpDownloadPath();
-        var ofn = new OPENFILENAME();
-        ofn.lStructSize = Marshal.SizeOf(ofn);
-        ofn.hwndOwner = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
-        ofn.lpstrFilter = "\0\0";
-        var pathBuffer = new string(new char[520]);
-        ofn.lpstrFile = currentPath.PadRight(520).Substring(0, 520);
-        ofn.nMaxFile = 520;
-        ofn.lpstrTitle = "选择下载保存文件夹";
-        ofn.Flags = OFN_NOCHANGEDIR;
+        var dir = Win32Dialogs.PickFolder();
+        if (string.IsNullOrEmpty(dir))
+            return;
 
-        if (GetSaveFileName(ref ofn))
-        {
-            var selected = ofn.lpstrFile.TrimEnd('\0');
-            if (!string.IsNullOrEmpty(selected))
-            {
-                var dir = Path.GetDirectoryName(selected) ?? selected;
-                AppSettings.Set("HttpDownloadPath", dir);
-                HttpDownloadPathText.Text = dir;
-            }
-        }
+        AppSettings.Set("HttpDownloadPath", dir);
+        HttpDownloadPathText.Text = dir;
     }
 
     private void HttpDownloadResetPathButton_Click(object sender, RoutedEventArgs e)

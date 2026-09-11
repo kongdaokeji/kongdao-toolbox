@@ -67,7 +67,7 @@ body:
   - type: input
     id: product-version
     attributes:
-      label: 图吧工具箱版本
+      label: 图吧工具箱CE版本
       placeholder: 例如：1.5.11
     validations:
       required: false

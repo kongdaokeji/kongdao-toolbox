@@ -8,7 +8,6 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Linq;
-using TubaWinUi3.Controls;
 using TubaWinUi3.Models;
 using TubaWinUi3.Pages;
 using TubaWinUi3.Services;
@@ -32,13 +31,10 @@ public sealed partial class HomePage : Page
     private int _lastCacheVersion = -1;
     private int _tagBarCacheVersion = -1;
 
-    // 标签栏：只保存标签名列表；芯片每次布局时按需重建（重建成本极低），
-    // 避免把现成的 UIElement 在“单行 StackPanel / 多行 WrapPanel”两个宿主间搬移
-    // —— WinUI 在跨自定义 Panel 摘挂同一元素时会抛 REGDB_E_CLASSNOTREG。
+    // 标签栏：只保存标签名列表；按钮每次布局时按需重建（重建成本极低），
+    // CommandBar 放不下的按钮会自动折叠进溢出菜单。
     private readonly List<string> _allTags = [];
     private bool _tagsPopulated;
-    private bool _tagsExpanded;
-    private readonly WrapPanel _tagWrapPanel = new() { Spacing = 6 };
 
     // 编辑排序模式（与收藏页同模式）：专用纵向列表 + 整行自实现拖拽
     private bool _isEditing;
@@ -58,10 +54,6 @@ public sealed partial class HomePage : Page
         InitializeComponent();
         ToolsGrid.ItemsSource = _tools;
         CompactGrid.ItemsSource = _tools;
-
-        TagWrapScrollViewer.Content = _tagWrapPanel;
-        // 首次布局完成后才可能测出“内容超宽”，用 LayoutUpdated 兜底刷新展开按钮显隐
-        TagBarScrollViewer.LayoutUpdated += (_, _) => UpdateTagExpandButtonState();
 
         _compactMode = CompactModeService.IsCompactModeEnabled();
         ApplyCompactMode();
@@ -269,7 +261,6 @@ public sealed partial class HomePage : Page
 
         DispatcherQueue.TryEnqueue(() =>
         {
-            _tagsExpanded = false;
             _allTags.Clear();
             _allTags.AddRange(tags);
             _tagsPopulated = true;
@@ -279,9 +270,9 @@ public sealed partial class HomePage : Page
     }
 
     /// <summary>
-    /// 依据当前形态（单行横向滚动 / 展开多行换行）重建标签芯片并同步可见性与按钮文案。
-    /// 芯片每次布局时全新创建，不做跨宿主搬移（规避 WinUI 重挂 UIElement 的崩溃）。
-    /// 仅“全部”页（无分类）且存在标签时显示。
+    /// 依据当前标签列表重建 CommandBar 按钮并同步可见性。
+    /// 按钮每次布局时全新创建；仅“全部”页（无分类）且存在标签时显示。
+    /// 放不下的按钮由 CommandBar 自动折叠进溢出菜单。
     /// </summary>
     private void ApplyTagBarLayout()
     {
@@ -292,87 +283,50 @@ public sealed partial class HomePage : Page
             return;
         }
 
-        // 清空两个宿主后按需重建（选中态按 _selectedTag 重新应用）
-        TagBarPanel.Children.Clear();
-        _tagWrapPanel.Children.Clear();
-        var host = _tagsExpanded ? (Panel)_tagWrapPanel : TagBarPanel;
-
-        host.Children.Add(CreateTagChip("全部", null as string, _selectedTag is null));
+        // 重建（选中态按 _selectedTag 重新应用）
+        TagBarCommandBar.PrimaryCommands.Clear();
+        TagBarCommandBar.PrimaryCommands.Add(CreateTagToggleButton("全部", null as string, _selectedTag is null));
         foreach (var tag in _allTags)
-            host.Children.Add(CreateTagChip(tag, tag, tag == _selectedTag));
-
-        if (_tagsExpanded)
-        {
-            TagBarScrollViewer.Visibility = Visibility.Collapsed;
-            TagWrapScrollViewer.Visibility = Visibility.Visible;
-        }
-        else
-        {
-            TagBarScrollViewer.Visibility = Visibility.Visible;
-            TagWrapScrollViewer.Visibility = Visibility.Collapsed;
-        }
+            TagBarCommandBar.PrimaryCommands.Add(CreateTagToggleButton(tag, tag, tag == _selectedTag));
 
         TagBarArea.Visibility = Visibility.Visible;
-        TagExpandIcon.Glyph = _tagsExpanded ? "\uE70E" : "\uE70D";
-        TagExpandText.Text = _tagsExpanded ? "收起" : "展开";
-        UpdateTagExpandButtonState();
     }
 
-    private RadioButton CreateTagChip(string content, string? tag, bool isChecked)
+    private AppBarToggleButton CreateTagToggleButton(string content, string? tag, bool isChecked)
     {
-        var chip = new RadioButton
+        var button = new AppBarToggleButton
         {
-            Content = content,
+            Label = content,
             Tag = tag,
-            IsChecked = isChecked,
-            Padding = new Thickness(10, 4, 10, 4),
-            Style = (Style)Resources["TagRadioButtonStyle"]
+            IsChecked = isChecked
         };
-        chip.Click += TagRadioButton_Click;
-        return chip;
+        button.Click += TagToggleButton_Click;
+        return button;
     }
 
-    /// <summary>展开/收起按钮显隐：收起态仅在内容确实超宽(可滚动)时出现；展开态始终保留以便收回。</summary>
-    private void UpdateTagExpandButtonState()
+    private void TagToggleButton_Click(object sender, RoutedEventArgs e)
     {
-        if (TagBarArea.Visibility != Visibility.Visible || _allTags.Count == 0)
+        if (sender is not AppBarToggleButton button)
+            return;
+
+        // 点击已选中的标签保持选中（保持单选语义）
+        if (button.Tag as string == _selectedTag)
         {
-            TagExpandButton.Visibility = Visibility.Collapsed;
+            button.IsChecked = true;
             return;
         }
-        if (_tagsExpanded)
+
+        _selectedTag = button.Tag as string;
+
+        // ToggleButton 无自动互斥，手动取消其他按钮
+        foreach (var command in TagBarCommandBar.PrimaryCommands)
         {
-            TagExpandButton.Visibility = Visibility.Visible;
-            return;
+            if (command is AppBarToggleButton other && other != button)
+                other.IsChecked = false;
         }
-        TagExpandButton.Visibility = TagBarScrollViewer.ExtentWidth > TagBarScrollViewer.ViewportWidth + 2
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-    }
 
-    private void TagExpandButton_Click(object sender, RoutedEventArgs e)
-    {
-        _tagsExpanded = !_tagsExpanded;
-        ApplyTagBarLayout();
-    }
-
-    private void TagRadioButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is RadioButton rb)
-        {
-            _selectedTag = rb.Tag as string;
-
-            // RadioButton 按父容器分组的自动互斥不可靠，手动取消同宿主内其他选项
-            var host = _tagsExpanded ? (Panel)_tagWrapPanel : TagBarPanel;
-            foreach (var child in host.Children)
-            {
-                if (child is RadioButton other && other != rb)
-                    other.IsChecked = false;
-            }
-
-            UpdateTitle();
-            _ = LoadToolsAsync();
-        }
+        UpdateTitle();
+        _ = LoadToolsAsync();
     }
 
     private async void DownloadToolsButton_Click(object sender, RoutedEventArgs e)

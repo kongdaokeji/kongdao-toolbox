@@ -9,7 +9,7 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
- * 拉取图吧工具箱官方最新 release。
+ * 拉取图吧工具箱CE官方最新 release。
  *
  * 与主应用 UpdateService 同一思路：GitCode 国内镜像优先，GitHub 兜底。
  */

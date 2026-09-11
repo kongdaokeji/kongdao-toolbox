@@ -110,7 +110,7 @@
                 </Border>
 
                 <Grid Grid.Row="1">
-                    <WebView2 x:Name="WebView" Source="about:blank" Visibility="Collapsed" />
+                    <WebView2 x:Name="WebView" Visibility="Collapsed" />
                     
                     <Grid x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <Grid.OpacityTransition>

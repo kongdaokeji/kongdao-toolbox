@@ -1,6 +1,6 @@
-# 图吧工具箱 WinUI3 官方网站
+# 图吧工具箱CE 官方网站
 
-本目录是图吧工具箱（TubaWinUi3）的新版官方网站，基于 [WinUIonWeb](https://github.com/Furry-Xiyi/WinUIonWeb) 构建——一个把 WinUI 控件带到 Web 的 Vue 3 项目。整站界面全部使用 Web 版 WinUI 控件（标题栏、NavigationView、按钮、ComboBox、RadioButtons、InfoBar、进度环等），外观与 Windows 11 的 WinUI 3 应用一致，支持浅色 / 深色 / 跟随系统主题。
+本目录是图吧工具箱CE（TubaWinUi3）的新版官方网站，基于 [WinUIonWeb](https://github.com/Furry-Xiyi/WinUIonWeb) 构建——一个把 WinUI 控件带到 Web 的 Vue 3 项目。整站界面全部使用 Web 版 WinUI 控件（标题栏、NavigationView、按钮、ComboBox、RadioButtons、InfoBar、进度环等），外观与 Windows 11 的 WinUI 3 应用一致，支持浅色 / 深色 / 跟随系统主题。
 
 ## 开发
 

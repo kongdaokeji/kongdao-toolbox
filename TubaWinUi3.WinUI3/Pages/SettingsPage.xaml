@@ -103,7 +103,7 @@
                                     x:Name="AppTitleText"
                                     FontSize="18"
                                     FontWeight="Bold"
-                                    Text="图吧工具箱" />
+                                    Text="图吧工具箱CE" />
                                 <TextBlock
                                     x:Name="AppSubtitleText"
                                     Opacity="1.0"
@@ -658,7 +658,7 @@
                                                 <TextBlock FontWeight="Bold" Text="水印文字" />
                                                 <TextBlock Opacity="1.0" FontSize="13" TextWrapping="Wrap" Text="自定义截图水印显示的文字" />
                                             </StackPanel>
-                                            <TextBox x:Name="WatermarkTextBox" Grid.Column="2" MinWidth="160" MaxWidth="240" PlaceholderText="图吧工具箱" TextChanged="WatermarkTextBox_TextChanged" />
+                                            <TextBox x:Name="WatermarkTextBox" Grid.Column="2" MinWidth="160" MaxWidth="240" PlaceholderText="图吧工具箱CE" TextChanged="WatermarkTextBox_TextChanged" />
                                         </Grid>
                                         <Grid Grid.Row="3" ColumnSpacing="16" x:Name="WatermarkFontPanel">
                                             <Grid.ColumnDefinitions>
@@ -1341,7 +1341,7 @@
                                             <FontIcon HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="18" Glyph="&#xE90F;" />
                                         </Border>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                                            <TextBlock FontWeight="Bold" Text="图吧工具箱" />
+                                            <TextBlock FontWeight="Bold" Text="图吧工具箱CE" />
                                             <TextBlock FontSize="12" Opacity="1.0" Text="本软件所集成的全部硬件检测与测试工具，均来源于「图吧工具箱」项目。" TextWrapping="Wrap" />
                                         </StackPanel>
                                         <HyperlinkButton Grid.Column="2" VerticalAlignment="Center" NavigateUri="https://www.tbtool.cn" Content="访问官网" />
