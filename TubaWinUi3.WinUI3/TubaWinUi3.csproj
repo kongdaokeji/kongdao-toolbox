@@ -1,0 +1,387 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <RootNamespace>TubaWinUi3</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <Platforms>x86;x64;ARM64</Platforms>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant())</RuntimeIdentifier>
+    <PublishProfile Condition="Exists('Properties\PublishProfiles\win-$(Platform).pubxml')">win-$(Platform).pubxml</PublishProfile>
+    <UseWinUI>true</UseWinUI>
+    <!-- 主程序使用 JIT + 不裁剪，AI 运行库按需加载。CsWinRT 的 AOT 全局类型表
+         会在普通 XAML 控件封送时提前解析 Windows ML 类型，导致未下载运行库时启动失败。
+         AOT 发布仍保留其必需的优化器；NativeAOT helper 项目不受此配置影响。 -->
+    <CsWinRTAotOptimizerEnabled Condition="'$(PublishAot)' != 'true'">false</CsWinRTAotOptimizerEnabled>
+    <WinUISDKReferences>false</WinUISDKReferences>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained Condition="'$(WindowsAppSDKSelfContained)' == ''">true</WindowsAppSDKSelfContained>
+    <CETCompat>false</CETCompat>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- 版本号：1.8.0（对齐上游 v1.8.0 基线，空岛品牌二次开发） -->
+    <Version>1.8.0</Version>
+    <SatelliteResourceLanguages>zh-Hans;zh-Hant;en</SatelliteResourceLanguages>
+    <!-- Win32 版本资源（exe 属性面板显示）：AssemblyTitle → 文件说明，Product → 产品名称 -->
+    <AssemblyTitle>空岛图吧工具箱</AssemblyTitle>
+    <Product>空岛图吧工具箱</Product>
+    <Company>空岛科技</Company>
+    <Copyright>© 空岛科技. 基于 GPL-3.0 授权的图吧工具箱衍生版本.</Copyright>
+    <FileVersion>1.8.0</FileVersion>
+    <AssemblyVersion>1.8.0.0</AssemblyVersion>
+    <InformationalVersion>1.8.0+空岛科技</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <DefaultItemExcludes>$(DefaultItemExcludes);artifacts\**;publish*\**;bin-verify\**</DefaultItemExcludes>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>CA2252;CA2014;NU1510</NoWarn>
+    <!-- 界面本地化 resw 由 WinUI3Localizer 直接读取（exe 旁 Strings/<lang>/*.resw），不参与 PRI：
+         MakePri 会把 "Key.Property" 形式的资源名解析为路径层级，与纯 "Key" 项冲突（PRI175/PRI278）；
+         且默认 glob "**/*.resw" 在自定义 BaseOutputPath 时会捡到输出目录里的副本。 -->
+    <EnableDefaultPRIResourceItems>false</EnableDefaultPRIResourceItems>
+  </PropertyGroup>
+  <!-- 商店/精简包不含内核。SDK 的默认 Content 项会把项目目录下所有 png/jpg/ico
+       当成资源（Tools/**/*.png 是工具截图，260+ 个），只移除下面的显式 Content 项不够。 -->
+  <PropertyGroup Condition="'$(ExcludeToolsFromPublish)' == 'true'">
+    <DefaultItemExcludes>$(DefaultItemExcludes);Tools\**</DefaultItemExcludes>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="TubaWinUi3.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- 界面本地化资源（WinUI3Localizer 直接读取 exe 旁 Strings/<lang>/*.resw，不使用 PRI）。
+       必须从 PRI 资源中排除：MakePri 会把 "Key.Property" 形式的资源名解析为路径层级，
+       与同一文件里的纯 "Key" 项冲突（PRI175 / PRI278）。 -->
+  <ItemGroup>
+    <Content Include="Strings\**\*.resw">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <PRIResource Remove="Strings\**\*.resw" />
+    <PRIResource Remove="bin\**\*.resw" />
+    <PRIResource Remove="obj\**\*.resw" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ExcludeToolsFromPublish)' != 'true'">
+    <Content Include="Tools\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="IconCache\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+  </ItemGroup>
+
+  <!--
+    精简版（Lite）工具集：仅 CI 的 Lite 便携包启用（-p:ExcludeToolsFromPublish=true -p:IncludeLiteTools=true）。
+    不打全量 Tools，只随包内置少量必要工具；完整工具集仍通过 Tools.zip / Tools_Lite.zip 内核包按需下载。
+    Store 的 MSIX 包（build-msix-store.ps1）只传 ExcludeToolsFromPublish，不传 IncludeLiteTools，保持无内置工具、
+    首次启动由用户在下载对话框中选择精简版/完整版内核。
+  -->
+  <ItemGroup Condition="'$(ExcludeToolsFromPublish)' == 'true' And '$(IncludeLiteTools)' == 'true'">
+    <Content Include="Tools\处理器工具\CPUZ\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="Tools\处理器工具\C2CLatency\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="Tools\显卡工具\GPUZ\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="Tools\显卡工具\DDU\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="Tools\硬盘工具\CrystalDiskInfo\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="Tools\硬盘工具\CrystalDiskMark\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="Tools\烤鸡工具\FurMark_win64\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="Tools\综合检测\hwinfo\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="Tools\综合检测\HWMonitor\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+  </ItemGroup>
+
+  <Target Name="PrepareOfficialToolCatalog" BeforeTargets="PrepareForBuild">
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Metadata\tools.json" DestinationFiles="$(IntermediateOutputPath)tools.default.json" />
+  </Target>
+  <ItemGroup>
+    <Content Include="$(IntermediateOutputPath)tools.default.json" Link="Metadata\tools.default.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Metadata\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <!-- CLI 工具文档单一事实来源：仓库根目录（AI Agent 解析用）。
+         注意：根目录文档已于提交 7442ad2 删除，此处引用会导致 MSB3030 构建失败故移除。
+         如后续恢复该文档，请将下面三行加回。 -->
+    <!--
+    <Content Include="..\CLI工具使用文档.md" Link="Metadata\CLI工具使用文档.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    -->
+    <Content Include="CertBlock\Certificates\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="CertBlock\CertBlockAssets\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+
+  </ItemGroup>
+
+  <ItemGroup>
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <!--
+    Microsoft.Windows.SDK.BuildTools.WinApp adds first-class support for
+    `dotnet run` on packaged WinUI apps: it hooks the .NET CLI Run target to
+    register a debug identity via the winapp CLI and launch the app with
+    package identity (AUMID).
+    Set <EnableWinAppRunSupport>false</EnableWinAppRunSupport> in a
+    <PropertyGroup> above to opt out.
+  -->
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" Version="8.2.251219" />
+    <PackageReference Include="Downloader" Version="5.9.6" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+    <PackageReference Include="LiveChartsCore.SkiaSharpView.WinUI" Version="2.0.4" />
+
+    <PackageReference Include="Microsoft.ApplicationInsights" Version="2.23.0" />
+    <!-- 正版软件商店直接读取 WinGet 官方源（source2.msix 内的 SQLite 索引 + YAML 清单），
+         不再依赖本机 winget.exe。 -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.14" />
+    <PackageReference Include="YamlDotNet" Version="18.1.0" />
+    <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.2.2" />
+
+
+    <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
+
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4022.49" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7705" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinUIAnalyzer" Version="0.7.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
+    <PackageReference Include="System.Drawing.Common" Version="10.0.0" />
+    <!-- Microsoft.Win32.SystemEvents（CloseToTrayService 的注销/关机保护）与
+         System.Diagnostics.Eventing.Reader（ErrorReportService 读事件日志）以前都由
+         FrameworkReference Microsoft.WindowsDesktop.App.WindowsForms 间接提供。 -->
+    <PackageReference Include="System.Windows.Extensions" Version="10.0.13" />
+    <PackageReference Include="System.Diagnostics.EventLog" Version="10.0.13" />
+    <PackageReference Include="System.Management" Version="10.0.8" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="10.0.0" />
+
+    <!-- 内置工具彩色矢量图标（Assets/BuiltinIcons/*.svg）光栅化：界面走 WinUI 原生
+         SvgImageSource，桌面快捷方式的 .ico 需要离屏渲染，用这个 MIT 纯托管库。 -->
+    <PackageReference Include="Svg" Version="3.4.7" />
+
+    <PackageReference Include="System.Speech" Version="10.0.10" />
+
+    <!-- 本地 AI 试炼场：Windows ML 自包含运行时（ONNX Runtime 1.27 + DirectML + ExecutionProviderCatalog
+         的 WinRT API），负责 NPU/GPU/CPU 执行提供程序的发现、按需下载与注册。
+         原生资产仅 win-x64 / win-arm64（无 x86），页面在 x86 下做降级提示。
+         运行时资产按需下载（见 AiRuntimeExcludeAssets）；System.Numerics.Tensors 是其传递依赖，
+         同样显式提升以便排除。 -->
+    <PackageReference Include="Microsoft.Windows.AI.MachineLearning" Version="2.4.89" ExcludeAssets="$(AiRuntimeWinMlExcludeAssets)" />
+    <PackageReference Include="System.Numerics.Tensors" Version="9.0.0" ExcludeAssets="$(AiRuntimeWinMlExcludeAssets)" />
+    <!-- 本地 AI 试炼场：ONNX Runtime GenAI（LLM 生成循环 / KV Cache / 采样），WinML 变体经
+         Windows ML 自动选择硬件（NPU → GPU → CPU）。不要同时引用其它 GenAI 变体（原生库同名冲突）。
+         该包自带 targets 明确拒绝 x86 平台，故 x86 RID 下排除引用，改用编译桩。
+         Managed 是其传递依赖（托管 API 所在），显式提升以便排除运行时资产。 -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI.WinML" Version="0.17.1" Condition="'$(RuntimeIdentifier)' != 'win-x86'" ExcludeAssets="$(AiRuntimeExcludeAssets)" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI.Managed" Version="0.17.1" Condition="'$(RuntimeIdentifier)' != 'win-x86'" ExcludeAssets="$(AiRuntimeExcludeAssets)" />
+
+    <PackageReference Include="WinUI3Localizer" Version="2.3.0" />
+
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Controls\NativeHardwareScene.cs" />
+  </ItemGroup>
+
+  <!-- Publish Properties -->
+  <PropertyGroup>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+  </PropertyGroup>
+
+  <!--
+    AI 依赖的运行时资产（Windows ML / ORT GenAI 的托管与原生 DLL）
+    默认不随包分发：首次打开 AI 内置工具（本地AI试炼场）时按需下载「AI 运行库」
+    zip 到数据目录，由 Services/AiRuntime/AiRuntimeLoader 动态加载（详见 AGENTS.md）。
+    值为 "runtime;native"——native 是独立的资产类型，光排除 runtime 原生 DLL 仍会进包。
+    本地开发需要 DLL 随输出时用 -p:BundleAiRuntime=true（AiRuntimeLoader 会优先使用
+    应用目录里已有的 DLL，无需下载）。
+  -->
+  <PropertyGroup>
+    <AiRuntimeExcludeAssets Condition="'$(BundleAiRuntime)' != 'true'">runtime;native</AiRuntimeExcludeAssets>
+    <!-- Windows ML 包的托管程序集是架构无关的小文件（约 330KB），x86 版保留随包分发
+         （该包无 32 位原生资产，x86 本地推理本来就不可用）——否则 x86 用户要为两个
+         托管 DLL 下载 51MB 整包。x64/arm64 与其他 AI 依赖一致按需下载。 -->
+    <AiRuntimeWinMlExcludeAssets Condition="'$(BundleAiRuntime)' != 'true' AND '$(RuntimeIdentifier)' != 'win-x86'">runtime;native</AiRuntimeWinMlExcludeAssets>
+  </PropertyGroup>
+
+  <!--
+    ONNX Runtime GenAI（WinML 变体）包用 props 里的 None + CopyToOutputDirectory 硬拷原生库
+    （onnxruntime-genai.dll / onnxruntime-genai-cuda.dll），ExcludeAssets 与复制项过滤都管不到：
+    构建 / 发布完成后直接从输出目录删除（-p:BundleAiRuntime=true 的本地开发构建保留）。
+  -->
+  <Target Name="StripAiRuntimeNativeCopiesAfterBuild" AfterTargets="Build"
+          Condition="'$(AiRuntimeExcludeAssets)' != ''">
+    <ItemGroup>
+      <_AiRuntimeLeftover Include="$(OutDir)onnxruntime-genai.dll;$(OutDir)onnxruntime-genai-cuda.dll" />
+    </ItemGroup>
+    <Delete Files="@(_AiRuntimeLeftover)" TreatErrorsAsWarnings="true" />
+  </Target>
+
+  <Target Name="StripAiRuntimeNativeCopiesAfterPublish" AfterTargets="Publish"
+          Condition="'$(AiRuntimeExcludeAssets)' != '' AND '$(PublishDir)' != ''">
+    <ItemGroup>
+      <_AiRuntimeLeftoverPublish Include="$(PublishDir)onnxruntime-genai.dll;$(PublishDir)onnxruntime-genai-cuda.dll" />
+    </ItemGroup>
+    <Delete Files="@(_AiRuntimeLeftoverPublish)" TreatErrorsAsWarnings="true" />
+  </Target>
+
+  <!-- x86：Windows ML 运行时无 32 位原生资产，且 ORT GenAI 包拒绝 x86；本地 LLM 部分以编译桩替代。 -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x86'">
+    <DefineConstants>$(DefineConstants);AI_PLAYGROUND_X86</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+    Pre-build the bundled icon cache (IconCache/) before publish so first launch
+    does not need to extract icons. Up-to-date files are skipped by the script.
+  -->
+  <Target Name="GenerateBundledIconCache" BeforeTargets="GetCopyToPublishDirectoryItems" Condition="'$(ExcludeToolsFromPublish)' != 'true'">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\build-icon-cache.ps1&quot; -ToolsRoot &quot;$(MSBuildProjectDirectory)\Tools&quot; -OutputDir &quot;$(MSBuildProjectDirectory)\IconCache&quot;" />
+    <!-- IconCache/ 为 gitignored，CI 干净 checkout 下评估期 glob 为空；直接登记
+         ContentWithTargetPath 才能随产物分发。
+         用 AssignTargetPath 任务而非 ItemGroup 内联 TargetPath：内联引用隐含元数据
+         （%(RecursiveDir)/%(Filename)）会触发批处理，把 TargetPath 错误套到其他
+         Content 项上（Assets/Tools 文件被平铺复制进 IconCache）。 -->
+    <ItemGroup>
+      <_IconCacheFiles Include="$(MSBuildProjectDirectory)\IconCache\**\*" />
+      <ContentWithTargetPath Remove="@(_IconCacheFiles)" />
+    </ItemGroup>
+    <AssignTargetPath Files="@(_IconCacheFiles)" RootFolder="$(MSBuildProjectDirectory)">
+      <Output TaskParameter="AssignedFiles" ItemName="ContentWithTargetPath" />
+    </AssignTargetPath>
+    <ItemGroup>
+      <ContentWithTargetPath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ContentWithTargetPath>
+    </ItemGroup>
+  </Target>
+
+  <!--
+    开发运行时后端（Build/Run）：把后端托管版 exe 拷贝到主程序输出目录。
+    Debug 构建主程序是 framework-dependent，后端托管版同样依赖系统 .NET 10，
+    因此 dotnet run 时后端能直接运行。Publish 时才用下面的 PublishBackend 做 AOT。
+    触发时机：Build 阶段（BeforeTargets="AfterTargets=..." 之后的 Build），
+    保证拷到 $(TargetDir)（即 AppContext.BaseDirectory），ActiveInterceptService 能定位。
+  -->
+  <Target Name="CopyBackendForBuild" AfterTargets="Build" Condition="'$(ExcludeToolsFromPublish)' != 'true'">
+    <PropertyGroup>
+      <_BackEndHostDir>$(MSBuildProjectDirectory)\..\TubaWinUI3.BackEnd\bin\$(Configuration)\net10.0-windows\$(RuntimeIdentifier)</_BackEndHostDir>
+      <_BackEndHostExe>$(_BackEndHostDir)\TubaWinUI3.BackEnd.exe</_BackEndHostExe>
+    </PropertyGroup>
+    <!-- 始终以 SelfContained=false 构建后端：后端 csproj 声明了 SelfContained=true（给 AOT 用），
+         但 Debug 阶段只拷 TubaWinUI3.BackEnd.*（不含运行时），必须用 framework-dependent 模式
+         让 runtimeconfig.json 指向系统 .NET 10 运行时。不加 Condition：避免残留的
+         self-contained 产物被复用导致 hostpolicy.dll 找不到。
+         Targets 带 Restore：后端不是主项目的 ProjectReference，dotnet publish 的隐式
+         restore 不会覆盖它；在干净的检出（CI）上必须先 restore 才有 project.assets.json。 -->
+    <MSBuild Projects="$(MSBuildProjectDirectory)\..\TubaWinUI3.BackEnd\TubaWinUi3.BackEnd.csproj" Targets="Restore;Build" Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=false" />
+    <!-- apphost exe 只是薄壳，实际代码在同名 .dll，需要把后端产物 TubaWinUI3.BackEnd.* 全部拷贝。
+         ContinueOnError=WarnAndContinue：后端正在运行时文件被锁，跳过拷贝不阻断 build。 -->
+    <ItemGroup>
+      <_BackEndBuildFiles Include="$(_BackEndHostDir)\TubaWinUI3.BackEnd.*" Condition="Exists('$(_BackEndHostExe)')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_BackEndBuildFiles)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" ContinueOnError="WarnAndContinue" Condition="Exists('$(_BackEndHostExe)')" />
+    <Message Importance="High" Text="已拷贝开发后端: $(TargetDir)TubaWinUI3.BackEnd.exe" Condition="Exists('$(TargetDir)TubaWinUI3.BackEnd.exe')" />
+  </Target>
+
+  <!--
+    主动拦截后端（NativeAOT）发布：把 TubaWinUI3.BackEnd 编译为单文件原生 exe，
+    随主程序一起分发（主程序运行根目录，ActiveInterceptService 直接启动）。
+    NativeAOT 需要 MSVC 链接器。build-backend-aot.ps1 负责定位 vcvars64 并在其
+    环境下以 IlcUseEnvironmentalTools=true 发布，兼容 vswhere 元数据缺失的机器。
+  -->
+  <Target Name="PublishBackend" BeforeTargets="GetCopyToPublishDirectoryItems" Condition="'$(ExcludeToolsFromPublish)' != 'true'">
+    <PropertyGroup>
+      <_BackEndOutDir>$(MSBuildProjectDirectory)\artifacts\backend-aot\$(RuntimeIdentifier)</_BackEndOutDir>
+    </PropertyGroup>
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\build-backend-aot.ps1&quot; -Rid $(RuntimeIdentifier) -OutputDir &quot;$(_BackEndOutDir)&quot; -Configuration $(Configuration)" />
+    <ItemGroup>
+      <_BackEndExe Include="$(_BackEndOutDir)\TubaWinUI3.BackEnd.exe" />
+    </ItemGroup>
+    <AssignTargetPath Files="@(_BackEndExe)" RootFolder="$(_BackEndOutDir)">
+      <Output TaskParameter="AssignedFiles" ItemName="ContentWithTargetPath" />
+    </AssignTargetPath>
+    <ItemGroup>
+      <ContentWithTargetPath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ContentWithTargetPath>
+    </ItemGroup>
+  </Target>
+
+  <!--
+    「文件占用查看」Win11 新版右键菜单处理程序（TubaWinUI3.ShellExtension）NativeAOT 发布：
+    仅 MSIX 打包需要（build-msix-store.ps1 / build-store.ps1 传 -p:IncludeShellExtension=true），
+    包清单以 com:SurrogateServer 声明该 DLL；便携发布不产出（不进 zip）。
+    注意：条件不能复用 ExcludeToolsFromPublish —— 商店 MSIX 构建该值为 true 但必须包含本 DLL。
+  -->
+  <Target Name="PublishShellExtension" BeforeTargets="GetCopyToPublishDirectoryItems" Condition="'$(IncludeShellExtension)' == 'true'">
+    <PropertyGroup>
+      <_ShellExtOutDir>$(MSBuildProjectDirectory)\artifacts\shell-ext-aot\$(RuntimeIdentifier)</_ShellExtOutDir>
+    </PropertyGroup>
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\build-shell-ext-aot.ps1&quot; -Rid $(RuntimeIdentifier) -OutputDir &quot;$(_ShellExtOutDir)&quot; -Configuration $(Configuration)" />
+    <ItemGroup>
+      <_ShellExtDll Include="$(_ShellExtOutDir)\TubaWinUi3.ShellExtension.dll" />
+    </ItemGroup>
+    <AssignTargetPath Files="@(_ShellExtDll)" RootFolder="$(_ShellExtOutDir)">
+      <Output TaskParameter="AssignedFiles" ItemName="ContentWithTargetPath" />
+    </AssignTargetPath>
+    <ItemGroup>
+      <ContentWithTargetPath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ContentWithTargetPath>
+    </ItemGroup>
+  </Target>
+</Project>

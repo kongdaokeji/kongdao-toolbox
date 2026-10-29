@@ -1,0 +1,425 @@
+﻿# TubaWinUi3 — Agent Notes
+
+## What this is
+
+A WinUI 3 (Windows App SDK / .NET 10) Chinese-language PC hardware toolbox ("空岛图吧工具箱"). Catalogs and launches third-party diagnostic executables from a local `Tools/` folder, shows WMI/LibreHardwareMonitor hardware info, ships ~30 built-in utility tools, and does real-time hardware monitoring with an FPS overlay. UI strings are hardcoded Chinese — there is no resource/localization system.
+
+## Solution layout (5 projects in `TubaWinUi3.sln`, plus the standalone PE edition below)
+
+- `TubaWinUi3.WinUI3/` — **the app**. The only project you normally build/run; `dotnet` commands target `TubaWinUi3.WinUI3/TubaWinUi3.csproj`.
+- `TubaWinUI3.BackEnd/` — a small **NativeAOT helper process** (`TubaWinUI3.BackEnd.exe`) used by the 主动拦截 (active intercept) feature; managed by `ActiveInterceptService`. The main csproj's `CopyBackendForBuild` target copies its framework-dependent output after every `dotnet build`, and `PublishBackend` builds/publishes the AOT version during `dotnet publish`.
+- `TubaWinUI3.ShellExtension/` — a **NativeAOT COM DLL** (`TubaWinUi3.ShellExtension.dll`) implementing `IExplorerCommand`: the Windows 11 modern context-menu handler for 文件占用查看, loaded by dllhost via the package manifest (`com:SurrogateServer`). Built by `build-shell-ext-aot.ps1`; included in MSIX builds only (`-p:IncludeShellExtension=true`); shares `Services/FileLock/FileLockShellMenuContract.cs` via linked `Compile`. See the feature section below.
+- `TubaWinUi3.Compatible/` — a separate **.NET Framework 4.8 WinForms** edition (`空岛图吧工具箱Winui3兼容版.exe`, ReaLTaiizor Crown theme + Costura.Fody single-file). NOT WinUI 3 and NOT .NET 10 — different toolchain, different conventions. **No longer bundled into portable zips** — that slot is taken by the PE edition (next bullet). Do not mix its patterns into the main app. Supports tools.json cross-category (`category` + `categories`) copies and splits each arch variant (x64/ARM64/x86) into its own tool card; `builtin` placement entries are skipped (WinForms can't run WinUI built-ins).
+- `TubaWinUi3.PECompatible/` — **PE 兼容版** (`图吧工具箱PE兼容版.exe`; MewUI Win32 host + GDI backend/text engine, .NET 10 self-contained single-file). Not in the `.sln` — target its csproj directly. Shares the Compatible project's models/services via linked `Compile` items; CI publishes it per-RID and bundles the exe into the portable/lite zips. Its Debug build auto-copies the output into the main app's Debug dir (`CopyToWinUiDebugDir` target → `TubaWinUi3.WinUI3/bin/**/Debug/<tfm>/win-<arch>/图吧工具箱PE兼容版/`), where the shared services walk up parent dirs to find `Tools/` + `Metadata/` — that's the intended local debugging flow.
+- `TubaWinUi3.Tests/` — **xUnit** tests (xUnit 2.9 + coverlet), referencing the main project via `InternalsVisibleTo`.
+
+## Build, run, test
+
+```bash
+dotnet build                                                      # Debug; RuntimeIdentifier auto-detects current arch
+dotnet run                                                        # Unpackaged profile (only profile in launchSettings.json)
+dotnet test                                                       # all tests
+dotnet test --filter "FullyQualifiedName~ToolCatalogTests"        # one class / one test
+.\run-msix.ps1                                                    # PACKAGED (MSIX) run: register build output as dev
+                                                                  #   package 'tubawinui3.dev' (Developer Mode, no signing)
+                                                                  #   → seed LocalState Tools → launch. CLI 版 F5。
+.\run-msix.ps1 -NoBuild -NoLaunch                                 # 只重注册不启动（CI/无头）
+```
+
+- Platforms x86 / x64 / ARM64; `RuntimeIdentifier` defaults to the current process architecture.
+- `WindowsPackageType=None` + `EnableMsixTooling=false` → runs unpackaged; no MSIX registration for dev.
+- **MSIX 自测**：`run-msix.ps1` 把现有构建输出（`bin/<Config>/<tfm>/win-<arch>`，含 exe/pri/Tools/Metadata/Assets）直接用开发者模式注册为 dev 包（identity `tubawinui3.dev`，与 Store 的 `DA3D64F4.winui3` 互不干扰），再从 `shell:AppsFolder` 激活启动 → 真实包身份。LocalFolder 数据在 `%LOCALAPPDATA%\Packages\tubawinui3.dev_<hash>\LocalState\TubaWinUi3\`。注意：注册的是可写 bin 目录，Store 那种「安装目录 ACL 只读」不模拟；要上架级验证走 `build-msix-store.ps1`。
+- **WebView2 + MSIX**：应用用 Evergreen 模式（`WebView2EnvironmentService` 的 `browserExecutableFolder: null`）。**打包应用只能通过包依赖图解析运行时**——清单必须声明 `Microsoft.WebView2` 框架包依赖（`Package.appxmanifest`、`build-msix-store.ps1` 的 `Write-CleanManifest`、`run-msix.ps1` 的 dev 清单三处都已加，微软 Store 安装时自动供应）。机器级 Evergreen 运行时对打包应用不可见：同一 exe 非打包正常、打包后 WebView2 完全不初始化（无 msedgewebview2 进程、数据目录不创建）。开发机自测前需先装一次框架包（下载页「WebView2 Runtime for use with MSIX apps」的 .msix，管理员 `Add-AppxPackage`），`run-msix.ps1` 有预检。
+- **Requires admin**: `App.OnLaunched` auto-elevates via the `runas` verb and `Exit()`s if not admin (unpackaged mode only). Headless command-line modes skip the window entirely: `EnergyStarStartupService.SilentArg` (EcoQoS throttling), `--copy-path`, `--toast`, `--show-active-intercept`, and `--file-lock <路径>` (open the file-lock tool with a pre-filled path — used by the Explorer context menu). **单实例闸门在这些模式之后**：只有「要建主窗口」的启动才参与单实例拦截/转发（见「单实例 + 激活转发」）。
+- `AllowUnsafeBlocks=true` (P/Invoke structs in `HardwareInfoService`).
+- Publish is self-contained; `PublishTrimmed=false`, `PublishReadyToRun=true` — trimming is never used.
+- **`.pri` gotcha**: after `dotnet publish`, copy `TubaWinUi3.pri` from `bin/<arch>/Release/.../<rid>/` into the publish output (CI does this; the app misbehaves without it).
+
+## Stray root files — do not edit
+
+`MainWindow.xaml`, `MainWindow.xaml.cs`, and `Pages/SettingsPage.xaml(.cs)` exist at the **repo root** but are NOT compiled by the main project. The live source is under `TubaWinUi3.WinUI3/`. Always edit there.
+
+## Architecture essentials
+
+- `App.xaml.cs` → `MainWindow` (custom TitleBar + `NavigationView` + `Frame`); nav categories come from `ToolCatalog.GetCategories()` and `BuiltinToolRegistry.GetCategories()`.
+- **All services are static classes with no DI**, called directly from pages. The single exception is `LiteMonitorService`, a singleton (`Instance`).
+- `ToolCatalog` scans `Tools/` for `.exe .bat .cmd .lnk .msc .ps1 .vbs`, merges x64/x86/ARM64 variants, and resolves the `Tools/` root by walking up from `AppContext.BaseDirectory` (`FindToolsRoot()`). **列表成员以 tools.json 为准**：目录本身或目录内任一可执行文件 `match` 命中条目才收录，Tools 里未收录的目录（如 ViveTool）不展示。No disk cache layer: in-memory cache + single-flight + parallel scan only.
+- `ToolMetadataService` merges `Metadata/tools.json` + `FileVersionInfo` + `readme.txt`. The `"match"` field is a **case-insensitive substring** against tool filenames/paths. tools.json is the single source of truth for: metadata, card order (`"order"`), cross-category copies (`"category"` = physical primary category + `"categories"` = extra categories), and builtin tool placements (`"builtin"` = BuiltinToolRegistry id; virtual dir key `ToolsRoot/分类/目录名` keeps favorites/order-save compatible with the removed link.json dirs). Copy dir resolution scores candidates: exact dir name > flexible match equality > relative-path substring.
+- Sorting: tools.json `"order"` primary → `AppSettings ToolOrder_{category}` fallback for uncatalogued custom tools → name. Drag-reorder (HomePage pure-category view + CustomToolManagerWindow) double-writes via `ToolMetadataService.SaveToolOrder(dirs)`; note `order` is entry-global, so copies share one order across categories.
+- `ToolItem.InitArchOptions()` auto-selects the best arch for the OS (ARM64 > x64 > x86 preference).
+- Built-in tools: see `BuiltinToolRegistry.RegisterDefaults()` (~45 tools). `CommunityToolBuiltinTool` registers only when `!RuntimeHelper.IsMsixPackaged`.
+- **每个已注册内置工具都必须在 `Metadata/tools.json` 里有 `builtin` 挂载条目**（`categories` 指定挂载分类）：收藏/排序/桌面快捷方式统一以该挂载的虚拟目录路径为键，收藏页与分类页星标互通。新增内置工具时 `RegisterDefaults()` 与 tools.json 两处都要加。
+- **快捷方式统一写入点 = `WindowsSearchIndexService`**：开始菜单搜索注册与「发送到桌面」共用同一 `CreateShortcut`（进程内 WScript.Shell COM，非 STA 线程自动起 STA 线程）。内置工具桌面快捷方式 = 自身 exe + `--open-builtin <id>`，图标为该工具字体字形（Segoe Fluent Icons）离线渲染的多尺寸 .ico，缓存于 `<DataDir>/DesktopIcons/`（字形→Bitmap→ICO 编码在 `BuiltinShortcutIconTests` 有回归测试）。「发送到桌面」两种工具都走 `CreateDesktopShortcut(ToolItem|IBuiltinTool)`（COM，写后回读校验），**禁止**改用 `powershell.exe -Command` 生成快捷方式：中文路径经子进程命令行会在非中文系统 / UTF-8 beta 代码页（ACP=65001）下写成乱码（回归测试 `DesktopShortcutTests`）。
+
+### 关闭主窗口 → 最小化到系统托盘（CloseToTrayService / TrayIconService）
+- 默认**关闭**（`CloseToTrayService.DefaultEnabled = false`，PR #208「default-disable-tray-behavior」起，勿再写默认开启）：开启后点标题栏 × / Alt+F4 不再退出进程，而是隐藏主窗口、常驻托盘继续运行——避免误关闭后被迫重启、把 WMI 硬件盘点（20+ 条查询）与 LiteMonitor 初始化再跑一遍。设置页「常规 → 关闭主窗口时最小化到系统托盘」（`AppSettings["CloseToTray"]`）可开；首次使用向导（`SetupWizardDialog` 的托盘开关）与「连接手机」页（`MaybePromptCloseToTrayAsync`，只问一次）会引导开启。
+- 判据只有一处：`CloseToTrayService.ShouldHideOnClose(closeToTrayEnabled, isLiteMode, isExiting, sessionEnding)`（纯函数，`CloseToTrayTests` 覆盖）。**`isExiting`（托盘「退出」）与 `sessionEnding`（注销/关机）必须放行真关闭**，否则程序退不掉、系统关不掉；`isLiteMode`（后台工具在跑）沿用旧行为，开关关掉也照样留在托盘（那些页面的「最小化到托盘」按钮本来就是这个语义）。
+- 两个关闭入口都接了同一个判据：`AppWindow.Closing`（系统入口，`args.Cancel = true`，这是可取消的官方通道）与 `Window.Closed`（编程式 `App.MainWindow?.Close()`，`args.Handled = true`——后台工具页面走这条）。先到先得，不要只留一个。
+- **退出统一走 `App.RequestExit()`**：关闭主窗口 → `MainWindow_Closed` 跑完整清理（FPS 的 ETW 会话、LiteMonitor 句柄、遥测收尾、`AppSettings.Flush`、托盘图标移除）→ `Application.Exit()`；另有兜底看门狗：**先等 `MainWindow_Closed` 报「清理已跑完」（`App.NotifyCleanupFinished`，上限 20s）再宽限 2s 硬退**——固定 3 秒硬超时会砍在 ETW 会话释放中途，那正是最不能丢的一步；只有主窗口不存在/关闭请求排不进 UI 队列时才用 3 秒短兜底。**禁止**回到 `Process.Kill()` 的老写法：内核 ETW 会话不随进程终止回收，残留会让下次启动的帧率采集失效。
+- **所有「真的要退出/重启」的地方都必须走 `App.RequestExit()`**（`isExiting` 置位后关闭拦截才会放行）：更新安装器启动后退出（`UpdateService.LaunchScannedUpdate`/`StartPendingInstaller`、`DownloadQueueModels` 的安装分支）、提权重启（`GameOverlayPage`）、错误页「重开」、配置目录切换后重启。直接用 `Application.Current.Exit()` 或 `App.MainWindow?.Close()` 会被「最小化到托盘」解读成隐藏——安装器撞上仍在运行的程序、或留下两个实例。
+- `TrayIconService` 仍是全进程唯一的托盘图标，**三套常驻理由共用一个图标**：「设置已开启」（`SetTrayEnabled(true)`，开启即注册，窗口在前台也显示，`CloseToTrayService.SetEnabled` 与启动时 `EnsureTrayIconForEnabledSetting` 两处驱动）、「关闭后留在托盘」（`ShowForCloseToTray()`）、「后台工具在跑」（`Show(toolName, stopAction)`，流量监控器/网络调度器/防晕3D 在用）。任一成立图标就可见，全部消失才自动收起；悬停文案按 后台工具 > 已隐藏 > 设置开启 的优先级选 `Tray_TooltipTool`/`Tray_TooltipResident`/`Tray_TooltipEnabled`；托盘菜单 = 打开主窗口 / [停止「工具名」并退出] / 退出空岛图吧工具箱（文案 `Tray_*` 资源键，中英双语）。**实现直接走 Win32 `Shell_NotifyIcon`（隐藏消息窗口 + `TrackPopupMenu` + `WM_TRAYICON` 回调 + `TaskbarCreated` 重注册）**，不要改回 `System.Windows.Forms.NotifyIcon`：那需要在主项目加 `FrameworkReference Microsoft.WindowsDesktop.App.WindowsForms`，会把整个 WindowsDesktop 共享框架（Forms / Forms.Design / Accessibility 等约 26 MB）打进自包含产物，而这些类型只有托盘在用。同理，`Microsoft.Win32.SystemEvents` 与 `System.Diagnostics.Eventing.Reader` 现在是独立的 PackageReference（`System.Windows.Extensions` / `System.Diagnostics.EventLog`），以前是搭 WindowsDesktop 的便车。注意后端进程 `TubaWinUI3.BackEnd.exe` 有**自己的**托盘（`BackendTrayHost`，主动拦截/游戏监控用），与主程序图标互相独立，属于预期。
+- `TrayIconService` 仍是全进程唯一 `NotifyIcon`，现在有两个独立的常驻理由：「后台工具在跑」（`Show(toolName, stopAction)`，流量监控器/网络调度器/防晕3D 在用）与「关闭后留在托盘」（`ShowForCloseToTray()`）。任一成立图标就可见，都没有就自动收起；托盘菜单 = 打开主窗口 / [停止「工具名」并退出] / 退出空岛图吧工具箱（文案 `Tray_*` 资源键，中英双语）。
+- 首次隐藏弹一次气泡（`AppSettings["CloseToTrayHintShown"]` 只弹一次，且只在开关开启时消耗，后台工具页面自己点的「最小化到托盘」不弹）说明「程序还在后台、双击恢复、右键退出」。`EnergyStarService.Shutdown()` 只在真正退出时调用——隐藏到托盘后程序还在后台跑，而后台节流本身就是常驻功能，隐藏时解除等于把用户开着的省电功能关掉。
+- 会话结束保护：`CloseToTrayService.AttachSessionEndingWatch()`（`SystemEvents.SessionEnding`，App 构造函数里注册）在注销/关机时置位，放行关闭；窗口重新可见时 `ResetSessionEnding()` 复位（用户取消注销不会有「取消」事件，只能靠「还能操作窗口」反推）。`_sessionEnding` 由 SystemEvents 自己的监听线程写、主线程读，必须是 `volatile`。
+
+### 单实例 + 激活转发（SingleInstanceService / LaunchIntent）
+- **不允许工具箱多开**：任何方式再次启动（双击 exe / 桌面快捷方式 / Windows 搜索 / 右键菜单 / 后端 Toast / 提权重启）都不再开第二个实例，而是**吊起已运行实例的窗口**，并按新进程的意图导航。
+- 机制三件套，全部复用仓库既有写法：单实例判据 = 命名互斥体 `SingleInstanceService.MutexName`（`TubaWinUi3.MainInstance`，旧 App 里的名字）；跨进程激活通道 = 数据目录 `<DataDir>/instance/*.json` + `FileSystemWatcher`（与 `Services/PhoneLink/PhoneLinkActivation` 同构）；提权重启接管 = `Mutex.WaitOne` + `AbandonedMutexException`（与 `TubaWinUI3.BackEnd/Program.cs` 一致）。
+- **闸门位置 = `App.OnLaunchedCore` 的自动提权块之后**（原互斥体创建处）。必须如此：留下窗口的进程一定是管理员；且 `--copy-path` / `--context-title-probe` / `--toast` / `--phone-toast-handler` / `--energystar-silent` 等无窗口辅助模式都在闸门之前 return，绝不能被误拦、也不参与拦截。
+- **意图解析 = `Services/MainInstance/LaunchIntent.cs`（纯逻辑，可单测）**：`--file-lock <路径>` > `--open-builtin <id>` > `--show-active-intercept` > `--game-overlay-auto` > 普通；大小写不敏感、缺值回退普通。首次启动与「转发激活」共用 `App.ApplyLaunchIntent`，保证两条路径行为一致。
+- **`--game-overlay-auto` 必须静默忽略**：后端检测到游戏自动拉起，用户正在游戏——`SingleInstanceService.Forward` 直接 return，绝不恢复/置前窗口（主实例自身的 `GameOverlayAutoService` 已在轮询信号文件自动显示悬浮层）。首次启动路径则保留「延迟最小化、不抢前台」逻辑。
+- **`--takeover`（`LaunchIntent.TakeoverArg`）**：`App.TryRelaunchElevated` 两条分支（非打包 runas / 打包 PowerShell 载体）都**无条件追加**。提权子进程启动时旧实例仍在运行，带该参数者 `WaitOne` 等旧实例退出（正常释放或 abandoned）后接管，避免被自己的旧实例当重复启动转发走。`MainWindow_Closed` 里 `SingleInstanceService.Shutdown()` 释放互斥体，让接管立即成功。
+- 激活转发：`Forward` 先 `AllowSetForegroundWindow(owner.pid)` 尽力交出前台权限，再写 JSON 意图文件；主实例 `StartWatcher` **先消费积压文件**（覆盖「转发先于监听就绪」的竞态）再监听。收到后 `MainWindow.ActivateFromExternal()`（托盘恢复 + `BringWindowToTop`/`SetForegroundWindow`）并按意图导航。
+- 测试：`SingleInstanceTests`（意图解析优先级/大小写/缺值/引号剥离、`--takeover` 识别、互斥体名兼容性）。
+
+### AI 助手（AiAgentPage）— AgentSession/AgentRuntime 引擎 + 多提供商
+
+- 「AI 助手」内置工具 = `AiAgentPage`，**当前是旧引擎**：页面 → `AgentSession.SendAsync` → `AgentRuntime.RunLoopAsync`，底层是 `IChatClient`（`AgentClientFactory.CreateClient()` 包官方 OpenAI SDK + M.E.AI 适配），消息气泡/步骤链/确认卡片全部手写 XAML。
+  - **历史的 FieldCure ChatPanel 路径已整体删除**（ChatPanel 回退后再清死代码）：`Services/Ai/TubaChatProvider`、`AgentToolAdapter`、`AiDiagnosticsLog`（组件桥）、`SkillTriggerHelper` 及其测试都不在了，FieldCure 全家桶 NuGet 依赖也已移除。若再改 AI 助手，按 `AiAgentPage` 现有的 AgentSession/AgentRuntime 引擎来改，**不要**恢复 ChatPanel 架构。
+  - `AgentRuntime.RunLoopAsync` / `ResumeLoopAsync` 支持 `IChatClient? clientOverride`；但 `AgentSession.SendAsync`（`Services/Agent/AgentSession.cs`）内部直接调 `AgentClientFactory.CreateClient()` —— **提供商/引擎的唯一切换点是 `AgentClientFactory`**。
+- **多提供商（增/删/改名）**：`Services/Ai/AiProviderStore.cs`（`ai_providers.json`）+ `Services/Ai/AiProvider.cs`。预设 `custom`（小图吧自带）/ `deepseek` / `mimo` / `opencode` / `local`（本地模型），由 `CreatePreset(id)` 定义；`AiProvider.Kind`（枚举 `ProviderKind.OpenAi|Local`）。
+  - 自定义提供商可改名（`RenameProvider`）与删除（`DeleteProvider`，预设不可删、删除当前选中项回退 `custom`、至少保留一个）。
+  - UI 两处管理入口：设置页 AI 卡片（`AiProviderNameBox` / `AiDeleteProviderButton`）与 AI 助手顶栏「管理 AI 提供商」按钮（`ManageProvidersButton`，`ContentDialog` 列全部提供商）。
+- **本地模型作为提供商**（`local`）：模型列表**不落库**，由「本地 AI 试炼场」的模型库派生 —— `AiProviderStore.SyncLocalProviderModels()` 取 `AiModelLibrary` 中 `Task==Chat && AllReady` 的条目。调用点：`SettingsPage.RefreshAiProviderList`、`AiAgentPage.RefreshProviderCombos`、`AiPlaygroundPage` 导入/删除模型后。
+  - 选中 `local` 时 `AgentClientFactory.CreateClient()` 返回进程内 `IChatClient` = `Services/Ai/Onnx/LocalOnnxChatClient`，包 `Services/Ai/Onnx/LocalModelRuntime`（进程级单例，持 `LlmChatRunner`，换模型自动重载）。
+  - 提示词改编 `Services/Ai/Onnx/LocalChatPrompt`：system 合并 + `LlmPromptBuilder` 多轮；工具定义注入 system、工具结果渲染为 `[工具结果] …`、assistant 的工具调用回放为 `<tool_call>{...}</tool_call>`。**本地模型无原生 function calling**，`Services/Ai/Onnx/ToolCallStreamParser` 增量解析 `<tool_call>` 块还原成 `FunctionCallContent`（回退保留标记前缀防泄漏），属**尽力而为**（小模型不稳定，靠 `AgentToolLoopGuard` 兜底）。
+  - 本地推理只服务 AI 助手（Agent 路径）；其余 HTTP 功能（`AiAssistantService` 快捷提问、设置页「测试连接」）在选中 `local` 时由 `AiService.GetConfig()` **回落内置默认网关**（避免空端点报错）——`AiService.IsLocalProviderSelected` 判定。平台门槛 `AiRuntimeService.UnsupportedReason`（x86 / <Win10 19H1）不满足时抛友好异常。
+  - **卸载时机（内存不常驻）**：`LocalModelRuntime` 现在是「无 AI 类型门面 + 嵌套 Core」（JIT 安全，见「AI 运行库」节）：关 AI 助手页面（`AiAgentPage.Unload`）/ 切走 local 提供商（助手与设置页两处）/ 退出应用（`MainWindow_Closed` 有界 `TryUnload(3s)`，不阻塞托盘与单实例清理）都会释放模型。`UnloadWhenIdle` 先尝试直接卸、锁被长加载占用则转后台等待并按「代际」判断（用户重开并加载了新模型就跳过，不误卸）。卸载后 `AiModelMemoryTrimmer`（GC + `EmptyWorkingSet`）把内存还回系统——此前卸载后工作集不降正是用户报告的问题。数据目录切换走 `RestartApp` → 同一退出路径，一并覆盖。
+- 历史/记忆/技能沿用 `AiAssistantService` 的 messages.json / display.json / skills.json / memory.md；skills 默认全开、按会话存档。
+- 技能触发经 `AgentToolContext.SkillTriggerActive` 静态桥接（web_search 拦截）。
+- **销毁竞态过滤器（历史遗留，保留兜底）**：`Services/Ai/ChatPanelCrashFilter.IsTeardownRace` 同时校验「CoreWebView2 is not present」类报错文本 + `FieldCure.AssistStudio` 调用栈来源（认错会吞掉真 bug），`App.OnWinUIUnhandledException` 命中后只记日志（`agent-debug.log` + `%TEMP%\app_crash.log`）不弹错误窗口（回归测试 `ChatPanelCrashFilterTests`）。FieldCure 组件已整体移除，此过滤正常不再可能命中，保留作为同类 WebView2 销毁竞态的兜底来源标记。
+- **顶栏 bot 吉祥物（唯一实例）**：`Assets/BotAvatar/`（bloub 引擎，github.com/jeremy-prt/bloub，MIT；esbuild IIFE 打包 + `botavatar.html`），顶栏右侧操作组最前（模型选择器旁）**44×44 单实例**（`BotAvatar`），原生 XAML 区域 → 透明必然生效。
+  - **只放顶栏的原因**：曾尝试聊天区大号（72×72）悬浮在输入框上方（`UpdateBotAnchor`/`FindInputAnchor` 动态锚定），但该区域叠在 WebView2 消息区之上，透明 WebView2 无法穿透另一 WebView2（平台硬限制）→ 背景灰块无解，用户要求透明 → 改为顶栏唯一实例。
+  - 初始化：`InitBotAvatarAsync` → `InitBotWebViewAsync(BotAvatar)` 单实例；导航成功才置 `_botAvatarReady` + 启动视线轮询 + `SendColorsTo` 补发主题色；`Unload` 时 Navigate about:blank。
+  - **顶栏操作动画**：AI 设置 → `swirl`（进入设置视图）、提供商/模型切换 → `notify`（蓝点）、技能菜单 → `notify`、完全访问开关 → `wide`/`exclaim`、新对话 → `play`、历史 → `comet`。
+  - **15 态全接入**（`BotPost` postMessage 联动）：
+  - `thinking` 发消息 → `orbit` 工具执行（HTML 桥 3s 循环重放，环 3.6s 会淡出）→ 定稿庆祝三选一（`_roundTokens` 分级：0→`wink` 眨眼 / >0→`notify` 蓝点 / >4000→`burst` 爆炸）
+  - `alert` 请求失败、`play` 新对话、`sleep` 5 分钟无活动、`wide`/`exclaim` 完全访问开关开/关、`swirl` 打开 AI 设置、`comet` 历史会话加载完成、`egg`/`hexagon` AI 写入记忆时随机变形
+  - 空闲时视线跟随鼠标（WebView2 吞 XAML 指针事件，用 `GetCursorPos` 66ms 轮询，仅 baseFace 态生效）；body 墨色取系统强调色（`BotSendColors`，导航成功后再补发一次）
+- 初始化失败不静默：Debug.WriteLine 留日志 + 首次导航失败自动重试一次。（FieldCure 时代的 `TubaChatProvider.RequestFailed` / `AgentToolAdapter.ToolExecutionStarted/Finished` 静态事件已随组件移除。）
+- **防死循环护栏（会话级）**：`Services/Ai/AgentToolLoopGuard`（静态、线程安全；新对话 `AiAgentPage.ResetToNewChat` 调 `Reset()` 清空）。
+  - **重复调用拦截**：同会话「工具+参数」相同（`NormalizeArgs` 递归按键排序签名）第二次直接拦截不执行，空参数（查询类）豁免；`MaxToolResultChars=6000` 结果截断 + 空结果标记「未返回内容」。
+  - **无进展检测**：连续 6 轮纯工具调用（无用户文本）→ `AgentRuntime` 直接终止循环。
+  - **web_search 技能拦截计数**：技能触发（配电脑查价）拦截第二次起返回硬终止「已连续两次被拦截」。
+  - **思维链护栏**：流式按轮限流 + 截断（保留开头+标记，防切断 surrogate pair）。**上限与截断标记只有一份**：`AgentRuntimeLimits.MaxReasoningChars(6000)` / `ReasoningTruncatedMarker`（`[思维链过长，已截断]`），流式累积、`TruncateReasoning` 与回传截断都读它 —— 曾经两处文案不同，`ReasoningEchoChatClientTests` 因此长期失败（2026-09-30 统一）。
+  - **历史预算压缩**：`AgentRuntimeLimits.HistoryBudgetChars=40000`，超限从最旧丢（保留首条 system——DeepSeek 网关拒绝多条 system）。
+  - **错误终态分类**：`AgentErrorPolicy.FormatToolError` 参数类异常（Argument/Json/Format）→「可调整重试」，其余系统性失败 →「请勿重试」；`IsLocalInferenceError` 另把「已释放 / disposed object」归类为本地推理问题（卸载竞态不误导去查端点/Key）。
+  - 兜底：轮次上限 `AgentRuntime.DefaultMaxRounds=30`。
+- **AI 工具的「零启动占用」**：不在 `App()` 里做任何 AI 注册 —— `AgentToolRegistry.RegisterDefaults()` 改为首次访问 `Tools`/`Find` 时惰性注册（加载 M.E.AI + 生成 Schema）；加速包注册 `AiRuntimeService.EnsureProvidersRegisteredAsync()`（进程内一次）由 `AiRuntimeGate` 在首次打开 AI 工具时按需调用；FieldCure 桥（`AiDiagnosticsLog.Initialize`）与启动 +8s 注册都已删除。
+
+### 格式转换（FormatConverterPage）— 多引擎批量转换架构
+- 「格式转换」内置工具 = `FormatConverterPage`（替换了旧的 VideoProcessorPage）。UI 为「拖入 → 选目标格式 → 文件队列逐个处理」，队列项有 等待/转换中/完成/失败/跳过 状态，**单个文件失败不中断批次**。
+- 纯逻辑层（可单测，`FormatConvertTests`）：`FormatConvertCatalog`（扩展名 → `SourceCategory`，类别 → 目标 `FormatOption`，`EngineFor`/`ShouldUseLibreOffice`）、`FormatConvertPlanner`（FFmpeg/ImageMagick 参数、输出路径消歧、ZIP 打包 0-9 级）。
+- **每个目标格式自带参数描述**（`Services/FormatConvertParams.cs`）：`FormatOption.Params` 声明该格式专属参数（Slider/Number/Combo/Toggle + `VisibleWhenId` 联动显隐），对话框按描述**自动生成控件**——滑块与数值输入框双向同步（可拖动也可直接输入任意值），取值收进 `FormatParamValues`（id → double）交给 Planner。新增一个可调项 = 参数集里加一条描述 + Planner 里读同一个 id，不需要改 UI 代码。默认值即「不改动时的行为」，`FormatConvertParams.Summarize` 生成「已自定义：…」摘要。
+- **WAV/AIFF 没有「码率」编码器参数**（PCM 码率 = 采样率 × 位深 × 声道）：改为暴露 音频编码（PCM/ADPCM Microsoft·IMA/A-law/μ-law）、位深、采样率滑块、声道，并在对话框实时显示等效码率；AAC/MP3/WMA 等有损格式才是可自由输入的码率滑块（0 = 编码器默认），MP3 另有 CBR/VBR 模式与 VBR 质量。视频目标是 编码器（H.264/H.265/VP9/AV1/MPEG-4/WMV2）+ 码率控制（CRF / 指定码率）+ 预设 + 分辨率 + 帧率 + 音轨编码器（含「去掉音轨」）。
+- 路由层 `DocumentConvertService`：Word/Excel/PPT/PDF/Markdown/Text/HTML/JSON 的目标分发。四条管线：
+  - **OfficeCLI 渲染引擎** `OfficeCliService`（docx/xlsx/pptx 首选，真实渲染：github.com/iOfficeAI/OfficeCLI，Apache 2.0，单文件 33MB 自包含 .NET 程序，无任何外部依赖——渲染走系统 WebView2）：**纯 CLI 原生输出，不做任何中间转换链**。txt = `view text`；html = `view html -o` 直存；md = CLI 的 html → `HtmlConvert.ToMarkdown`（纯文本级变换）；**pdf/png/jpg = `view screenshot` 原生逐页截图**（无头浏览器渲染，像素零重采样——实测水印/复选框/表格分页全部干净；此前 html→WebView2 打印→pdf.js 的中转链会产生巨字水印叠加/勾选丢失等 bug，已废弃）。逐页循环的末页判定：CLI 对超出末页的页码会**钳位回第 1 页**（pptx 则报 "total slides: N"），按"页内容 MD5 已出现过"终止循环。pdf 目标 = 页面 PNG 经 doceng 新 job `startImagesToPdf`（pdf-lib）原样嵌入容器（页面尺寸=图片像素，文字不可选中——officecli 官方 pdf 导出需其 exporter 插件，尚未发布）；合并长图 = System.Drawing 纵向拼接；JPG = System.Drawing JPEG 编码（质量可调）。参数经 `DocConvertOptions`（ZipLevel/MergeImages/**ImageMaxEdge=--screenshot-width 清晰度/JpgQuality/PageRange=--page 页码范围/RenderMode=--render auto|native|html**，native 用本机 Word/PowerPoint 渲染）从转换对话框透传。仅 OOXML 源（.docx/.xlsx/.pptx）进入此管线，失败自动回退内置引擎（回退路径仍走 WebView2 打印 + pdf.js，共用同一组参数）；未就绪时页面弹窗确认下载（单文件 33MB，主源 = 作者自建 GitCode 镜像 `api.gitcode.com/api/v5/repos/luolangaga/tubatoolr/releases/12` 解析 browser_download_url——**不做 HEAD 验证**，该端点 HEAD 返回 401 假阴性而 GET 302 到 file-cdn 签名 CDN 正常下载；兜底 GitHub `releases/latest/download/` 直链 + gh-proxy.com/ghproxy.053000.xyz HEAD 探测，arm64 缺资产时回退 x64 靠 Windows on ARM 模拟）。老格式 .doc/.wps/.et/.dps/.ppt/.xls 仍走 Office/WPS COM，rtf/odt/odp/ods 走内置解析器。
+  - **WebView2 文档引擎** `DocumentEngineService` + `Assets/DocEngine/doceng.html`（markdown-it / docx-preview / SheetJS / pdf.js / pdf-lib 全部本地打包，虚拟主机 `doceng`；ExecuteScriptAsync 不等 Promise → 「同步启动 + 轮询 getJob」模式）：渲染 PDF（PrintToPdfAsync）、PDF 文字层提取/表格行列聚类（→XLSX）、PDF 合并/拆分（pdf-lib）、工作簿读写（SheetJS）。OfficeCLI 未就绪时的回退管线。
+  - **纯 C# 转换器**：`DocxWriter`（手写 OpenXML 包，HTML/文本→docx，含编号列表）、`DocxReader`（docx→Markdown/纯文本）、`RtfTextExtractor`（\'hh 按 GBK 双字节配对）、`OdfConverter`（odt/ods/odp→HTML）、`HtmlConvert`（HtmlAgilityPack，HTML→文本/Markdown；img 的 data:/blob: src 转占位符，防 Markdown 泄漏巨型 base64）、`TabularConvert`（CSV/JSON/MD/HTML 互转 + 智能编码读取 UTF-8/GB18030）。
+  - **`OfficeInteropService`**：.doc/.ppt/.wps/.et/.dps 旧格式走本机 Office/WPS COM（动态探测 ProgID：Word/KWPS、Excel/KET、PowerPoint/KWPP；STA 线程 + 3 分钟超时 + 禁宏），未安装则给出明确错误。
+- OCR = `OcrService`（Windows OCR API / `Windows.Media.Ocr`）。注意：Windows AI `Microsoft.Windows.Vision.TextRecognizer` 在 .NET 26100 投影与 NuGet 中均不可引用，故未采用（见文件头注释）。
+- 图片→MP4/WebM 借用 FFmpeg（`BuildImageVideoArgs`：静态图 -loop 1 + 时长，GIF 直接转码）；OCR/ZIP/合并/拆分等非普通目标是 `ConvertSpecial`，由页面专门调度。
+- Win32 拖放复用 `Win32DropHelper`（管理员 UIPI 绕过）；文件多选用 `Win32Dialogs.PickOpenMultiple`。
+
+### 游戏联机助手（GameTunnelPage）— EasyTier 免登录虚拟网络联机
+
+- 「游戏联机助手」内置工具（id `game-tunnel`）= `Pages/GameTunnel/GameTunnelPage.xaml`：一个主页 + 全套弹窗（组件准备 / 主机向导 / 加入向导 / 邀请面板 / 教程 / 网络检测）。主页只回答「现在能不能玩、点哪里」，细节全部收进弹窗与分步向导里。
+- **传输层 = EasyTier（无网卡模式）**：`no_tun = true`，不装驱动、不创建虚拟网卡、不接管 DNS/路由。房主固定虚拟地址 `10.144.144.1`、hostname `tuba-host-<游戏端口>`；加入者 `dhcp = true`、hostname `tuba-guest-<4hex>`。加入者靠 hostname 前缀找到房主（端口也编码在里面）。**完全不需要账号、登录或第三方服务器**——这也是当初从 Tailscale 换过来的原因。
+- **房间码 = 网络名 + 密钥**：`Services/GameTunnel/TunnelRoomCode.cs` 生成 `U/XXXX-XXXX-XXXX-XXXX`（16 位 base-34，I/O 按 1/0 读，整体为 7 的倍数做校验）。前 8 位 → `network_name = tuba-XXXX-XXXX`，后 8 位 → `network_secret`，所以光凭房间码就能入网。
+- 关键文件（均在 `TubaWinUi3.WinUI3/Services/GameTunnel/`）：
+  - `EasyTier/EasyTierPackage.cs`（按需下载 + SHA-256 校验 + 解包）
+  - `EasyTier/EasyTierConfig.cs`（TOML：网络名/密钥、白名单、直连/中转、隐藏 IP）
+  - `EasyTier/EasyTierInstance.cs`（起 `easytier-core`，用 `easytier-cli` 查 peer/connector、动态加端口转发）
+  - `EasyTier/EasyTierPeer.cs`（`peer -o json` 解析：cost=p2p/relay、lat_ms、nat_type）
+  - `EasyTier/ChildProcessJob.cs`（作业对象：主程序退出/崩溃，组件进程一起结束）
+  - `TunnelSession.cs`（进程内单例，Host/Guest 状态机与 2 秒刷新）
+  - `LanWorldAnnouncer.cs`（Minecraft 局域网广播）、`GameTunnelFirewall.cs`（程序级入站放行）、`TunnelLog.cs`（`<DataDir>/GameTunnel/tunnel.log`）
+  - `GameTunnelInvite.cs`（TBG2 邀请码 + 朋友端 .cmd）、`GameTunnelCatalog.cs`（游戏档案/设置/节点）、`GameTunnelProbe.cs`（端口监听与 TCP 连通性）
+- **组件分发（不随安装包）**：首次联机时经下载队列入队 `easytier-windows-<x86_64|arm64|i686>-v<版本>.zip`（Gitee → GitHub → ghfast → gh-proxy），只解出 `easytier-core.exe` / `easytier-cli.exe` / `Packet.dll`，逐个与写死的 SHA-256 比对后原子落盘，落点 `<DataDir>/GameTunnel/EasyTier/<版本>-<架构>/`。**升级版本只改 `EasyTierPackage.Version` 与哈希表一处**。
+- **配置口径**：房主 `tcp_whitelist/udp_whitelist` 只放行自己的游戏端口；加入者白名单是 `["0"]`（拒绝一切入站）。`private_mode = true`（不替陌生网络中转）；「仅直连」→ `p2p_only = true`；「隐藏 IP」→ `listeners = []` + `disable_p2p` + 关三种打洞 + 关 UPnP（此时强制走中转，`p2p_only` 必须为 false）。
+- **加入流程**：启动组件 → 轮询 `peer` 找 `tuba-host-*` 成员 → 优先等直连（8 秒宽限）→ 加 TCP（协议含 UDP 时再加 UDP）转发 `127.0.0.1:<本地端口> → 房主虚拟IP:<游戏端口>`（本地端口优先沿用房主端口号，被占用再随机；用 `IPGlobalProperties` 查监听表，不 bind 试探）→ TCP 探测本机端口确认链路通。
+- **Minecraft 局域网发现**：仅 `GamePreset.UsesLanDiscovery`（我的世界 Java 版）启用。`LanWorldAnnouncer` 每 1.5 秒发原生格式 `[MOTD]空岛图吧工具箱 · 游戏[/MOTD][AD]本地端口[/AD]` 到 `224.0.2.60:4445`；默认只发 `127.0.0.1:4445`（设置 `ShareWithLan` 才向每块网卡组播）。从局域网列表进入也是离线账号绕过正版会话校验的唯一路径。
+- **邀请模型**：邀请码 `TBG2:{Base64Url(JSON)}`（`c` 房间码、`p` 端口、`g` 游戏名、`r` 协议、`l` 是否 MC 局域网），也接受裸房间码（端口由房主 hostname 运行时给出，协议按 TCP+UDP 处理）；**不再支持纯 IP 地址**（EasyTier 下房主虚拟 IP 恒为 10.144.144.1，没有网络密钥的地址没有意义）。朋友端脚本自动提权 → 下载官方 zip → `Expand-Archive`（官方包内文件在 `easytier-windows-<架构>\` 子目录，脚本要先提回根目录）→ 写 guest TOML（含房主同一套发现节点）→ 后台启动 `easytier-core` → `port-forward add` → 打印 `127.0.0.1:<端口>`。脚本落盘用 **UTF-8 无 BOM + 第二行 `chcp 65001`**：ACP=65001（UTF-8 beta）的机器用 GBK 会整段变成替换字符 `�`，而 GBK 机器切到 65001 后能正常读取 UTF-8；**不要改回 GBK**。
+- **防火墙**：程序级规则 `New-NetFirewallRule -Program <easytier-core.exe>`（规则名 `空岛图吧工具箱·游戏联机组件`），不对游戏端口或网卡单独放行；首次建房/加入时自动创建，网络检测里可一键清理，并会顺手删掉 Tailscale/EasyTier 早期按旧命名留下的 `*游戏联机*` 规则。
+- **退出清理**：组件进程同时挂在 Job Object 上（句柄关闭即杀），`MainWindow_Closed` 还会显式调 `TunnelSession.Instance.Shutdown()`；下次启动 `EasyTierInstance.StopLeftovers()` 清掉父进程已死的残留与遗留 TOML（里面有网络密钥）。
+- 数据落盘 `DataDir/GameTunnel/`：`custom_games.json`、`settings.json`（中继/隐藏 IP/节点/本地端口）、`Scripts/`（生成的加入脚本）、`tunnel.log`、`EasyTier/`（组件与运行时配置）。存储清理页把 `EasyTier/` 单列为组件项。
+- 端口校验用 `IPGlobalProperties.GetActiveTcpListeners/GetActiveUdpListeners` 判断游戏是否真的开好了（无副作用）；正确性由 `GameTunnelProbe.CanConnectAsync` 的 TCP 探测兜底。
+- 测试：`TubaWinUi3.Tests/GameTunnelTests.cs`（房间码、TOML、peer JSON、组件资产/哈希、邀请码、脚本内容与 UTF-8/CRLF、LAN 广播格式、档案与设置）。
+- **不能本机自测**：应用是单实例，同一台机器无法同时当房主和加入者；端到端联机必须两台机器 / 虚拟机。
+- 「游戏联机助手」内置工具（id `game-tunnel`）= `Pages/GameTunnel/GameTunnelPage.xaml`：一个主页 + 全套弹窗（环境准备向导 / 主机向导 / 加入向导 / 邀请面板 / 教程 / 网络检测）。主页只回答「现在能不能玩、点哪里」，细节全部收进弹窗与分步向导里。
+- **主页口径 = 虚拟网络 + 地址（不是"房间"）**：Tailscale 是三层覆盖网，**不转发局域网广播/组播**（tailscale#11134），所以游戏**不会**自动扫描出对方大厅，必须在游戏里用「直接连接 / 通过 IP 加入」填 `100.x.x.x:端口`。主页因此分五段：①联机环境卡（状态 + 我的地址 + 同一虚拟网络里的设备 `_status.Peers`）②健康告警 ③和朋友连起来（我当主机 / 我加入朋友）④我要玩的游戏（游戏卡点一下直接进主机向导并预选）⑤原理说明。**没有「最近联机」记录**（`records.json` 与相关 UI 已删除，别再往回加）。「邀请/邀请码」是必需的（解决朋友入网授权），但 UI 一律不用「开房/房间」这套词（游戏内的房间/世界概念除外）。
+- **设备列表零成本**：`TailscaleStatus.Peers` 由 `ParseStatusJson` 顺带解析（`ParsePeerMap` 与 `ParsePeers` 共用），主页 5 秒刷新不额外起 `tailscale status` 进程。
+- **通道选择**：用 Tailscale 而不是 HTTP 隧道——它是 L3 虚拟局域网，**TCP/UDP 游戏都支持**，不需要公网 IP、不用改路由器、也不用域名。代价是朋友的机器也要装一次客户端（脚本会自动装）。
+- 关键文件（均在 `TubaWinUi3.WinUI3/`）：`Services/GameTunnel/TailscaleService.cs`（安装/登录/状态/**Health 中文释义**/netcheck/ping/防火墙）、`TailscaleCli.cs`（进程调用，「无输出/超时/取消」都归一成 `CliResult`）、`TailscaleApiService.cs`（API 令牌 → 自动生成邀请密钥、设备列表）、`GameTunnelInvite.cs`（邀请码 + 朋友端 .cmd）、`GameTunnelCatalog.cs`（档案 + JSON 存储）、`GameTunnelProbe.cs`（端口占用探测）、`Controls/GameTunnelInvitePanel.xaml`（邀请面板，主机向导最后一步共用）。
+- **游戏 Logo**：`GamePreset.LogoUrls` 存候选地址（Steam 用官方 `logo.png` 透明字标 + 两个 CDN 互为备份；我的世界用官网 svg），`Services/GameTunnel/GameLogoService.cs` 首次下载后缓存到 `<DataDir>/GameLogos/<id>.<ext>`（png → `BitmapImage`、svg → `SvgImageSource`），拿不到就退回 `GamePreset.Glyph` 图标字形——卡片图标是 64×40 的宽条，`TunnelGameCard` 因此实现了 `INotifyPropertyChanged` 以便图片到位后就地替换。素材不随仓库分发，界面注明版权归各自所有者。
+- **邀请模型**：邀请码 `TBG1:{Base64Url(JSON)}`（房主地址+端口+游戏名+短期 auth key），同时兼容「整段邀请文字」和手输 `100.x.x.x:端口`；朋友端脚本自动提权 → 下载 MSI（`tailscale-setup-latest-<arch>.msi`，官方 302 到当前版本）→ `msiexec /qn TS_NOLAUNCH=1` → `tailscale up --auth-key=… --accept-dns=false --unattended` → 轮询 `ip -4` → `ping` 测连通。脚本落盘用 **GBK 无 BOM 且不能 chcp**（中文 cmd 的批处理读取编码）。
+- **邀请密钥**：优先用 API 令牌自动生成（`POST /api/v2/tailnet/-/keys`，2 小时有效、reusable+preauthorized），没配令牌则就地引导手动创建；同一房间 10 分钟内复用同一把密钥，避免反复生成把朋友手里的邀请码作废。
+- **加入侧不要求先登录自己的账号**：邀请带密钥时由加入向导直接装客户端 + 用密钥入网（一次授权搞定）；若对方已能 `tailscale ping` 通房主则完全不碰登录状态；需要切换账号时先在弹窗内就地确认（ContentDialog 不能再嵌套 ContentDialog）。
+- **防火墙**：`New-NetFirewallRule … -InterfaceAlias 'Tailscale'`，只在 Tailscale 虚拟网卡上放行，规则名统一 `空岛图吧工具箱·游戏联机 <协议> <端口>`（清理脚本用 `*游戏联机*` 通配兼容新旧规则名），可在网络检测里一键清理。应用自身已提权，所以这一步不需要再弹 UAC。
+- 端口校验用 `IPGlobalProperties.GetActiveTcpListeners/GetActiveUdpListeners` 判断游戏是否真的开好了（无副作用），配合「游戏正在监听端口」徽标提示房主。
+- 数据落盘 `DataDir/GameTunnel/`：`custom_games.json`、`records.json`（最近联机）、`settings.json`（API 令牌）、`Scripts/`（生成的加入脚本）。无常驻子进程，应用退出**不需要**清理。
+- 测试：`TubaWinUi3.Tests/GameTunnelTests.cs`（103 项，覆盖真实 `status --json` / `netcheck` 输出解析、Health 分级、邀请码往返、脚本内容与 GBK 编码、档案与存储）。
+
+### Windows 镜像下载（WindowsImagePage）— UUP Dump JSON API 管线
+- 「UUP Dump」标签页是**三步向导**（选版本 → 选语言/版本 → 下载转 ISO），数据全部来自官方 JSON API（`https://api.uupdump.net`，仓库 uup-dump/json-api）。`UupDumpService` 内的解析方法（`ParseBuildsJson` 等）为 internal，单测在 `UupDumpApiTests`。
+- **不再抓取 HTML 页面**（旧版对 selectlang/selectedition/known.php 的正则解析已删除）；`fetchupd.php` 未用（实测 Retail 渠道恒返 NO_UPDATE_FOUND 且限流严格），构建列表只用 `listid.php`（无限流）。API 限流规则：同 IP 切换不同资源 10 秒 1 次、同资源 1 秒 1 次；`get.php` 的 `noLinks=1` 不限流（用于大小预览）。
+- **网络连接层（全链路共享 `HttpClientFactory`）**：`CreateIpv4PreferredHandler()` 只查 A 记录建 IPv4 连接（无 A 记录回退全家族），同一域名多个 IP 逐个尝试（每 IP 3 秒预算、整体 9 秒封顶）——国内到 Cloudflare/微软 CDN 的 IPv6 路径常被静默丢弃，默认 handler 顺序连 IPv6 会挂满超时周期（「正在获取构建列表」卡死的根因）。`UupDumpService`（60s）、`MicrosoftOfficialService`/`WindowsImageService`（30s）共用；**Downloader 队列下载**通过 `CustomHttpMessageHandlerFactory` 注入同一 handler（自定义 handler 下 `RequestConfiguration.Proxy` 不再自动施加，需手动 `ProxyService.GetWebProxy()` 回填）。
+- **API 调用韧性**：`GetJsonOnceAsync` 每次请求独立 30 秒上限（连接层另有 9 秒预算）；`GetJsonAsync` 最多 3 次尝试，网络抖动等 2 秒、`HTTP_429` 等 10 秒（对应官方「切资源 10 秒 1 次」限流窗口）；错误码→中文提示走 `GetFriendlyErrorMessage`（NETWORK 类附 `api.uupdump.net` 与代理/VPN 排障建议），页面兜底异常统一走 `FriendlyTimeoutMessage`。
+- **CDN 直链仅约 15 分钟有效**（`tlu.dl.delivery.mp.microsoft.com`，`expire` 字段）：文件集下载走 `DownloadQueueService.EnqueueMultiFile`，每次重试会重新调用 `get.php` 换新链接；queue 在 `ProcessItemAsync` 的 catch 里做多文件自动重试（本轮有新文件完成则重置计数，上限 6 次），与官方 aria2 脚本「失败重拉列表」语义一致。已按大小校验的文件自动跳过 → 包目录可跨会话续传。
+- **转换**：不用网站生成的 ZIP。入队时按 UI 转换选项生成官方格式 `ConvertConfig.ini` 到包根目录（下载期间可手动编辑，转换时**不覆盖**）；下载完成后 post-processor 先拉官方清单 `git.uupdump.net/uup-dump/misc` 的 `autodl_files/converter_windows`（aria2 格式：url/out=/checksum=sha-256=，官网打包同源，转换器升级自动跟随；失败用代码内兜底值）得到 `7zr.exe` + `uup-converter-wimlib-v*.7z` 的地址与 SHA-256，从清单 URL 下载（镜像 = git raw + **远端版本化文件名**——`uupdump.net/misc/` 上没有不带版本的 `uup-converter-wimlib.7z`，404！本地保存名用清单 `out=`）→ 7zr 解压（排除 ConvertConfig.ini，转换器包名用 `uup-converter-wimlib*.7z` 通配查找）→ `ScriptRunnerWindow` 跑 `convert-UUP.cmd`（AutoExit=1）。
+- **转换选项 ↔ ConvertConfig 键**（已实测官网 POST 参数对照）：`updates→AddUpdates`、`cleanup→Cleanup`、`netfx→NetFx3`、`esd→wim2esd+vwim2esd`（两处同时置 1）、`SkipApps` 默认 1（更快）。**附加版本（虚拟版本）**：JSON API 不提供列表，映射写死在 `GetVirtualEditionsForBase`（Pro→Enterprise/Education/ServerRdsh/IoTEnterprise…，Core→CoreSingleLanguage，N 版同理，来自官网 Required edition 表）；仅改写 `StartVirtual=1` + `vAutoEditions`，下载文件集仍是基础版本的。
+- 包目录：`Downloads\UUPDump\<build>_<lang>_<edition>\`（`UUPs/` 子目录放文件集，ISO 与 ConvertConfig.ini 在包根），同名目录复用实现断点续传。
+
+### 空间清理（SpaceCleanupPage）— TreeMap + 垃圾清理 + Windows 清理
+- 唯一注册入口 `space-cleanup`；旧 `junk-cleaner` 启动参数经 `BuiltinToolRegistry.GetById` 转发，tools.json 保留旧 `match: 垃圾清理` 虚拟路径以兼容收藏。旧代码构建的 `JunkCleanerTool` 页面已移除。
+- `Services/SpaceCleanup/SpaceScanService` 只读目录/文件元数据（可选 NTFS 备用流），默认使用 `SpaceDiskCache` 临时压缩缓存：文件元数据以 UTF-8/变长整数编码、256 KiB 分页 Brotli 压缩后顺序追加，目录骨架常驻内存，文件按需解码；仅保留 8 个读页与当前可见项。无数据库/WAL/逐文件落盘/强制 Flush，不保存文件内容。缓存目录从扫描结果排除，状态栏显示实际缓存大小；重扫、退出工具与进程退出时关闭 DeleteOnClose 句柄自动删除。默认无固定缓存容量、剩余空间百分比/保留量或内存压力中止阈值，优先完整扫描；显式调用者预算仅用于指定场景与测试。跳过目录重解析点，不读取文件内容，不触发云文件下载。取消/暂停逐条检查；SpaceReadOnlyDirectory 自持 CreateFile 目录句柄，以 SetFileTime 的 -1 特殊值在同一句柄上抑制访问时间更新，再用 GetFileInformationByHandleEx 批量读取 FILE_FULL_DIR_INFO。-1 不设置磁盘时间戳；禁止读取后恢复时间（会写盘）、修改全局 DisableLastAccess、或退回未抑制时间更新的枚举。备用流也用受保护句柄查询 FileStreamInfo。无法取得抑制权限的目录明确跳过；管理员既有备份/还原权限仅在工作线程的临时模拟令牌中启用，WindowsIdentity.RunImpersonated 负责恢复。默认没有固定索引大小上限，不根据可用内存自动停止；增量刷新保留原结果直到新树完成。目录监视默认关闭，重扫替换所有共享视图的旧扫描树。
+- NTFS 整盘走 `SpaceNtfsScanner` / `SpaceNtfsVolume`：明文卷经只读物理磁盘句柄按扇区对齐、无缓存批量读取 MFT；禁止经已挂载卷做 raw ReadFile（NTFS 会隐式刷回脏 MFT/日志），不锁卷、不 Flush、不创建 VSS。加密卷用既有 USN/MFT 元数据接口（不创建/调整 USN 日志），线程后台内存/IO 优先级降低缓存换页压力；后台状态必须恢复。文件/目录不逐个打开。进度分目录索引、文件大小、扩展属性，进度条与百分比显示在磁盘选择下方；文件夹扫描总量未知时显示已扫描数量与不定进度。
+- `SpaceTreemapLayout` 为纯 C# squarified TreeMap；`Controls/SpaceTreemap` 使用已有 SkiaSharp 画布渲染有界区块与动画，配原生惰性展开 TreeView（`SpaceFileRow`）供键盘/读屏访问。图与树共用 `SpaceColorPalette` 的当前目录分支配色（可切文件类型），`Assets/SpaceFileIcons` 是类型矢量图标包，树中占比为彩色进度条。动画使用 CompositionTarget.Rendering 按显示帧刷新，380 ms Fluent 缓动；导航从最后实际绘制的区块位置/颜色/透明度接续，父视图同步缩放淡出，保留内容区标题偏移，快速进入/返回可中断衔接。动画计时从首个绘制帧开始，避免文件树更新吃掉过渡；字体/画笔及标签测量复用，闲置/卸载时取消帧事件并释放绘图资源。不使用扫光/闪烁/从中心伸缩。多标签共享扫描树；筛选支持通配符、大小、日期、排除、颜色标记，CSV 为用户主动导出。
+- 删除仅经确认后调用 STA `IFileOperation`，回收站与永久删除分开；执行前拒绝扫描根、越界路径和重解析点。Windows 简易清理直接用 `IEmptyVolumeCache[2]` 先 GetSpaceUsed 后 Purge，不写 StateFlags，不启动自动清理命令。
+- 页头“全屏”按钮 / F11 进入工具全屏，隐藏主窗口标题栏与导航；Esc / 按钮退出，恢复原窗口 presenter 与布局，页面卸载自动恢复。
+- 回归：`SpaceCleanupTests` 覆盖只读扫描/计数、文件/目录/备用流访问时间不变、默认无固定上限、压缩缓存计数/精确路径/自动删除/无默认上限、按需读取、增量刷新与标签、取消、链接拒绝、删除路径边界、布局面积/无重叠、筛选。
+
+### 垃圾清理引擎 — FluentCleaner.Core（已并入空间清理）
+- 「空间清理 → 垃圾清理」为 **Winapp2.ini 规则库驱动**，引擎移植自 builtbybel/FluentCleaner（MIT）的 `FluentCleaner.Core`，代码在 `Services/JunkCleaner/`，保留上游命名空间 `FluentCleaner.Models` / `FluentCleaner.Services` 以便对照上游更新。
+- 管线：`Winapp2Parser`（FileKeyN/RegKeyN/ExcludeKeyN/Detect/DetectFile/SpecialDetect 多值键解析）→ `DetectionService`（注册表/文件/SpecialDetect 检测已安装应用，OR 逻辑）→ `CleaningService`（两阶段：Analyze 只读构建删除清单 + Clean 真删；CreateFileW 探测锁定文件、跳过 reparse point、REMOVESELF 剪除空目录、注册表排除分支保护）→ `PathExpander`（%EnvVar% 展开 + 通配符路径段递归解析）。
+- 规则库管理 `JunkCleanerDatabase`：**两个规则库随应用内置**于 `Assets/JunkCleaner/`（Winapp2.ini 清理规则 + Winappx.ini 预装应用清单，csproj `Assets\**` Content 自动打包）。数据目录 `<DataDir>/JunkCleaner/` 存在副本时优先（`GetEffectivePath(kind)`），否则回退读内置文件——离线开箱即用。「更新规则库」手动触发，从原仓库拉取（raw.githubusercontent → jsdelivr CDN → gh-proxy 三级回退），先下临时文件校验再原子替换，覆盖 Winapp2 与 Winappx 两个文件。自定义规则放 `<DataDir>/JunkCleaner/Custom/*.ini`。
+- 预装应用清理：Winappx 驱动，`AppxService`（移植上游，PowerShell `Get-AppxPackage` 检测 / `Remove-AppxPackage` 卸载）在工具页底部「预装应用清理」Expander 区，默认不勾选，卸载前确认。
+- UI 防闪：扫描时进度文本单行截断 + `CreateUiProgress` 100ms 节流（避免千级路径刷新导致顶栏忽大忽小）；结果文本固定高度常驻（不 Collapsed/Visible 切换），布局不再重排。
+- UI：条目按 `CategoryResolver`（LangSecRef → 分类，回退 Section → 其他应用程序）分组展示，逐条开关默认取 ini 的 `Default`；清理前有确认面板，含注册表项目黄色警示。旧硬编码分类 `JunkCleanerService` 与 AI 扫描 `AiJunkAnalyzerService` 已删除。
+- 测试：`Winapp2ParserTests`（解析/Key 模型/分类映射）。
+
+### 时间同步（TimeSyncPage）— w32tm / NTP 服务器切换
+- 「时间同步」内置工具（id `time-sync`，Issue #189 的需求）= `Pages/TimeSyncPage.xaml`，把「网络正常但时间不对」（证书告警、登录/购票失败、网页加载慢）做成三步：看状态 → 服务器测速 → 应用并校时。**只驱动 Windows 自带的 w32tm 与 Windows 时间服务，不装驱动、不常驻进程**。
+- 服务层在 `Services/TimeSync/`：`W32TimeCli.cs`（w32tm.exe/net.exe 进程封装 + 本地化输出解析，超时杀进程树、按 OEM 代码页读输出）、`TimeSyncProbe.cs`（RFC 5905 SNTP 客户端，UDP 123 客户端模式，θ=((T2−T1)+(T3−T4))/2，**正值 = 本机慢**，与 w32tm /stripchart 的符号一致）、`TimeSyncCatalog.cs`（8 组内置预设 + 对等列表拼装 + 地址校验 + `<DataDir>/TimeSync/settings.json`）、`TimeSyncService.cs`（状态读取 / 应用 / 校时 / 恢复默认 / 服务控制 / 一键修复 / 健康检查 / 诊断报告）。
+- 命令口径（全部来自 Microsoft Learn《Windows Time service tools and settings》）：应用服务器 = `w32tm /config /manualpeerlist:"host,0x8 …" /syncfromflags:manual /update` + `net stop/start w32time` + `w32tm /resync /rediscover`；恢复默认 = 域机器 `syncfromflags:domhier`、非域机器 `time.windows.com,0x9`；重置 = `/unregister` + `/register`。**不要用 `/resync /force`——官方文档里没有这个开关**（工单示例里的写法是错的）。
+- 对等列表标志位：`0x8` 客户端模式恒开；`0x1`（SpecialInterval）仅在用户选了固定同步频率时加（`0x9`）。同步频率选「系统自适应」= 去掉 0x1，**不写 SpecialPollInterval**（各版本出厂值并不一致，16384/1024/3600 都见过，改了等于发明配置）。
+- **读取状态一律以 /query /status 为主**：未提权时 `/query /source` 直接返回「拒绝访问 (0x80070005)」，而 /status 仍然可用且带「源:」一行（`ParseSourceFromStatus`，中英标签都认）；`/query /configuration` 同理只在需要诊断报告时读取。服务运行状态/启动类型走 WMI `Win32_Service`（值恒为英文，不受系统语言影响），失败退回注册表 `Start`/`DelayedAutostart`。
+- 注册表读写一律用 `RegistryView.Registry64` 显式打开（x86 构建下 `HKLM\SYSTEM\...` 会被重定向到 Wow6432Node，读不到真实配置）。
+- 测试：`TimeSyncTests`（预设完整性、对等列表与标志位、地址校验、注册表字符串反查、SNTP 报文与偏移数学、w32tm 中英文/真实机器输出解析、健康检查判定、设置落盘）。
+
+### 驱动管理（DriverStorePage）— pnputil + WMI + FileRepository（Issue #241）
+- 「驱动管理」内置工具（id `driver-store`，分类「系统工具」）= `Pages/DriverStorePage`（代码构建，GpuRankingPage 同模式）+ `Services/DriverStore/DriverStoreService.cs`：DriverStore 浏览、旧版本清理、导出备份 / 从备份还原（Driver Store Explorer 平替）。
+- **数据源三件套**：`pnputil /enum-drivers` 出全量包列表（**WMI `Win32_PnPSignedDriver` 只列有设备绑定的包，旧版本残留恰恰没有绑定，不能单独用**，只用它做「使用中」设备关联）；`FileRepository` 目录扫描出占用（目录名前缀 = 原始 inf 名，版本匹配靠读目录内 INF 的 `DriverVer`，UTF-16/ANSI/UTF-8 自动识别）。
+- **pnputil 输出是本地化的，解析一律按值模式**（`oem\d+\.inf`、日期+版本正则），标签文本（提供程序/签名者/类）只做中英文关键字尽力识别，缺失不影响分组排序。输出按 OEM 代码页解码（同 `W32TimeCli`）。
+- **删除安全边界（勿放宽）**：只允许删「旧版本且无设备使用」，**绝不加 `/force`**——正在使用时让系统拒绝是特性；删除前后端不带 `/uninstall` 之外的动作。`DeleteAsync` 会拒绝非 `oemNN.inf` 的输入。
+- 分组 = 原始 inf 名（缺失回退发布名）；组内按日期+版本降序，第一个标 `IsNewest`，其余为可清理旧版本。退出码 0 成功、3010 成功需重启。
+- 测试：`DriverStoreTests`（中英文/未知语言枚举解析、日期格式、INF DriverVer、分组与最新标记、大小匹配策略、结果分类、非 oem inf 拒绝）。
+
+### 排行榜页滚动折叠的布局震荡（LayoutCycleException，Issue #165）
+- `GpuRankingPage`/`CpuRankingPage` 的「滚动时折叠头部三行」有个经典死循环：折叠改变列表视口高度 → 底部附近偏移被钳制 → 再次触发 ViewChanged → 方向反转又展开 → 无限震荡直到 LayoutCycleException。**修复口径（勿回退）**：`CollapseNav`/`ExpandNav` 幂等，切换后 `ApplyNavVisibility` 里同步 `UpdateLayout()` 并把钳制后的偏移设为 `_lastScrollOffset` 新基线，`_navToggling` 期间忽略回声事件。两页是复制品，改就一起改。
+
+### 统一日志（LogService）与内置工具「运行日志」log-viewer
+- **所有日志只有一个写入点**：`Services/Logging/LogService`（`TubaWinUi3.Services.LogService`）。目录 = `<DataDir>/Logs`，设置页「日志目录」可自定义（`AppSettings["LogDir"]`，目录不存在/不可写自动回退默认，切换前探测可写性）；**一个类别一个文件** `<类别>.log`，超过 `MaxFileBytes`(1 MB) 滚动成 `.1/.2/.3`（保留 3 份），多行消息第二行起缩进。级别标签定宽：`[DEBUG]`/`[INFO ]`/`[WARN ]`/`[ERROR]`。
+- 类别常量（文件名即类别）：`App`=`app.log`、`Startup`=`startup.log`（启动轨迹，每轮 `ResetFile` 重写）、`Crash`=`crash.log`（崩溃 + 托盘面包屑）、`Agent`=`agent.log`、`GameTunnel`=`game-tunnel.log`、`GameOverlay`=`game-overlay.log`、`StressTest`=`stress-test.log`、`Backend`=`backend.log`、`RogueCleaner`=`rogue-cleaner.log`、`Clipboard`=`clipboard.log`、`PhoneLink`=`phone-link.log`（连接手机审计：配对/拒绝/exec/winget/撤销）。
+- **新增日志不要再自己拼路径/自己轮转**：`LogService.Info/Warn/Error/Debug(category, message)`、`WriteBlock`（原样多行，崩溃报告用）、`ReadTail(path, maxLines, maxBytes)`、`ListFiles()`、`Clear(category)`。写失败一律静默（崩溃路径也走这里）。要新类别就加常量 + `KnownCategories` + `DisplayName` 的 `Log_File_<category>` 本地化键。
+- 各功能保留自己的门面但全部转调 `LogService`：`StartupTrace`（启动面包屑）、`Services/Agent/AgentDebugLog`、`TunnelLog`、`GameOverlayAutoService.Log`、`StressTestControl.Log`、`ClipboardService`、`RogueCleanerCore.Logger`；`DiagnosticLogService` 已删除（不要恢复）。注意 `StartupTrace` 目前**没有任何调用点**（HEAD 起就是死代码，`startup.log` 只由旧文件迁移产生）——需要启动面包屑时在 `App.OnLaunched` 里调 `StartupTrace.Begin()` 并在关键阶段 `Mark(...)`。
+- `LogService.Prepare()`（启动 + 设置页改目录后调用）每进程跑一次：建目录 + **迁移旧位置**（数据目录根部的 `agent-debug.log`/`game_overlay_auto.log`/`stress_test.log`、`active_intercept/backend.log`、`Clipboard/error.log`、`RogueCleaner/logs/*.log`、旧的 `Logs/app_crash.log`+`startup_trace.log`、`%TEMP%/app_crash.log`+`startup_trace.log`）→ 追加进新文件后删旧文件。
+- **主动拦截后端**（独立进程）的日志目录由 `ActiveInterceptService.BuildConfigJson` 的 `LogFile` 指定 = `LogService.PathFor(LogService.Backend)`，后端自己 `CreateDirectory`。Shell 扩展的 `shell-menu/handler.log` 是 NativeAOT 组件自管，**不**进统一目录（错误报告打包单独收录）。
+- **两级上限，别让日志无限长**：①单文件 `MaxFileBytes`=1 MB 滚动成 `.1/.2/.3`；②**目录总量配额 `MaxTotalBytes`=10 MB**，超出后 `EnforceQuota` 按「最旧的滚动副本 → 最久没写过的非关键主文件」删到配额的 80%（`QuotaTargetRatio`），**`crash`/`startup`/`app` 三个关键类别的主文件永不删**（滚动副本照删）。写入路径里 60 秒节流检查一次；启动后 30 秒的延迟任务与打开「运行日志」页各显式调一次 `EnforceQuota()`——主程序几乎不写 app/crash 日志，不能只靠写入触发。
+- **后台组件 `TubaWinUI3.BackEnd` 自己降噪 + 自滚动**：`BackEndLog.Debug` 只进控制台、**不落盘**（每轮心跳走它，如 `InterceptMonitor` 的「扫描完成：N 项」，以前每 10 秒一条、一天几千行）；游戏监控的「未命中诊断」从 30 秒一条降到 5 分钟一条（150 tick，排查「开了游戏不弹窗」仍够用）；`BackEndLog` 自身 1 MB 轮转成 `.1/.2`（独立进程不能指望主程序的配额兜底）。**backend 里新增日志先想清楚频率：轮询/心跳级别的一律 `Debug`。**
+- 内置工具 `log-viewer`（`Pages/LogViewerPage`，分类「系统工具」）= 日志查看器：左侧文件列表（类别显示名 + 大小）、右侧内容（`Consolas`、可选中的 `TextBlock` + `ScrollViewer`），1 秒 `DispatcherQueueTimer` 实时跟随（用户上翻即停止跟随、滚回底部恢复）、级别过滤（`[INFO ]`/`[WARN ]`/`[ERROR]` 前缀匹配）、关键字过滤、复制（走 `ClipboardService`）、清空（`ContentDialogGuard` 确认）、打开目录。设置页「日志目录」卡片有「查看日志」按钮直达。
+- 存储清理：日志条目收敛为一条「运行日志」= `LogService.LogDirectory`；错误报告打包按 `LogService.ListFiles()` 全量收录（单文件截断保留末尾 2 MB）。
+- 新增内置工具的固定四件套仍然适用：注册表 `RegisterDefaults()` + `Metadata/tools.json` 的 `builtin` 挂载 + `Assets/BuiltinIcons/<id>.svg` + 本地化键（`Builtin_<id>_Name/_Desc`）。
+- `> 2026-10-25`：`TubaWinUi3.Tests/NativeHardwareSceneTests.cs` 引用的 `HardwareSceneModel`/`DeviceInspectionSession` 等类型只存在于 `.scene-verify/` 验证程序、从未进主项目，是 NavIconTests 同款孤儿——已在测试 csproj 用 `<Compile Remove>` 排除（文件保留在盘上）；3D 场景类型若真落地主项目，记得移除排除。
+
+
+### AI 运行库（按需下载 + 动态加载）— 不打开 AI 工具就零加载零占用
+
+- **AI 依赖的运行时 DLL 不随安装包分发**（M.E.AI / OpenAI SDK / Windows ML / ORT GenAI，x64 约 70MB）：主 csproj 用 `AiRuntimeExcludeAssets=runtime;native` 排除（`ExcludeAssets` 里 **native 是独立资产类型**，只排 `runtime` 原生 DLL 仍会进包）；本地开发要 DLL 随输出用 `-p:BundleAiRuntime=true`（Loader 优先用应用目录里已有的 DLL，无需下载）。
+- 两个必须知道的打包坑：① `Microsoft.ML.OnnxRuntimeGenAI.WinML` 的 props 用 `None + CopyToOutputDirectory` **硬拷** `onnxruntime-genai[-cuda].dll`，`ExcludeAssets` 管不到 → `StripAiRuntimeNativeCopiesAfterBuild/AfterPublish` 目标在构建/发布后从输出目录删除这两个文件；② x86 版保留 Windows ML 包的托管程序集（`AiRuntimeWinMlExcludeAssets`，约 330KB、架构无关、该包无 32 位原生）——x86 本地推理依旧不可用，但 AI 对话链路照常。
+- **下载安装** = `Services/AiRuntime/AiRuntimeBundleService`：首次打开 AI 工具（AI 助手 / 本地AI试炼场 / 硬件页「发送给 AI」）时 `AiRuntimeGate.EnsureReadyAsync` 弹带进度条的对话框 → 经 `DownloadQueueService.EnqueueMultiFile` 从 NuGet 官方源（`api.nuget.org` flatcontainer 主源 + `globalcdn.nuget.org` 备用，HEAD 取大小供续传跳过）下载对应 `.nupkg`（整包即 zip）→ 后处理器 `AiRuntimeNupkgProcessor` 解包：托管取第一个命中的 lib 目录（net10.0→net9.0→net8.0→net8.0-windows→netstandard2.0），原生只取 `runtimes/<rid>/native/*.dll`（排除 cuda）→ 落 `<DataDir>/ai-runtime/<rid>/`，校验必备文件后写 `manifest.json`（`AiRuntimeBundle.ContractVersion`，不匹配视为未安装）并删除 nupkg。**更新 AI 依赖版本 = 改 csproj 与 `AiRuntimeBundle.GetPackages` 的版本 + ContractVersion +1**。
+- **加载** = `Services/AiRuntime/AiRuntimeLoader`（进程内一次）：`AssemblyLoadContext.Default.Resolving` 从运行库目录按文件名加载（进默认 ALC，保持类型标识一致）；每个加载的 AI 程序集挂 `NativeLibrary.SetDllImportResolver`；`AddDllDirectory` + PATH 前置覆盖 native→native 的按名加载（genai → onnxruntime）；按依赖序预加载 DirectML → onnxruntime → WinML → genai。已用 spike 实测：DLL 全部移出应用目录后，WinML 投影（EP 目录）与 ORT GenAI 真实推理均正常。
+- **JIT 安全（新增 AI 入口时必须遵守）**：CLR 在 JIT 方法时解析其引用的类型（含字段类型），运行库未安装时任何触碰 AI 类型的代码都会 `FileNotFoundException`。现有防护：① `AiAssistantTool` / `AiPlaygroundTool` 先过 gate，再在 `[MethodImpl(NoInlining)]` 薄方法里 `new AiAgentPage()` / `NavigateToToolPage(typeof(AiPlaygroundPage))`；② `LocalModelRuntime` = 「零 AI 类型门面 + 嵌套 Core」（`AiRuntimeBundleTests.LocalModelRuntimeFacade_HasNoAiTypedMembers` 锁死），退出路径调用失败被 try/catch 吞掉（`MainWindow_Closed` 用有界 `TryUnload(3s)`）；③ `AiEpProbe.RunChild` 先 `AiRuntimeLoader.EnsureLoaded()` 再进 `RunChildCore`；④ `AiPlaygroundPage.OnLoaded` 有运行库缺失兜底横幅；⑤ 启动期无任何 AI 注册（`AgentToolRegistry` 惰性注册、`EnsureProvidersRegisteredAsync` 按需一次）。
+
+### 本地 AI 试炼场（AiPlaygroundPage）— Windows ML 本地推理
+
+- 「本地AI试炼场」内置工具（id `ai-playground`，分类「实用工具」）= `Pages/AiPlaygroundPage.xaml`，三标签：**模型库**（HF 模型一键下载 / 删除 / 本地导入）、**试炼场**（LLM 对话 / 图像分类 / 目标检测 / 图像特征相似度）、**引擎与设备**（EP 加速包安装注册 / 设备表 / NPU 编译缓存）。服务层在 `Services/AiPlayground/`。
+- **推理类库（两个包，勿再加第三种变体）**：`Microsoft.Windows.AI.MachineLearning` 2.4.89（Windows ML 自包含运行时：onnxruntime 1.27 + DirectML + `ExecutionProviderCatalog`，约 41 MB）+ `Microsoft.ML.OnnxRuntimeGenAI.WinML` 0.17.1（LLM 生成，经 Windows ML **自动选择 NPU → GPU → CPU**；不要同时引用其它 GenAI 变体，原生库同名冲突）。项目 WASDK 2.2 + `WindowsAppSDKSelfContained=true` 正是官方支持的自包含组合。**运行时 DLL 不随安装包分发**（见「AI 运行库」节：首次打开按需下载 + 动态加载；本地开发 `-p:BundleAiRuntime=true`）。
+- **x86 无原生资产**（Windows ML 运行时仅 win-x64 / win-arm64）：`AiRuntimeService.UnsupportedReason` 返回原因，页面显示降级横幅并禁用推理入口；包引用保持无条件（x86 构建可编译）。厂商 EP 动态下载需 Win11 24H2（26100）+，CPU 与 DirectML 任何受支持系统（Win10 19H1+）内置可用。
+- **EP 流程**：`ExecutionProviderCatalog.GetDefault().FindAllProviders()` → `ReadyState`（NotPresent / NotReady / Ready）→ `EnsureReadyAsync()`（失败走返回结果不抛）→ `TryRegister()`；一键 = `EnsureAndRegisterCertifiedAsync()`。会话侧：`sessionOptions.SetEpSelectionPolicy(...)`（自动→PREFER_NPU / GPU→PREFER_GPU / CPU→PREFER_CPU）或按设备表显式 `AppendExecutionProvider(env, devices, options)`（顶部「设备」下拉，优先于引擎模式）。
+- **EP 注册是进程级的**（注册进当前 `OrtEnv`，进程结束即失效）——所以每次启动都要重注册，这不是 bug。对策：**启动期不再自动注册**（注册会拉起 Windows ML 原生运行时，违背「不打开 AI 工具零加载」）；`AiRuntimeGate` 在首次打开 AI 工具时调用 `AiRuntimeService.EnsureProvidersRegisteredAsync()`（进程内一次，静默注册**已安装**（`ReadyState != NotPresent`）的加速包，绝不触发下载）；`RegisteredProviders` 记录本进程已注册的 EP，`IsProviderRegistered(name)` 供 UI 判断。首次*安装*仍需用户手动「下载并安装」。
+- **LLM 设备选择**：`LlmChatRunner.Load(modelDir, provider, deviceType)` 用 `ORT GenAI` 的 `Config(modelDir)` + `ClearProviders()` / `AppendProvider(provider)` / `SetDecoderProviderOptionsHardwareDeviceType(provider, type)` 显式指定 EP，再 `new Model(config)`；指定失败自动回退纯 `new Model(modelDir)` 并在 `RuntimeNote` 标注。**此前直接 `new Model(modelDir)` 会永远按 genai_config.json 的 `provider_options: []` 走 CPU**。设备解析 = `AiRuntimeService.ResolveLlmTarget(explicitEpName, explicitDeviceType)`（纯逻辑核心 `ResolveLlmTargetCore` 可单测）：显式设备优先 → 引擎模式挑对应 `HardwareDevice.Type` 的 EP → Auto 返回 null（Windows ML 自动选择）。
+- **模型变体命名**：CPU（`phi35-mini-int4-cpu`）与 GPU（`phi35-mini-int4-gpu`）变体过去 `DisplayName` 完全相同、下拉里分不出 → 现在带 `· CPU/移动版` / `· GPU 版` 后缀。
+- **对话会话**：`AiChatSessionStore` 按模型分目录落盘 `<DataDir>/AiPlayground/chat/<modelId>/<sessionId>.json`（每会话一个文件，原子写；无消息不落盘；标题取首条 user 消息截断 20 字），页面顶部「会话」下拉 + 新建 / 删除；`LoadSessionsForCurrent` 有 `_sessionsModelId` 守卫，下载完成等界面刷新不会打断进行中的对话。
+- **设备可见性**：`LlmChatRunner.RuntimeNote`（实例属性，如 `"GPU（DmlExecutionProvider）"`）经 `UpdateRuntimeChip` 常驻顶栏，且每次助手气泡下标注「本次运行：…」；视觉任务完成文案追加 `· {RuntimeNote}`。
+- **NPU 编译缓存（仅 QNN）**：`OrtModelCompilationOptions` + `SetEpContextEmbedMode(true)` 是**高通 QNN 专属**的 EP 上下文编译。对 Intel OpenVINO 等其它 EP 调用它，原生 VPUX 编译器会直接 `abort()`（`0xC0000409` fail-fast，**托管 try/catch 拦不住**，进程当场闪退）——实测 resnet50 报 `LLVM ERROR: Failed to infer result type(s)`。因此 `SupportsEpContextCompilation()` 只在确有 QNN EP 时才走这条编译缓存分支，其余 EP 直接常规加载。缓存落 `<DataDir>/ai-models/.compiled/<modelId>__<ep>_<device>.onnx`（失败自动回退；删除模型 / 手动清缓存一并清理）。LLM 由 GenAI 自行管理。
+- **Intel NPU 可用（关键，实测）**：Intel OpenVINO 的 NPU **可以正常推理**——根因不是 NPU 不行，而是**模型是动态形状 `[-1,-1,-1,-1]`，而 NPU 只支持静态形状**，未定死时 VPUX 编译器报 `Missing upper bound` 并 abort。解法：`SessionOptions.AddFreeDimensionOverrideByName` 把 `batch_size/num_channels/height/width` 定死（`ApplyStaticShapeOverrides`，页面经 `ResolveStaticShape` 从模型元数据推断）。实测：resnet50 **NPU 2.4ms vs CPU 11.8ms（快约 5 倍，数值完全一致）**、CLIP 30.8ms、DETR 推理 2.2s（首次冷编译 4 分钟+，之后走 OpenVINO 驱动级缓存）。
+- **NPU 必须经「隔离子进程」探测（重要）**：NPU 编译不兼容的模型时会**原生 abort（0xC0000409，托管 try/catch 拦不住）或长时间卡住**，在主进程里直接尝试会杀掉/卡死整个应用。因此 `AiEpProbe`：主进程以自身 `--ai-ep-probe <model> <ep> <device> <h> <w> <outfile>` 拉起子进程试编译（子进程先 `AiRuntimeLoader.EnsureLoaded()` + `EnsureProvidersRegisteredAsync()` 再建会话——DLL 可能不在应用目录，JIT 安全见「AI 运行库」节），崩溃/超时/失败只影响子进程；结果按 (模型,EP,设备,形状) 缓存到 `<DataDir>/AiPlayground/ep-probe.json`。页面 `LoadVisionRunnerAsync` 经 `ResolveVisionTarget` 得到 (显式EP, 类型, 是否需探测)：需探测的 NPU 先探，通过才真跑 NPU，否则 `ResolveVisionFallback()` 回退 GPU/CPU。
+- **策略路径永远不选 NPU（YOLO 闪退事故的教训，重要）**：`GetPolicyFor` 现在**任何模式都不返回 PREFER_NPU** —— NPU 只允许走「页面 `ResolveVisionTarget` 解析出显式设备 → 子进程探测通过 → 显式 Append」这一条门。事故链：探测失败时页面把 epName 置回 null → `CreateVisionSession(null)` 走策略 → 策略对「优先 NPU」模式又返回 PREFER_NPU → 主进程直接撞上 NPU 编译器（`openvino_intel_npu_compiler.dll` 0xC0000005 访问违例，托管拦不住）→ 闪退。同批修复：**OpenVINO 的 `.AUTO` 设备在所有显式选择里被排除**（它会在内部自行路由到 NPU，绕过探测）；探测失败的回退用 `ResolveVisionFallback()` 显式挑 DirectML GPU/CPU，绝不回 null。
+- **探测必须是「三重校验」，否则假阳性（YOLO 第二起事故的根因）**：子进程里 `RunChild` 依次 (1) `RegisterInstalledProvidersAsync()` 后**确认目标 `epName/deviceType` 真的出现在 `GetEpDevices()`**（否则注册失败时探测会静默在 CPU 上"成功"）；(2) `ProbeSessionOnDevice` 编译建会话；(3) `ProbeRunDummyInference` **真跑一次推理**。三者都过才算 `Ok`。只建会话会假阳性 —— 实测 YOLO 的探测曾返回 `Ok:true`，而主进程挂 NPU 必 0xC0000005。
+- **静态形状覆盖不能猜符号名（YOLO 另一根因）**：各导出器的符号维度名不同 —— resnet50/CLIP 是 `[batch_size,num_channels,height,width]`，而 **YOLO 是 `[batch, "", height, width]`**（channels 是空串、batch 不叫 batch_size）。因此 `GetSymbolicDims(modelPath)` 读出模型真实 `SymbolicDimensions` 再按位置映射覆盖（[0]→1、[1]→3、[2]→H、[3]→W），常见别名再补一轮。注意 `AddFreeDimensionOverride` 的两个参数都是 **(符号名, 值)**，没有按索引的重载。
+- **YOLO 解码与预处理（实测教训）**：`Xenova/yolov9-c` 的输出是 **NMS 已完成**的 `[N,6]` = `[x1,y1,x2,y2, score, class_id]`（坐标在 inputSize 空间，score 已 sigmoid，class 是整数），**不是** `[1,84,N]` 原始头 —— `DetectionDecode.YoloNmsOutput` 负责这类布局（旧代码只认 3 维会报「无法识别 YOLO 输出形状」）。预处理 `PrepareYolo` 必须 **0..1（仅 ÷255，不做 mean/std）**：实测官方 `city-streets.jpg` 下 0..1 得 24 个正确框（score 0.86~0.94，与模型 README 逐值吻合），而 0..255 会得到 3000+ 个垃圾框。`maxOutput` 不可卡在 100 以下（真实图常 >100 框）。
+- **YOLO 在 Intel NPU 上不可用（实测结论）**：YOLO 图内部的 `Unsqueeze/Concat/ScatterND`（anchor 网格计算）中间张量有未定 bounds，`AddFreeDimensionOverride` 覆盖不到（它只作用于输入维度），NPU 编译必 `0xC0000005`。resnet50 / CLIP（224 分类与特征）与 DETR（800×1333）在 NPU 上可用；YOLO 与 LLM 只能走 GPU/CPU，探测会如实失败并回退。
+- **ORT 会话创建的坑**：`SessionOptions.AppendExecutionProvider(env, devices, …)` 要求传入设备**同属一个 EP 且部分 EP（DML）只接受单个设备**（多个 DML GPU 会报 `DML EP factory currently only supports one device at a time`；混入 `OpenVINOExecutionProvider.AUTO` 会报 `must have the same execution provider`）→ 只取匹配的**第一个**设备。
+- **LLM（ORT GenAI）EP 兼容性（实测 2026-10，Intel Core Ultra X7 + OpenVINO EP 1.8.95 + GenAI 0.17.1）**：Phi-3.5-mini INT4 上 **CPU（4.9 tok/s）是唯一跑得通的设备** —— **DirectML 加载即报错**（模型含控制流节点）；**OpenVINO NPU** 编译不过动态序列长度（内部静默回退其 CPU）；**OpenVINO GPU 能加载但生成首 token 即崩**（`Failed to find allocator for device`）。因此 `IsLlmUsableEp` 目前只放行 **QNN NPU**，其余一律返回 null 走 genai_config 默认（CPU）并如实标注；等新版 ORT GenAI / OpenVINO EP 修复后再在 `IsLlmUsableEp` 放行对应设备。
+- **模型目录（`AiPlaygroundCatalog.cs`，全部经 HF API 核实）**：对话 = `microsoft/Phi-3.5-mini-instruct-onnx` / `Phi-4-mini-instruct-onnx` 的 cpu（NPU/CPU）/ gpu（DirectML）两个 int4 变体；分类 = `Xenova/resnet-50`（timm crop_pct 0.875 → 先缩 256 再中心裁 224）；检测 = `Xenova/detr-resnet-50`（800/1333 + sigmoid）与 `Xenova/yolov9-c`（640 拉伸 + `[1,84,N]` 解码 + NMS + **负值启发式补 sigmoid**，GPL-3.0 仅作进阶项）；特征 = `Xenova/clip-vit-base-patch32` 的 vision_model（相似度对比）。新增模型 = 加一条 preset（Runner 按 Task + Family 自动选预处理/后处理管线）。
+- **下载**：`HfModelDownloader` 逐个文件在 `hf-mirror.com` / `huggingface.co` 上并发 HEAD 探测取可用源与大小（顺序可在设置 `AiPlayground_DownloadSource` 切换），经 `DownloadQueueService.EnqueueMultiFile` 入全局队列（断点续传 / 暂停 / 磁盘预检）。**探测取「第一个成功者」即用、不等其余探测**（`ResolveFirstAvailableAsync`，曾有 `Task.WhenAll` 写法：官方源被墙时每个文件都干等满探测超时，7 文件的 Phi-3.5 解析阶段要 100 秒+），网络级失败（超时/连不上）的主机本轮解析中跳过（`ProbeResult.HostUnreachable`，区别于 404 等文件级失败）。模型落盘 `<DataDir>/ai-models/<id>/`；`StorageUsageService` 组件组挂 `ai-models`（占用统计 + 一键删除）。
+- **标签**：优先模型 `config.json` 的 `id2label`（分类 ImageNet / DETR 91 类）；YOLO 用内置 `Assets/AiPlayground/coco-labels.txt`（COCO-80）；显示经 `AiPlaygroundLabels.Translate` 中英映射（未知原样）。DETR 的 `N/A`（no-object）类别跳过。
+- **检测高级设置**：`DetectionOptions`（置信度 / IoU / MaxDetections / ClassAwareNms / DisabledClasses）按模型落盘于 `AppSettings["AiPlayground_Detect_<modelId>"]`；`DetectionItem` 带 `RawLabel`（英文）与 `ClassId`。`DetectionDecode.NmsAndSort` 支持**类别内 NMS** + 可配上限（旧签名保留为类别无关 + 100 上限）。页面高级面板：置信度/IoU 滑块、最大框数、类别内 NMS、类别过滤对话框。
+- **自定义绘制规则（受限 DSL，无代码执行）**：`Services/AiPlayground/Rules/`（`RuleLexer`/`RuleParser`/`RuleExpr`/`RuleEngine`/`RuleStore`）。语法 `when <条件> then k=v k=v` / `else then …`；字段 `label`(英文)/`class_id`/`score`/`x`/`y`/`w`/`h`；函数 `count/contains/startsWith/endsWith/upper/lower`；动作 `stroke`(#RRGGBB)/`width`/`label`(支持 `{score:P0}` 占位)/`visible`/`fill`。**只解析本 DSL，不做反射/IO/代码执行**。规则按模型落盘 `<DataDir>/AiPlayground/rules/<modelId>.draw.txt`；无自定义时 `RedrawOverlay` 用 `RuleStore.ColorForLabel` 按类别稳定配色。
+- **分类为单张**：图像分类只处理当前选中的一张图片（`PickImageButton` → `RunClassificationAsync`）。曾有过「多选批量分类 + 按类别移动文件」的 `FileActionPlanner` / `ClassificationRuleContext` / `BuildRule 的 file+to 动作`，已按产品要求整条删除（**勿再加回**）。
+- **自定义输入源 + 实时流**：`IFrameSource`（`FrameBuffer` BGRA）三实现：`GdiCaptureFrameSource`（Screen=BitBlt 虚拟桌面含多屏 / Window=PrintWindow 优先回退 BitBlt）、`CameraFrameSource`（`MediaCapture`+`MediaFrameReader`，CPU 内存、只留最新帧）。`DetectionLoop` 后台循环丢旧帧跑最新、统计 FPS/推理耗时；页面预览用 `WriteableBitmap` 直接写 BGRA。**必须**在 `OnUnloaded`/`UpdatePlaygroundSetup` 调 `StopLive()` 释放摄像头/句柄。打包版需 `webcam` 能力（`Package.appxmanifest`）。
+- **ImagePreprocess 帧入口**：`PrepareYolo/Detr(FrameBuffer, …)` 与 `path` 版本等价（`FrameToBitmap` 转 `Bitmap` 后复用同一套 resize/normalize 逻辑）；分类/特征无帧入口（无实时需求）。
+- **图像工具行的溢出处理**：顶部按钮行与检测高级设置行都用横向 `ScrollViewer`（`HorizontalScrollBarVisibility=Auto`）包裹，窄窗口下可滚动而不是被裁切；`VisionStatus` 文本不参与滚动、固定在按钮行右侧。
+- **LLM 对话**：`LlmChatRunner`（ORT GenAI Model/Tokenizer/Generator + 流式；进程级持有 `OgaHandle` 至退出）。提示词按模型家族模板**手工构造**（Phi `<|system|>…` / ChatML / Llama3 / 纯文本；导入 GenAI 目录时在对话框里选），不依赖 jinja；`<|end|>` 等停止标记兜底检查；温度 ≤0.01 走贪心（`do_sample=false`）。导入 GenAI 目录 = **引用原位置不复制**（目录常 2 GB+），单文件 .onnx 复制进模型库。
+- **安全卸载（关闭逻辑，重要）**：`GenerationGate`（纯托管，单测 `GenerationGateTests`）负责「取消在途生成 + 有界等待其退出」之后才释放 native 对象——生成线程直接读 genai 对象，边生成边 Dispose 是 use-after-free（原生层闪退，托管拦不住）；`GenerateAsync` 持门期间字段不会被卸载并捕获为局部变量供 worker 使用，`Unload`/`Dispose` 走 `CancelAndWait(5s)`、超时则放弃销毁。试炼场生成期间禁用会触发重载的控件（`SetConfigControlsEnabled`）；`BuiltinToolWindow.OnClosed` 对直接导航的试炼场页兜底 `CleanupOnWindowClose()`（窗口关闭时 Frame 不保证触发 Unloaded）。
+- **上下文预算（重要，勿退回字符数/估算计数）**：`LlmContextBudget`（纯逻辑，单测 `LlmContextBudgetTests`）——`LlmChatRunner.Load` 从 `genai_config.json` 读 `num_hidden_layers` / `num_key_value_heads`(缺省回退 `num_attention_heads`) / `head_size` 算出每 token KV 字节数（层×2×KV头×head_size×4B），按 `可用物理内存 − ReserveBytes(4GiB)` 折算内存预算，再与用户自定义上限合并（`ResolveEffectiveBudget`：用户值 `AiPlayground_ContextTokens` 只作**上限**，永不突破内存值；0=自动）→ `ContextBudgetTokens`（夹在 1024..16384）。
+  - **`max_length` 必须用真实分词数**：`GenerateAsync` 用 `tokenizer.Encode(prompt)[0].Length` 真实计数（**不是**字符数、不是 `EstimateTokens` 估算——估算偏差约 7%），先 `TruncateToTokens(prompt, 预算−32, CountTokens)` 截断（保留首 60%+尾 40%，迭代收敛保结尾 assistant 标记），再 `max_length = 真实promptTokens + effectiveMaxNew`（≥16 富余）——恒大于真实 `input_ids`。
+  - **两次事故教训**：① 曾把提示词**字符数**当 token 数设 `max_length`（AI 助手 system + 45 工具 schema + 长历史可达 4 万字符）→ phi-3.5-mini KV 768KB/token → ORT 一次性预分配 **~32GB** 失败（`GroupQueryAttention … BFCArena AllocateRawInternal Failed to allocate memory … 32731660544`）；② 改用**估算** token 后仍失败：估算低估 → 真实 prompt 超 max_length（`input_ids size (13187) + current sequence length (0) exceeds max length (12322)`）。结论：**只有真实 tokenizer 计数可靠**。
+  - UI：试炼场对话设置行「上下文」`ContextTokensBox`（0=自动）→ `AppSettings["AiPlayground_ContextTokens"]`，改动即重载模型（`ReloadLlmForContextChangeAsync`）。
+  - 错误提示 `AgentErrorPolicy.FormatApiError` 按异常内容识别本地推理失败（`IsLocalInferenceError`：onnxruntime/GroupQueryAttention/BFCArena/内存不足/已释放…）给「本地模型」排查建议，而非误导去查端点/Key。
+- **本地模型（models.json）**：`AiModelLibrary.ImportSingleFile` / `ImportGenAiFolder`，条目落 `<DataDir>/ai-models/models.json`；引用型目录消失时状态自动变为不可用。
+- 图标 `Assets/BuiltinIcons/ai-playground.svg`（Fluent 芯片 + 火花）；tools.json 挂载 `其他工具`；注册在 `BuiltinToolRegistry.RegisterDefaults()` 末尾；本地化键 `Builtin_ai-playground_*` + `AiPlayground_*`（zh/en 全量）。
+- 测试：`AiPlaygroundTests`（目录完整性 / HF URL 与主机顺序 / 探测竞速与主机降级 / 检测解码 DETR+YOLO 两种布局+同类 NMS+sigmoid 启发式 / 预处理尺寸（timm crop、DETR 长边封顶）/ 提示词模板与停止标记 / 尺寸解析 / 对话会话落盘往返（`AiChatSessionStoreTests`）/ LLM 设备解析（`AiLlmTargetTests`）/ 注册测试）+ `GenerationGateTests`（取消 + 有界等待语义）+ `AiRuntimeBundleTests`（依赖包按架构分档、nupkg 提取规则、manifest 契约往返、`LocalModelRuntime` 门面 JIT 安全）。
+
+### 文件占用查看的右键菜单集成（file-locksmith）
+
+- 「文件占用查看」可把入口加进资源管理器右键菜单（`Services/FileLock/FileLockShellMenuService.cs`；**首次打开工具页询问一次**，之后在页面底部「资源管理器右键菜单」折叠区随时开关）。两种模式：
+  - **便携/安装版（非打包）**：经典右键菜单（`HKCU\Software\Classes\{*|Directory}\shell\TubaWinUi3.FileLocksmith`，Win11 上位于「显示更多选项」），命令 = `"<exe>" --file-lock "%1"`，图标用内置工具彩色图标的 .ico；
+  - **MSIX 打包版（Win11）**：Win11 新版菜单。条目由**包清单静态声明**（不能运行时增删），开关 = 处理程序在 `GetState` 里按标记文件返回 `ECS_ENABLED`/`ECS_HIDDEN`。**四处清单必须同步**：`run-msix.ps1`（dev）、`build-msix-store.ps1`（商店）、`build-store.ps1`（旧版）、`Package.appxmanifest`（源参考）——`ShellExtensionManifestTests` 拦截 CLSID/DLL 路径/扩展声明漂移。**Win10 + MSIX 不支持**（页面显示说明）。
+- **处理程序 = `TubaWinUI3.ShellExtension`**：C# NativeAOT 原生 DLL（无 .NET 运行时依赖），导出 `DllGetClassObject`/`DllCanUnloadNow`，由 dllhost（包内 COM 代理）加载。与主程序**共享编译**契约文件 `Services/FileLock/FileLockShellMenuContract.cs`（CLSID、别名名、标记文件格式、经典命令行、提权脚本；仅 BCL，无 WinUI 依赖）。接口 vtable 顺序可对照 `Services/RogueCleaner/ContextMenuTitleProbe.cs` 的既有定义。
+- **构建链**：`build-shell-ext-aot.ps1`（镜像 `build-backend-aot.ps1`，需 MSVC 链接器）。dev：`run-msix.ps1` 在 DLL 缺失时自动构建（`-RebuildShellExt` 强制重建，DLL 被就地注册的包根引用）。发布：主 csproj 的 `PublishShellExtension` 目标，**仅当 `-p:IncludeShellExtension=true`**（商店脚本传；便携包不产出该 DLL，也不进 zip）。
+- **标记文件**：`<数据根>\TubaWinUi3\shell-menu\file-locksmith.txt`（第 1 行菜单标题、第 2 行悬停提示；随界面语言重写）。处理程序按 `%LocalAppData%` → 包 `LocalState`（PFN 解析）两处探测；打包版同时写两处（提权会话/虚拟化视图下都读得到）。
+- **点击菜单 → `--file-lock <路径>`** 直达 `FileLockPage`、预填路径并**自动扫描一次**（其余入口仍不自动扫描）。打包版处理程序经**执行别名**（`uap3:appExecutionAlias` → `%LocalAppData%\Microsoft\WindowsApps\TubaWinUi3.exe`）启动主程序（保留包身份、可带参数）；别名被用户关闭时回退包内 exe 直启。处理程序诊断日志：`%LocalAppData%\TubaWinUi3\shell-menu\handler.log`（64 KB 滚动）。
+- **「以管理员身份重新启动」按钮**（FileLockPage 顶部操作条，未提权时显示；打包版默认非管理员）：`App.TryRelaunchElevated` —— 非打包直接 `Verb=runas`；打包版打包进程直接 runas 会 0x32 失败，改走 **PowerShell 载体** `Start-Process -Verb RunAs`（仓库既有实测写法），并追加 `--msix-admin-session` + 环境变量 `TUBA_MSIX_LOCALSTATE=<LocalState>`。提权进程会丢失包身份，`RuntimeHelper.IsPackagedContext`（= `IsMsixPackaged || MsixAdminSession`）为这类会话恢复打包语义（数据根指向 LocalState、跳过自更新、隐藏社区工具、不启动后端等）——**所有「商店版应如何表现」的新判定都应走 `IsPackagedContext` 而不是 `IsMsixPackaged`**（物理打包判断才用后者）。提权重启成功后必须走 `App.RequestExit()`。两条分支都**无条件追加 `--takeover`**：提权子进程要等旧实例退出后接管单实例互斥体，否则会被自己的旧实例当重复启动转发走（见「单实例 + 激活转发」）。
+- 单实例：点击右键菜单会唤醒已运行实例（不再多开），`--file-lock <路径>` 意图经单实例转发直达工具页（见「单实例 + 激活转发」）。其余限制：提权会话的 WebView2 依赖机器级 Evergreen 运行时（本工具链路不依赖 WebView2）。
+- 测试：`FileLockShellMenuTests`（契约纯逻辑：模式判定/命令构造/标记文件往返/提权脚本转义）、`ShellExtensionManifestTests`（四处清单 + 共享源码 + 发布开关一致性）。
+
+### 连接手机（PhoneLinkService / PhoneLinkPage）— 局域网控制 + 文件互传
+
+- 服务 = `Services/PhoneLinkService.cs`（`HttpListener`，默认 `http://+:18765/`，端口冲突自动 +1）+ `PhoneLinkDiscovery`（UDP 18764 局域网发现）+ Android 伴侣 App（`android-tuba-remote/`，Kotlin/Compose）。协议接口：`/api/ping`、`/api/pair`、`/api/info|hardware|monitor|screenshot`、`/api/exec`、`/api/jobs/{id}`、`/api/winget/*`、`/api/chat*`。
+- **审计日志类别 = `LogService.PhoneLink`（`phone-link.log`）**：配对成功/失败、电脑端拒绝、exec 命令与退出码、winget 安装、文件上传、撤销授权。exec/winget 是 RCE 级能力，新增任何高危接口都必须同样落这个类别——以前只有 `Debug.WriteLine`，Release 下等于没有痕迹。
+- **令牌持久化 = `Services/PhoneLink/PairedDeviceStore`**：24 字节随机令牌，落盘只存 SHA-256 摘要（设置键 `PhoneLinkPairedDevices`），有效期 90 天，过期自动清理并 401。**明文令牌永远不写盘**。进程重启后手机不必重新配对；页面手动关服务仍会清空全部令牌（沿用手动关闭 = 全部断开的语义）。
+- 电脑端设备列表支持**逐台断开**（`PhoneLinkService.PairedDevices` / `RevokeDevice(id)`），不再只有「撤销全部」。
+- **聊天 = `Services/PhoneLink/PhoneLinkChatStore`**：内存上限 500 条，落盘 `<DataDir>/phone_link/chat.json`（原子写），启动恢复；超限从最旧丢（同时清掉它的文件路径映射）。`/api/chat` 支持 `after` / `before` / `limit` 分页。
+- **长任务统一 Job 模型**：`/api/exec` 带 `background: true` 立即返回 `jobId`，客户端轮询 `/api/jobs/{id}`（`/api/jobs` 给列表）；同步响应模式保留给旧客户端。手机切后台 / 断网不会丢结果。
+- **文件下载支持 Range**（`PhoneLinkService.ParseRange`：`bytes=start-`、`start-end`、`-suffix`），可断点续传；上传按**实际收到字节数**强制 20 GB 上限（chunked 没有 Content-Length 也拦得住），超限删临时文件并 413。
+- 截图 `CaptureScreenJpeg` 带 150 ms 缓存（同宽度多设备/连点共用一帧）；`/api/ping` 与 `/api/info` 带 `apiVersion`（当前 = 2），手机端据此协商能力。
+- `Services/PhoneLink/PhoneLinkFirewall` 在服务启动时后台自动创建入站规则（TCP = 实际 HTTP 端口、UDP 18764），失败只记日志，不阻断服务。
+
+### 硬件详细信息（HardwareDetailPage）— 瀑布流参数卡片
+
+- 「硬件信息」页 →「详细信息」= `Pages/HardwareDetailPage`：15 个信息分区（系统/设备/处理器/主板/内存/显卡/NPU/硬盘/显示器/声卡/网卡/电池/安全/USB/其他设备），由 `Controls/CardBoard`（自制瀑布流面板）排布；空分区自动隐藏（台机无电池、无 NPU 就不显示）。
+- **布局数学是纯函数**：`Controls/CardLayoutMath`（列数解析/最短列/堆叠排布/`DistributeFill` 铺满补偿）与界面无关，`HardwareDetailTests` 覆盖极端输入。`CardBoard` 每次测量都按自然高度重新贪心分列（没有「钉住的列」），任何内容变化后列高都保持均衡。
+- **完全铺满（唯一策略）**：页面按「视口高度 − 页头/实时区」算出 `CardBoard.FillHeight`，内容比它矮时把每列缺口平均补给该列的**单列卡片**（`DistributeFill`，跨列卡不动）并重排一次——各列底部对齐、填满窗口；内容更高时照常滚动。宽度方向由 `MaxColumns=6` + 无最大宽度限制实现「宽屏自动更多列」。
+- **不提供手动排布（重要，勿加回来）**：按产品要求删除了拖动换列/换位、边缘缩放、右键选宽度、布局持久化（`HwDetailLayout`）与「重置布局」按钮。历史教训：拖拽/缩放依赖小组件命中（无背景的 Grid、3px 圆点手柄）反复被反馈「拖不动 / 改不了大小」，手动交互的收益远低于维护成本。排布完全交给默认策略：分区定义顺序 + 默认跨度 + 贪心最短列 + 铺满对齐；要调布局就改这里的默认值，而不是加交互。
+- **采集**：`HardwareInfoService.BuildDetailData` 并行采集各分区（`Safe()` 隔离单分区失败；授权 4s / TPM 5s 限时，避免慢 WMI 提供程序拖垮首开）。新增字段/分区时：`HardwareDetailData` 加模型 → 服务加采集 → 页面的 `SectionDefinitions` 加定义（枚举成员必须都有定义，`SectionDefinitions_CoverEveryDetailPart` 拦截漏配）→ `BuildItems` 加行 → `LocalizationService.TranslateHardwareLabel` 加标签翻译（中文数据键只在显示层翻译）。
+- **理论带宽 / 位宽**（只挂在系统内存，显卡行不加）：`HardwareDisplayPolicy.ComputeMemoryBandwidthGbs` = SMBIOS 传输速率（`ConfiguredClockSpeed`，回退 `Speed`，单位 MT/s —— 不是时钟频率）× 总位宽（各已插内存 `DataWidth` 之和，回退 `TotalWidth`）÷ 8。概览「内存」行尾部与内存卡片（`MemoryDetail.BusWidth` / `MemoryDetail.Bandwidth`）两处展示。独显显存带宽需要显存位宽 + 显存频率，WMI/DXGI 都不提供，故不显示。
+- **硬件图标**：`Assets/HwIcons/<icon>.svg`（与侧栏一致的 128px 彩色填充、柔和渐变风格，`HardwareIcons_FollowFluentSpecifications` 校验），`Services/HardwareIconService` 加载；`KeyForLabel` 统一映射概览明细标签，型号/系统/运行时间三个概览卡也使用此目录。明细行左侧功能图标与行末品牌 Logo 分开，品牌更新必须定位 `HardwareBrandLogo`，不能再找第一个 Image。缺失分区图标只退回纯标题，不报错。
+- 特殊数据源：磁盘分区样式走 `IOCTL_DISK_GET_DRIVE_LAYOUT_EX`（WMI 没有，需管理员）；SMART（健康/通电时间/写入量）复用 `DiskSmartReader`；DirectX = 注册表 d3d 文件版本 + 系统内部版本判定；.NET = 注册表 Release；TPM/VBS 走 DeviceGuard/TPM 命名空间。非管理员下的缺失项静默跳过（应用本身管理员启动）。
+- 回归：`HardwareDetailTests`（布局数学、Windows 系统信息映射、图标资源、本地化键覆盖）。
+
+### Adding a built-in tool
+1. New class in `TubaWinUi3.WinUI3/Services/BuiltinTools/` implementing `IBuiltinTool`.
+2. Pick `BuiltinToolKind`: `Dialog` / `BackgroundTask` / `ProgressTask` / `InstantAction`.
+3. Register in `BuiltinToolRegistry.RegisterDefaults()` — **duplicate IDs throw**.
+4. Create dialogs via `context.CreateDialog(title)` (or manually set `RequestedTheme = ThemeService.CurrentElementTheme`) so ContentDialogs respect the app theme.
+5. 加彩色矢量图标 `Assets/BuiltinIcons/<id>.svg`（文件名 = `Id`）——**必须有**，`BuiltinIconTests` 会拦住漏配。
+
+### 内置工具彩色矢量图标
+
+- 每个内置工具一个 `TubaWinUi3.WinUI3/Assets/BuiltinIcons/<tool-id>.svg`（`Assets\**` 已是 Content glob，随包分发，不需要改 csproj）。`Services/BuiltinIconService.cs` 负责加载：`Has(id)` 只探测文件（后台线程安全），`Get(id)` 返回缓存的 `SvgImageSource`（**只能在 UI 线程调用**）。没有 SVG 就返回 null，界面回退到 `IBuiltinTool.Glyph` 的字体字形，所以漏配只会退回旧样式、不会开天窗。
+- **内置工具采用首页已确认的彩色填充、柔和渐变风格**（用户于 2026-10-27 要求统一替换原描边风格）：`viewBox="0 0 128 128"`，主体轮廓清晰、分层填充、同色系线性渐变、少量圆头细节描边。参考 `quick-device-check.svg` / `game-monitor.svg`；每个工具保留自己的功能形象，不统一套通用底板。侧栏的 `Assets/NavIcons` 与硬件分区的 `Assets/HwIcons` 已按用户要求统一采用这套填充渐变规范。
+- **SVG 写法必须落在 Direct2D SVG 支持的子集里**：使用 `path` / `rect` / `circle` / `ellipse` / `g` / `defs` / `linearGradient` / `stop`；显式颜色，渐变只引用文件内 ID。禁止 CSS、`currentColor`、文字、脚本、外部引用、`filter`、`mask`。`BuiltinIconTests` 校验 128px 填充规范、内部渐变引用、XML、非空光栅化；共享校验器仍保留 HwIcons 的严格 24px 描边检查。
+- 渲染点靠「三选一」图层：卡片模板里 `Image(IconPath)` / `Image(IconSource)` / `FontIcon(IconGlyph)` 三层并存，用 `NullToVisibilityConverter`（`Pages/FavGlyphConverter.cs`）驱动显隐；有 SVG 的内置工具在 `ToolCatalog.CreateBuiltinItemCore` 里把 `IconGlyph` 置空，字形层自然收起。`ToolItem.IconSource` / `BuiltinToolViewModel.IconSource` / `SearchResult.IconSource` 都是**惰性属性**——ToolCatalog 扫描在后台线程，而 `SvgImageSource` 是 DependencyObject，必须在 UI 线程构造。
+- 桌面快捷方式的 .ico 用同一份 SVG 离屏光栅化：`WindowsSearchIndexService.RenderBuiltinIconBitmap` 走 `Svg` 包（MIT，NuGet）的 `SvgDocument.Draw(256,256)`，失败回退 `RenderGlyphBitmap`（字形，`BuiltinShortcutIconTests` 靠反射调它，**签名不能改**）。缓存文件名带 `IconCacheVersion`（`-v3`）后缀——换图标风格时必须改它，否则老用户盘上的旧 `.ico` 永远不会重新生成。
+- 页头 `Controls/ToolPageHeader` 的图标瓦片**有意不参与**：那是 40×40 强调色/工具专属渐变底 + 白色字形的独立设计语言，彩色双色图标压在彩色底上会糊。
+
+### 界面本地化（WinUI3Localizer）
+
+- 资源在 `TubaWinUi3.WinUI3/Strings/<lang>/Resources.resw`（`zh-CN` / `en-US`），WinUI3Localizer 直接读 exe 旁文件（`AppContext.BaseDirectory/Strings`，非打包/MSIX 通用）。语言服务 = `Services/LocalizationService.cs`：启动时在 `App()` 构造里 `Initialize()`（必须早于 MainWindow 创建），设置页「界面语言」→ `SetLanguageAsync`（立即生效，不重启；`AppSettings["Language"]`，`auto` = 跟随系统）。
+- XAML 用 `xmlns:l="using:WinUI3Localizer"` + `l:Uids.Uid="Key"`，resw 键 = `Key.Property`（如 `.Text`/`.Content`/`.PlaceholderText`/`.CloseButtonContent`）；代码用 `LocalizationService.L(key, fallback)`（**缺键回退 fallback 原文**，所以未迁移页面/文案安全保持中文）。键集合一致性由 `TubaWinUi3.Tests/LocalizationTests.cs` 保证（两语言键集必须相同、XAML 引用的 Uid 必须有定义）。
+- **resw 从 PRI 排除**：主项目与测试项目都设 `EnableDefaultPRIResourceItems=false`（`Strings/**/*.resw` 只由 WinUI3Localizer 直接读取）。否则 MakePri 把 `Key.Property` 当路径层级，与同文件里的纯 `Key` 项冲突（PRI175/PRI278）导致构建失败；且默认 `**/*.resw` glob 在自定义 `BaseOutputPath` 时会捡到输出目录里的 resw 副本再次触发。
+- **主项目 `L()` 的坑**：库未构建时返回 `NullLocalizer`，它把**键名本身**当结果返回——`L()` 必须同时判断「空串」与「值==键名」才回退 fallback，否则 Strings 缺失时界面显示键名（`TimeSyncTests.DescribeInterval_FallsBackToSeconds` 有回归）。
+- **附加属性不能用 Uid**：`ToolTipService.ToolTip` / `AutomationProperties.Name` 在库内部用 `GetProperty` 解析而附加属性是静态字段 → 解析失败。对策：ToolTip 走注册的自定义 `LocalizationActions`（`typeof(Button)` → `SetToolTip`，resw 键写 `Key.ToolTip`）；AutomationProperties.Name 用代码 `AutomationProperties.SetName(...)`（`MainWindow.ApplyLocalizedShellText()` / `UpdateBanner.ApplyLocalizedNames()`）。`Window.Title` 不是依赖属性，也只能代码设置。
+- 语言切换刷新：Uid 控件由库自动重刷；代码赋值文本由 `ILocalizablePage.ApplyLocalization()` 钩子刷新（MainWindow 订阅 `LanguageChanged` 后调用当前页，另失效 `ToolMetadataService`/`ToolCatalog` 缓存并重建分类导航项）。**页面必须显式声明 `, ILocalizablePage`**，否则钩子不会被调用；**不重建 MainWindow**。
+- **工具元数据多语言 = `Metadata/Tools_<lang>.json` 覆盖层**：`ToolMetadataService.LoadMetadata()` 读 `tools.json` 后按 `match`（不区分大小写）合并 `Tools_<当前语言>.json` 里的 `description`/`publisher`/`tags`；逻辑字段（order/category/categories/builtin/downloadUrl…）永远只信 `tools.json`。覆盖文件缺失/条目缺失/字段空 → 回退中文。新增语言只需加文件（无需改代码）；新增工具条目时记得同步补英文（`Tools_en-US.json` 目前 89 条）。
+- **内置工具名称/简介**：`IBuiltinTool.Name`/`Description` 在 48 个实现里统一写成 `LocalizationService.L("Builtin_<id>_Name|_Desc", "中文")`（键由 id 派生，改 id 要同步改键）；分类 Header 显示走 `GetBuiltinCategoryDisplayName()`，`BuiltinToolsPage` 的 Pivot 用 `Tag`（原始分类名）做定位、`Header` 只做显示。
+- 菜单项定位禁止用 `Text.Contains(...)` 匹配中文（语言一变就失效）——一律用 `x:Name`（HomePage/FavoritesPage 的 `UpdateBuiltinLinkFlyoutItems` / `UpdateTutorialVisibility` 已改）。
+- 目前覆盖：主窗口 shell、首页 HomePage、常用页 FavoritesPage、搜索弹窗（UnifiedSearchService/SearchResult）、设置页全量、内置工具页（含 48 个内置工具名称/简介）、时间同步页、Windows 镜像下载页、端口占用页、磁盘健康页、硬件信息页 + 硬件详情页、工具元数据（外部工具描述/标签/发布者）。其余页面按需渐进迁移（加 Uid/键即可，缺键自动回退中文）。
+- **服务层数据键 = 标签只在显示层翻译**：`HardwareInfoService` 的 `Label`（"设备型号"/"处理器"/"内存"…）是数据键，服务内部大量按其比较，**永远不改**；显示走 `LocalizationService.TranslateHardwareLabel(label)`（switch 映射 → `Hw_Label_*` / `Hw_Field_*` 键，未知原样返回），模型层经 `HardwareInfoItem.DisplayLabel` 暴露给 XAML 绑定。同样的模式适用于任何"服务产数据 + 页面展示"的字段（如 UUP 的 Channel 值）。
+- **数据值下拉的多语言**：ComboBox 选项若同时充当筛选数据键（如"全部"/"正式版"/"简体中文"），改用 `<ComboBoxItem Content="显示文案" l:Uids.Uid="…" Tag="数据值" />`，代码取 `SelectedItem is ComboBoxItem { Tag: string s }`——**Tag 永不翻译**。
+- **`Run` 不支持 Uid**（非 FrameworkElement）：含加粗 Run 的段落用 `x:Name` + 代码赋值（见 `WindowsImagePage.ApplyCommunityRiskText()`）。
+- **静态参数表不能直接包 `L()`**：`static readonly` 数组/字段只初始化一次，语言切换后会残留旧语言——必须改成 `static` 属性（每次访问重建，如 `public static FormatParam[] Mp3Params => new[] { … };`）再包 `L()`。`FormatConvertParams` / `FormatConvertCatalog` 仍待迁移。
+
+## Gotchas
+
+- `Tools/` has Chinese category directory names (处理器工具, 显卡工具, …) — path handling must be Unicode-safe.
+- `HardwareInfoService` runs WMI on `Task.Run`; results are consumed on the UI thread. `ApplyCpuzOverride()` deep-copies WMI sections and overwrites them with CPU-Z data (`IsVerified=true`).
+- `LiteMonitorService` uses LibreHardwareMonitorLib **0.9.7-pre737** (稳定的 0.9.6 不认识 Panther Lake 等新 CPU → uarch=Unknown，温度/频率/功耗传感器根本不会创建) with nvapi64 / ATI ADL / D3DKMT / WMI fallbacks. **CPU 温度/频率/功耗走 MSR，依赖 PawnIO 驱动**：`PawnIoService` 在 LHM 初始化前补启动「已安装但未加载」的驱动（这类驱动重启后不会自动加载），仍不可用时「一键三烤」会弹窗引导安装官方 PawnIO_setup；游戏监控覆盖层本身不再强制要求 PawnIO（只影响 CPU 这几项数据）。The FPS overlay reads the ETW `DxgKrnl` Present event via `FpsService` (needs admin, no driver).
+- `FpsService` uses an ETW `DxgKrnl` trace session (`Microsoft.Diagnostics.Tracing.TraceEvent`) — needs admin for kernel tracing.
+- `ConfigManager` supports two data locations — AppData (`%LocalAppData%/TubaWinUi3/`) or AppRoot (`<appdir>/Data/`) — selected by a `.config_location` marker file.
+- `Package.appxmanifest` declares `runFullTrust` and `systemAIModels`.
+- **Bundled icon cache**: `ToolIconService` prefers `<appdir>/IconCache/` (ships inside the package, read-only) over the writable `DataDir/IconCache`; missing/stale icons are copied from the bundled cache or extracted at runtime. `build-icon-cache.ps1` generates it (same SHA256 `{ToolsRoot}\<relative>` key scheme); a `GenerateBundledIconCache` MSBuild target runs it automatically before every `dotnet publish` (skipped when `ExcludeToolsFromPublish=true`). The `IconCache/` folder is gitignored — never commit it.
+- **正在运行 Debug 版应用时构建**：exe/dll 被进程锁住，`dotnet build/test` 会挂在最后的文件拷贝（MSB3026/3027）。仓库先例是换输出路径 `-p:BaseOutputPath=bin/xxx/`；但注意 2026-10-25 实测：该路径下测试项目的 `makepri.exe` 会递归扫描 `bin\xxx\` 里的整份应用输出而**无限卡死**——构建命令要加 `-p:AppxGeneratePriEnabled=false`，或者干脆先关掉正在运行的应用再构建（最省事）。
+
+## File-transfer subsystem (separate from the .NET app)
+
+The "文件传输" feature spans three pieces with their own toolchains — none are part of `dotnet build`:
+- `TubaWinUi3.WinUI3/Services/BuiltinTools/LanFileShareTool.cs` — the in-app side（局域网 HTTP 分享；历史上引用的 SIPSorcery/WebRTC 包已无任何代码引用，遂移除）。
+- `file-transfer-web/` — Vue 3 + Vuetify 4 web UI (`npm run dev`; build is `vue-tsc -b && vite build`).
+- `cloudflare-worker/` — WebRTC signaling server (Cloudflare Durable Object `GroupRoom`); `wrangler dev` / `wrangler deploy`.
+
+## Android downloader app (separate)
+
+`android-tuba-installer/` is a **Kotlin + Jetpack Compose** Android app (空岛图吧工具箱安装助手) that lets users pick a PC architecture (x64 default), download the official Inno setup exe (GitCode mirror first, GitHub fallback — same asset naming as `UpdateService`), and follow an MTP copy + double-click install guide. **No root / no ADB / no Bluetooth** by design (target PCs must stay offline). Not part of `dotnet build`:
+
+- Build: `./gradlew -p android-tuba-installer assembleDebug` (Gradle wrapper inside the folder; needs Android SDK; `local.properties` is gitignored).
+- APK CI: `.github/workflows/android-build.yml` (manual `workflow_dispatch`, uploads debug APK artifact).
+- Android 10+ writes to public Downloads via MediaStore (no permissions); API 26–28 needs WRITE_EXTERNAL_STORAGE.
+- Release API sources: `api.gitcode.com/api/v5/repos/{luolangaga|gcw_uDDNaqJw}/tubatool/releases/latest` → `api.github.com/repos/luolangaga/tubatool/releases/latest`; assets matched by `TubaWinUi3_Setup_*_{arch}.exe`.
+
+## CI (`.github/workflows/` — all manual `workflow_dispatch`)
+
+**There is no push/PR CI** — nothing builds or tests automatically on commit; run `dotnet build` + `dotnet test` locally before pushing.
+
+> **2026-09-30 修复**：`TubaWinUi3.Tests/NavIconTests.cs` 引用的 `NavIconCatalog` 从未提交（`Assets/NavIcons/` 在仓库、git 全历史、已发布安装包里都不存在），测试项目因此一直编译失败（13 个 CS0103）→ **已删除该孤儿测试**。被删掉的规格（如果以后要做侧边栏导航图标）：每个固定导航项（首页/常用/硬件信息/内置工具/社区工具…）与每个已知工具分类各需一个 `Assets/NavIcons/<slug>.svg`，slug 一一对应不重复，图标写法要过 `IconAssetValidation.ValidateAll`（Fluent 规范：viewBox 24、收在 2..22 网格、1.5 描边、圆头圆角、≥2 色）与 `ValidateRasterizes`（光栅化非空白）；`IconAssetValidation` 仍在被 `BuiltinIconTests` 使用，不要一起删。
+
+- `build-release.yml` — bumps `<Version>` in **both** `.csproj`s and `#define MyAppVersion` in all `installer*.iss`, publishes x64/x86/ARM64 portable + Inno installer + x64-lite (`ExcludeToolsFromPublish=true` + `.lite_build` marker), publishes the PE edition (self-contained single-file) for the zips, restores `.pri`, generates the changelog via **DeepSeek** (`DEEPSEEK_API_KEY`), creates the GitHub release, and optionally mirrors to **GitCode/AtomGit** (`GITCODE_ACCESS_TOKEN`). Portable zips are staged as a `src/` folder plus the native `Launcher\bin\图吧工具箱WinUI3_<arch>.exe` (renamed `图吧工具箱WinUI3.exe`) and `图吧工具箱PE兼容版.exe` at the zip root.
+- `android-build.yml` — Gradle debug APK for `android-tuba-installer/`; the only workflow that runs tests.
+- `sync-to-gitcode.yml` — re-uploads assets from an existing GitHub Release to GitCode via AtomGit API.
+
+`Launcher/` is a native C launcher (`launcher.c` + `launcher.rc`, built via `Launcher/build.ps1`) that finds and starts the .NET app. `build-setup.ps1` / `build-store*.ps1` build the Inno installer / MSIX locally.
+
+## Docs site (separate)
+
+Root `package.json` + `src/docs/` are a **VitePress** site only (`npm run dev` / `npm run build`). `node_modules/` is not referenced by any `.csproj`.
+
+## New official website (separate)
+
+`website-winui3/` is the new official website, built on **WinUIonWeb** (Vue 3 + Web WinUI controls, `npm run dev` / `npm run build`). Docs markdown lives in `website-winui3/src/docs/` (migrated from `src/docs/`), tutorial images in `website-winui3/public/tutorials/images/`. Icon glyphs must exist in `src/assets/Fonts/SEGOEICONS.TTF` (check with `node check-font` against the cmap table).
+
+## Conventions
+
+- Namespaces: `TubaWinUi3` / `.Pages` / `.Services` / `.Models`. PascalCase; XAML + code-behind pairs.
+- Commit messages are short Chinese summaries in practice (`优化OSD编辑器`, `修复打包`); `feat:`/`fix:` prefixes are welcome but not enforced.
+- Never commit: `bin/`, `obj/`, `.pfx`, `.cer`.
+
+## 品牌变基清单（同步上游新版本时必读）
+
+空岛分支 `kongdao-rebrand` 叠在上游 `master` 之上。同步新版本用
+`git rebase --onto <新tag> <旧tag> kongdao-rebrand`，**不要 merge**。
+
+同步后必须逐项核对，三条已知陷阱：
+
+1. **git 三方合并会静默丢弃品牌代码，不产生任何冲突标记。**
+   冲突解完 ≠ 品牌还在。必须逐文件 `git diff` 确认品牌改动仍存在。
+   （2026-10-20 同步 v1.7.1 时，SettingsPage.xaml.cs 的品牌注入被静默丢弃。）
+
+2. **`Strings/{zh-CN,en-US}/Resources.resw` + `l:Uids.Uid` 会覆盖 XAML 硬编码。**
+   XAML 里写死 `Text="..."` 仍会被 resw 按 Uid 覆盖，编译期不报错，
+   运行时界面照样显示上游名。改品牌必须 XAML + resw 两边同改。
+
+3. **exe 版本属性散在三处，`Launcher/launcher.rc` 最易漏。**
+   - `TubaWinUi3.WinUI3/TubaWinUi3.csproj` — AssemblyTitle / Product / Company / Copyright / Version
+   - `TubaWinUi3.WinUI3/Package.appxmanifest` — DisplayName / PublisherDisplayName / Version
+   - `Launcher/launcher.rc` — FILEVERSION / PRODUCTVERSION / VS_VERSION_INFO
+
+   注意上游 tag 名与 csproj `<Version>` 可能不一致（v1.7.1 的 csproj 仍写 1.6.4），
+   以用户拍板的版本号为准。
+
+**GPL-3.0 署名区不得空岛版**：设置页「关于」的 `Settings_CreditsApp_Title`
+等产品归属文案保留上游名称。品牌审计时这唯一 1 处残留是正确的，不要"修"。
+
+上游会误提交开发会话缓存（`website-winui3/.mimosa/`、`sess_*.json`、`*.source`），
+同步到对外仓库时须剔除。

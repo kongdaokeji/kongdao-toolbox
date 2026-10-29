@@ -1,0 +1,105 @@
+<Page x:Class="TubaWinUi3.Pages.MemoryManagerPage"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:controls="using:TubaWinUi3.Controls"
+ xmlns:lvc="using:LiveChartsCore.SkiaSharpView.WinUI">
+ <Page.Resources>
+  <Style x:Key="MemoryCard" TargetType="Border">
+   <Setter Property="Padding" Value="20"/><Setter Property="CornerRadius" Value="8"/>
+   <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/>
+   <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/>
+  </Style>
+ </Page.Resources>
+ <Grid>
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+  <controls:ToolPageHeader x:Name="Header" ToolId="memory-manager" Title="内存管理" Subtitle="查看内存状态，整理缓存，把分页文件迁移到其他磁盘" Glyph="&#xE964;">
+   <controls:ToolPageHeader.Actions><Button x:Name="RefreshButton" Content="刷新" Click="Refresh_Click" Style="{StaticResource ToolHeaderActionButtonStyle}"/></controls:ToolPageHeader.Actions>
+  </controls:ToolPageHeader>
+  <ScrollViewer Grid.Row="1" Padding="24,4,24,32" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" controls:ToolViewport.ConstrainContent="True">
+   <StackPanel Spacing="20" MaxWidth="1040">
+    <InfoBar x:Name="Feedback" IsOpen="False" IsClosable="True"/>
+    <Border Style="{StaticResource MemoryCard}">
+     <StackPanel Spacing="16">
+      <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+       <StackPanel Spacing="4"><TextBlock x:Name="MemoryTitle" Text="物理内存" Style="{StaticResource SubtitleTextBlockStyle}"/>
+        <TextBlock x:Name="MemoryAmount" Text="正在读取…" Style="{StaticResource TitleTextBlockStyle}"/>
+        <TextBlock x:Name="AvailableText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+       </StackPanel>
+       <TextBlock x:Name="MemoryPercent" Grid.Column="1" Style="{StaticResource TitleTextBlockStyle}" VerticalAlignment="Center"/>
+      </Grid>
+      <ProgressBar x:Name="MemoryBar" Minimum="0" Maximum="100" AutomationProperties.Name="内存占用率"/>
+      <ComboBox x:Name="CleanMode" Header="清理方式" HorizontalAlignment="Stretch" SelectionChanged="CleanMode_Changed"/>
+      <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+       <TextBlock x:Name="CleanHint" Text="整理低优先级缓存，不关闭应用。缓存减少不一定增加可用内存。" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+       <Button x:Name="CleanButton" Grid.Column="1" Content="整理缓存" Click="Clean_Click"/>
+      </Grid>
+      <TextBlock x:Name="CleanResult" Visibility="Collapsed" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+      <Expander x:Name="Details" Header="查看详细内存分布" IsExpanded="False" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+       <StackPanel Spacing="12"><TextBlock x:Name="DetailHint" Text="每项显示实际容量和占比；小项也不会隐藏。缓存、池和提交属于不同口径，不相加。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+        <StackPanel x:Name="MetricRows" Spacing="12"/>
+       </StackPanel>
+      </Expander>
+     </StackPanel>
+    </Border>
+    <Border Style="{StaticResource MemoryCard}">
+     <StackPanel Spacing="16">
+      <TextBlock x:Name="GraphTitle" Text="内存图表" Style="{StaticResource SubtitleTextBlockStyle}"/>
+      <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <ComboBox x:Name="GraphMode" Header="查看方式" HorizontalAlignment="Stretch" SelectionChanged="GraphSelectionChanged"/>
+       <ComboBox x:Name="GraphGroup" Grid.Column="1" Header="数据分类" HorizontalAlignment="Stretch" SelectionChanged="GraphSelectionChanged"/>
+      </Grid>
+      <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <ComboBox x:Name="GraphUnit" Header="显示单位" HorizontalAlignment="Stretch" SelectionChanged="GraphSelectionChanged"/>
+       <ComboBox x:Name="GraphWindow" Grid.Column="1" Header="趋势时间范围" HorizontalAlignment="Stretch" SelectionChanged="GraphSelectionChanged"/>
+      </Grid>
+      <StackPanel x:Name="MetricPicker" Spacing="6"/>
+      <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+       <CheckBox x:Name="SmallScale" Content="放大小项（对数尺度）" Checked="GraphSelectionChanged" Unchecked="GraphSelectionChanged"/>
+       <ToggleButton x:Name="PauseGraph" Grid.Column="1" Content="暂停采样"/>
+      </Grid>
+      <TextBlock x:Name="GraphHint" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+      <TextBlock x:Name="ChartThemeProbe" Visibility="Collapsed" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+      <lvc:CartesianChart x:Name="MemoryChart" Height="300"/>
+      <TextBlock x:Name="GraphReadout" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+      <StackPanel Orientation="Horizontal" Spacing="12"><Button x:Name="ResetGraph" Content="重置缩放" Click="ResetGraph_Click"/><Button x:Name="ExportGraph" Content="导出采样 CSV" Click="ExportGraph_Click"/></StackPanel>
+     </StackPanel>
+    </Border>
+    <Border Style="{StaticResource MemoryCard}">
+     <StackPanel Spacing="16">
+      <TextBlock x:Name="MigrationTitle" Text="分页文件迁移" Style="{StaticResource SubtitleTextBlockStyle}"/>
+      <TextBlock x:Name="MigrationHint" Text="分页文件为系统提供额外的内存提交空间。迁移只修改下次启动配置，不直接移动或删除正在使用的文件。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+      <InfoBar x:Name="Pending" IsOpen="False" IsClosable="False" Severity="Success"/>
+      <TextBlock x:Name="CurrentPageFiles" Text="正在读取分页文件…" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+      <Grid x:Name="DriveGrid" ColumnSpacing="24" RowSpacing="16">
+       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+       <ComboBox x:Name="Source" Header="1 · 当前位置" HorizontalAlignment="Stretch" SelectionChanged="Source_Changed"/>
+       <ComboBox x:Name="Target" Grid.Column="1" Header="2 · 目标磁盘" HorizontalAlignment="Stretch" SelectionChanged="Target_Changed"/>
+       <TextBlock x:Name="DriveSpace" Grid.Row="1" Grid.ColumnSpan="2" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+      </Grid>
+      <ComboBox x:Name="Sizing" Header="目标分页文件大小" HorizontalAlignment="Stretch" SelectionChanged="Sizing_Changed"/>
+      <Grid x:Name="Sizes" Visibility="Collapsed" ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+       <NumberBox x:Name="Initial" Header="初始大小（MiB）" Value="1024" Minimum="16" Maximum="4194303"/>
+       <NumberBox x:Name="Maximum" Grid.Column="1" Header="最大大小（MiB）" Value="4096" Minimum="16" Maximum="4194303"/>
+      </Grid>
+      <CheckBox x:Name="KeepSystem" Content="在系统盘保留系统管理的分页文件（推荐，有助于崩溃转储）" IsChecked="True"/>
+      <TextBlock x:Name="MigrationSummary" TextWrapping="Wrap"/>
+      <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+       <TextBlock x:Name="RestartHint" Text="应用前显示完整变更，自动备份；重启电脑后生效。" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+       <Button x:Name="MigrateButton" Grid.Column="1" Content="检查并迁移" Style="{StaticResource AccentButtonStyle}" Click="Migrate_Click" IsEnabled="False"/>
+      </Grid>
+     </StackPanel>
+    </Border>
+    <Expander x:Name="Recovery" Header="恢复与系统设置" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+     <StackPanel Spacing="12">
+      <TextBlock x:Name="RecoveryHint" Text="迁移失败时会尝试恢复原配置，也可以恢复上次备份或让 Windows 自动管理。" TextWrapping="Wrap"/>
+      <Button x:Name="RestoreButton" Content="恢复上次备份" Click="Restore_Click"/>
+      <Button x:Name="AutomaticButton" Content="恢复 Windows 自动管理" Click="Automatic_Click"/>
+      <Button x:Name="SystemButton" Content="打开系统设置" Click="System_Click"/>
+      <Button x:Name="AdminButton" Content="以管理员身份重新打开" Click="Admin_Click"/>
+     </StackPanel>
+    </Expander>
+   </StackPanel>
+  </ScrollViewer>
+ </Grid>
+</Page>

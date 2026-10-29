@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    EnergyStarWindow — standalone window UI for the EcoQoS efficiency-mode tool.
+    UI design ported from EnergyStarX (https://github.com/JasonWei512/EnergyStarX)
+    Copyright 2022 Bingxing Wang — MIT licensed (see Services/EnergyStar/LICENSE.txt).
+-->
+<Page
+    x:Class="TubaWinUi3.Pages.EnergyStarPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:controls="using:TubaWinUi3.Controls"
+    xmlns:toolkit="using:CommunityToolkit.WinUI.Controls"
+    mc:Ignorable="d">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <controls:ToolPageHeader ToolId="energy-star"
+            x:Name="PageHeader"
+            Grid.Row="0"
+            Title="后台节流省电神器"
+            Glyph="&#xE83F;">
+            <controls:ToolPageHeader.Actions>
+                <Border x:Name="StatusBadge" Style="{StaticResource StatusPillStyle}" VerticalAlignment="Center">
+                    <TextBlock x:Name="StatusBadgeText" FontSize="12" FontWeight="SemiBold" />
+                </Border>
+            </controls:ToolPageHeader.Actions>
+        </controls:ToolPageHeader>
+
+        <ScrollViewer Grid.Row="1" HorizontalScrollMode="Disabled" VerticalScrollBarVisibility="Auto" Padding="24,4,24,32" HorizontalContentAlignment="Stretch">
+            <StackPanel Spacing="24" MaxWidth="1040">
+                <StackPanel.ChildrenTransitions>
+                    <TransitionCollection>
+                        <EntranceThemeTransition FromHorizontalOffset="0" FromVerticalOffset="24" IsStaggeringEnabled="True" />
+                    </TransitionCollection>
+                </StackPanel.ChildrenTransitions>
+
+                <!-- 概述卡片 -->
+                <Border Style="{StaticResource FluentCardStyle}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontSize="16" Glyph="&#xE83F;" />
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="EcoQoS 效率模式 (Energy Star X 内核)" />
+                        </StackPanel>
+                        <TextBlock FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap">
+                            通过 Windows 11 Process Power Throttling API 节流后台进程以提升电池续航与散热；前台应用不会被节流以保证体验。任务管理器的“状态”列会对节流的后台进程显示绿色叶子图标。
+                        </TextBlock>
+                        <TextBlock x:Name="AdminWarningText" FontSize="12" Foreground="{ThemeResource SystemFillColorCautionBrush}" Visibility="Collapsed" IsTextSelectionEnabled="True" />
+                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,2,0,0">
+                            <FontIcon FontSize="12" Glyph="&#xE71B;" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                            <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}">
+                                <Run Text="源自开源项目 " /><Run FontWeight="SemiBold" Text="EnergyStarX" />
+                                <Hyperlink NavigateUri="https://github.com/JasonWei512/EnergyStarX">
+                                    <Run Text="github.com/JasonWei512/EnergyStarX" />
+                                </Hyperlink>
+                                <Run Text=" (MIT License, © 2022 Bingxing Wang)" />
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <toolkit:SettingsCard Header="效率模式" Description="自动降低后台进程的功耗，让前台应用保持流畅。">
+                    <toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE83F;" /></toolkit:SettingsCard.HeaderIcon>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button x:Name="PauseButton" Click="PauseButton_Click" ToolTipService.ToolTip="暂停节流但保留进程列表和启动设置">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon x:Name="PauseButtonIcon" Glyph="&#xE769;" FontSize="16" />
+                                <TextBlock x:Name="PauseButtonText" Text="暂停节流" />
+                            </StackPanel>
+                        </Button>
+                        <ToggleSwitch x:Name="MainToggle" AutomationProperties.Name="效率模式" OnContent="开启" OffContent="停止" Toggled="MainToggle_Toggled" />
+                    </StackPanel>
+                </toolkit:SettingsCard>
+                <InfoBar x:Name="ToastBar" IsClosable="True" IsOpen="False" />
+                <StackPanel Spacing="8">
+                    <TextBlock Text="节流选项" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,0,0,4" />
+                    <toolkit:SettingsCard Header="接通电源时继续节流" Description="关闭时仅节流黑名单；开启时节流所有不在白名单中的后台进程。">
+                        <toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE945;" /></toolkit:SettingsCard.HeaderIcon>
+                        <ToggleSwitch x:Name="ThrottleWhenPluggedInToggle" AutomationProperties.Name="接通电源时继续节流" OffContent="关" OnContent="开" Toggled="ThrottleWhenPluggedInToggle_Toggled" />
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard Header="登录时启动" Description="通过管理员计划任务自动启用效率模式。">
+                        <toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE7E8;" /></toolkit:SettingsCard.HeaderIcon>
+                        <ToggleSwitch x:Name="RunAtStartupToggle" AutomationProperties.Name="登录时启动效率模式" OnContent="已启用" OffContent="未启用" Toggled="RunAtStartupToggle_Toggled" />
+                    </toolkit:SettingsCard>
+                    <TextBlock x:Name="RunAtStartupHint" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                </StackPanel>
+
+                <!-- 白名单编辑器 -->
+                <Border Style="{StaticResource FluentCardStyle}">
+                    <StackPanel Spacing="8">
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="进程白名单" />
+                                <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="白名单中的进程绝不会被节流 (一行一个)" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Click="ToggleWhitelistEdit_Click" x:Name="ToggleWhitelistEditButton">
+                                <TextBlock x:Name="ToggleWhitelistEditText" Text="编辑" />
+                            </Button>
+                            <Button Grid.Column="2" Click="SaveWhitelist_Click" x:Name="SaveWhitelistButton" Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE74E;" FontSize="12" /><TextBlock Text="保存" /></StackPanel>
+                            </Button>
+                            <Button Grid.Column="3" Click="RestoreWhitelist_Click" ToolTipService.ToolTip="还原为默认白名单">
+                                <FontIcon Glyph="&#xE72C;" FontSize="12" />
+                            </Button>
+                        </Grid>
+                        <TextBox x:Name="WhitelistEditor"
+                                 FontFamily="Consolas"
+                                 FontSize="14"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 IsSpellCheckEnabled="False"
+                                 MinHeight="180"
+                                 MaxHeight="320"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 Visibility="Collapsed" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 黑名单编辑器 -->
+                <Border Style="{StaticResource FluentCardStyle}">
+                    <StackPanel Spacing="8">
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2">
+                                <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="进程黑名单" />
+                                <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="黑名单中的进程始终被节流, 即使在插电时 (一行一个)" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Click="ToggleBlacklistEdit_Click" x:Name="ToggleBlacklistEditButton">
+                                <TextBlock x:Name="ToggleBlacklistEditText" Text="编辑" />
+                            </Button>
+                            <Button Grid.Column="2" Click="SaveBlacklist_Click" x:Name="SaveBlacklistButton" Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE74E;" FontSize="12" /><TextBlock Text="保存" /></StackPanel>
+                            </Button>
+                            <Button Grid.Column="3" Click="RestoreBlacklist_Click" ToolTipService.ToolTip="还原为默认黑名单">
+                                <FontIcon Glyph="&#xE72C;" FontSize="12" />
+                            </Button>
+                        </Grid>
+                        <TextBox x:Name="BlacklistEditor"
+                                 FontFamily="Consolas"
+                                 FontSize="14"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 IsSpellCheckEnabled="False"
+                                 MinHeight="120"
+                                 MaxHeight="260"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 Visibility="Collapsed" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 活动日志 -->
+                <Border Style="{StaticResource FluentCardStyle}">
+                    <StackPanel Spacing="8">
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="活动日志" />
+                            <Button Grid.Column="1" Click="ClearLog_Click" ToolTipService.ToolTip="清空日志"><FontIcon Glyph="&#xE74D;" FontSize="12" /></Button>
+                        </Grid>
+                        <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Padding="8" CornerRadius="4">
+                            <ScrollViewer x:Name="LogScrollViewer" Height="140" VerticalScrollBarVisibility="Auto">
+                                <TextBlock x:Name="LogText" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
+                            </ScrollViewer>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

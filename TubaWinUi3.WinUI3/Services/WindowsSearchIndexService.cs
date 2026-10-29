@@ -1,0 +1,720 @@
+using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
+using Svg;
+using TubaWinUi3.Models;
+
+namespace TubaWinUi3.Services;
+
+internal sealed record SearchRegistrationResult(int Registered, int Unavailable, IReadOnlyList<string> Errors);
+
+/// <summary>
+/// 工具快捷方式的统一写入点：注册 Windows 搜索索引（开始菜单）与「发送到桌面」。
+/// 内置工具快捷方式以 --open-builtin &lt;id&gt; 启动本程序直达工具，
+/// 图标用该工具的彩色矢量图标（Assets/BuiltinIcons/&lt;id&gt;.svg）离线渲染成 .ico；
+/// 没有 SVG 的工具回退到 Segoe Fluent Icons 字形。
+/// </summary>
+internal static class WindowsSearchIndexService
+{
+    private static readonly object IndexGate = new();
+    internal static string? StartMenuDirectoryOverride;
+    private static string StartMenuFolder => StartMenuDirectoryOverride ?? Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        @"Microsoft\Windows\Start Menu\Programs\空岛图吧工具箱");
+
+    /// <summary>
+    /// 将所有工具注册到 Windows 搜索索引（后台执行，不阻塞 UI）。
+    /// </summary>
+    public static async Task<SearchRegistrationResult> RegisterAllToolsAsync()
+    {
+        try
+        {
+            return await Task.Run(() => RegisterTools(ToolCatalog.GetAllToolsCached()));
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[WindowsSearchIndex] 注册失败: {ex}");
+            return new(0, 0, [ex.Message]);
+        }
+    }
+
+    public static Task<SearchRegistrationResult> RefreshAsync() => RegisterAllToolsAsync();
+
+    internal static SearchRegistrationResult RegisterTools(IReadOnlyList<ToolItem> tools)
+    {
+        lock (IndexGate)
+        {
+            if (!ToolVisibilityService.HasSearchSelection)
+            {
+                RemoveAllCore();
+                return Directory.Exists(StartMenuFolder)
+                    ? new(0, 0, ["部分工具快捷方式未能移除。"])
+                    : new(0, 0, []);
+            }
+            return RegisterToolsCore(tools);
+        }
+    }
+
+    private static SearchRegistrationResult RegisterToolsCore(IReadOnlyList<ToolItem> tools)
+    {
+        // 确保目标文件夹存在
+        if (!Directory.Exists(StartMenuFolder))
+            Directory.CreateDirectory(StartMenuFolder);
+
+        // 记录当前应该存在的快捷方式文件名，用于后续清理
+        var expectedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var registered = 0;
+        var errors = new List<string>();
+        var selectedExternal = tools.Where(t => !t.IsBuiltinLink && ToolVisibilityService.IsSearchEnabled(ToolVisibilityService.SearchKey(t))).ToList();
+        var unavailable = selectedExternal.Count(t => t.NeedsDownload || string.IsNullOrWhiteSpace(t.EffectivePath) || !File.Exists(t.EffectivePath));
+
+        // 1) 外部工具（.exe 等）
+        var toRegister = DeduplicateTools(selectedExternal);
+        foreach (var (name, tool) in toRegister)
+        {
+            var shortcutPath = Path.Combine(StartMenuFolder, $"{SanitizeFileName(name)}.lnk");
+            expectedFiles.Add(Path.GetFileName(shortcutPath));
+
+            try
+            {
+                CreateShortcut(shortcutPath, tool.EffectivePath, tool.EffectiveWorkingDir,
+                    $"{name} - {tool.Category}");
+                VerifyShortcutTarget(shortcutPath, tool.EffectivePath);
+                registered++;
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{name}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[WindowsSearchIndex] 创建快捷方式失败 [{name}]: {ex.Message}");
+            }
+        }
+
+        // 2) 内置工具（通过 --open-builtin 启动参数打开）
+        var appExe = Process.GetCurrentProcess().MainModule?.FileName ?? "";
+        var appDir = AppContext.BaseDirectory;
+        if (!string.IsNullOrWhiteSpace(appExe) && File.Exists(appExe))
+        {
+            foreach (var builtin in BuiltinToolRegistry.AllTools)
+            {
+                if (!ToolVisibilityService.IsSearchEnabled("builtin:" + builtin.Id)) continue;
+                if (!ToolVisibilityService.IsBuiltinEnabled(builtin.Id)) { unavailable++; continue; }
+                var displayName = builtin.Name;
+                if (string.IsNullOrWhiteSpace(displayName))
+                    continue;
+
+                // 同名去重（内置工具与外部工具同名时，优先保留外部工具）
+                if (expectedFiles.Contains($"{SanitizeFileName(displayName)}.lnk"))
+                    continue;
+
+                var shortcutPath = Path.Combine(StartMenuFolder, $"{SanitizeFileName(displayName)}.lnk");
+                expectedFiles.Add(Path.GetFileName(shortcutPath));
+
+                try
+                {
+                    CreateShortcut(shortcutPath, appExe, appDir,
+                        $"{displayName} - {builtin.Category}",
+                        $"--open-builtin {builtin.Id}", EnsureBuiltinIcon(builtin));
+                    VerifyShortcutTarget(shortcutPath, appExe);
+                    registered++;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"{displayName}: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[WindowsSearchIndex] 创建内置工具快捷方式失败 [{displayName}]: {ex.Message}");
+                }
+            }
+        }
+
+        // 3) 清理过期快捷方式
+        CleanupStaleShortcuts(expectedFiles);
+        return new(registered, unavailable, errors);
+    }
+
+    /// <summary>
+    /// 对工具列表去重：
+    /// - 跳过内置工具链接（没有真实文件路径）
+    /// - 跳过需要下载但还没下载的工具
+    /// - 同名工具（不区分大小写）只保留第一个有效项
+    /// - 同一路径的工具只保留一次
+    /// </summary>
+    private static List<(string Name, ToolItem Tool)> DeduplicateTools(IReadOnlyList<ToolItem> tools)
+    {
+        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<(string Name, ToolItem Tool)>();
+
+        foreach (var tool in tools)
+        {
+            // 跳过内置工具链接
+            if (tool.IsBuiltinLink)
+                continue;
+
+            // 跳过需要下载但还没下载的工具
+            if (tool.NeedsDownload)
+                continue;
+
+            // 跳过路径为空或文件不存在的工具
+            var effectivePath = tool.EffectivePath;
+            if (string.IsNullOrWhiteSpace(effectivePath) || !File.Exists(effectivePath))
+                continue;
+
+            // 同一可执行文件路径去重（不同分类下的同一工具）
+            if (!seenPaths.Add(effectivePath))
+                continue;
+
+            // 同名工具去重（用户装了多个版本时只保留一个）
+            var displayName = tool.Name;
+            if (!seenNames.Add(displayName))
+                continue;
+
+            result.Add((displayName, tool));
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// 创建 .lnk 快捷方式（进程内调用 WScript.Shell COM，无子进程）。
+    /// WScript.Shell 需要在 STA 线程上调用：UI 线程本身是 STA，
+    /// 后台注册路径（Task.Run 的 MTA 线程池）则临时起一个 STA 线程执行。
+    /// 字符串全程走 COM BSTR，不经过子进程命令行，中文路径不受系统代码页
+    /// （936 / 1252 / UTF-8 beta）影响。
+    /// </summary>
+    private static void CreateShortcut(string shortcutPath, string targetPath, string workingDir,
+        string description, string? arguments = null, string? iconPath = null)
+        => RunOnSta(() => CreateShortcutOnSta(shortcutPath, targetPath, workingDir, description, arguments, iconPath));
+
+    private static void RunOnSta(Action action)
+    {
+        if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
+        {
+            action();
+            return;
+        }
+
+        Exception? error = null;
+        var staThread = new Thread(() =>
+        {
+            try { action(); }
+            catch (Exception ex) { error = ex; }
+        });
+        staThread.SetApartmentState(ApartmentState.STA);
+        staThread.Start();
+        staThread.Join();
+        if (error is not null)
+            throw error;
+    }
+
+    private static void CreateShortcutOnSta(string shortcutPath, string targetPath, string workingDir,
+        string description, string? arguments, string? iconPath)
+    {
+        var shellType = Type.GetTypeFromProgID("WScript.Shell");
+        if (shellType is null)
+            throw new InvalidOperationException("无法加载 WScript.Shell 组件。");
+
+        object? shell = null;
+        object? shortcut = null;
+        try
+        {
+            shell = Activator.CreateInstance(shellType)
+                ?? throw new InvalidOperationException("无法创建 WScript.Shell 组件。");
+            shortcut = ((dynamic)shell).CreateShortcut(shortcutPath);
+            dynamic sc = shortcut;
+            sc.TargetPath = targetPath;
+            sc.WorkingDirectory = workingDir;
+            sc.Description = description;
+            if (!string.IsNullOrWhiteSpace(arguments))
+                sc.Arguments = arguments;
+            if (!string.IsNullOrWhiteSpace(iconPath))
+                sc.IconLocation = $"{iconPath},0";
+            sc.Save();
+        }
+        finally
+        {
+            if (shortcut is not null)
+            {
+                try { Marshal.FinalReleaseComObject(shortcut); } catch { }
+            }
+            if (shell is not null)
+            {
+                try { Marshal.FinalReleaseComObject(shell); } catch { }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 清理不再对应的过期快捷方式。
+    /// </summary>
+    private static void CleanupStaleShortcuts(HashSet<string> expectedFiles)
+    {
+        try
+        {
+            if (!Directory.Exists(StartMenuFolder))
+                return;
+
+            foreach (var file in Directory.GetFiles(StartMenuFolder, "*.lnk"))
+            {
+                var fileName = Path.GetFileName(file);
+                if (!expectedFiles.Contains(fileName))
+                {
+                    try
+                    {
+                        File.Delete(file);
+                        System.Diagnostics.Debug.WriteLine($"[WindowsSearchIndex] 清理过期快捷方式: {fileName}");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[WindowsSearchIndex] 清理失败 [{fileName}]: {ex.Message}");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[WindowsSearchIndex] 清理扫描失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 清理所有由本服务创建的快捷方式（卸载/重置时调用）。
+    /// </summary>
+    public static void RemoveAll()
+    {
+        lock (IndexGate) RemoveAllCore();
+    }
+
+    private static void RemoveAllCore()
+    {
+        try
+        {
+            if (Directory.Exists(StartMenuFolder))
+            {
+                Directory.Delete(StartMenuFolder, recursive: true);
+                System.Diagnostics.Debug.WriteLine("[WindowsSearchIndex] 已移除所有搜索索引快捷方式");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[WindowsSearchIndex] 移除失败: {ex.Message}");
+        }
+    }
+
+    private static string SanitizeFileName(string name)
+    {
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var sanitized = new string(name.Where(c => !invalidChars.Contains(c)).ToArray());
+        return string.IsNullOrWhiteSpace(sanitized) ? "工具" : sanitized;
+    }
+
+    #region 内置工具桌面快捷方式 + 字体图标渲染
+
+    private static readonly object _iconLock = new();
+
+    private static string IconCacheDir => Path.Combine(ConfigManager.GetDataDir(), "DesktopIcons");
+
+    /// <summary>
+    /// 「发送到桌面」第三方工具快捷方式：与内置工具共用同一 COM 写入器，
+    /// 不经过 powershell.exe 等子进程，非中文系统（含 UTF-8 代码页）上
+    /// 中文分类目录也不会被损坏。
+    /// </summary>
+    /// <param name="desktopDirectory">落盘目录，null = 当前用户桌面。</param>
+    /// <returns>生成的 .lnk 完整路径。</returns>
+    internal static string CreateDesktopShortcut(ToolItem tool, string? desktopDirectory = null)
+    {
+        if (tool.IsBuiltinLink)
+        {
+            if (string.IsNullOrWhiteSpace(tool.BuiltinToolId))
+                throw new InvalidOperationException("内置工具缺少注册信息，无法创建快捷方式。");
+            var builtin = BuiltinToolRegistry.GetById(tool.BuiltinToolId)
+                ?? throw new InvalidOperationException("找不到对应的内置工具，无法创建快捷方式。");
+            return CreateDesktopShortcut(builtin, desktopDirectory);
+        }
+
+        var target = tool.EffectivePath;
+        if (tool.NeedsDownload)
+            throw new InvalidOperationException("工具尚未下载，请先下载后再发送到桌面。");
+        if (string.IsNullOrWhiteSpace(target) || !File.Exists(target))
+            throw new InvalidOperationException("工具文件不存在，可能已被移动或删除，无法创建快捷方式。");
+
+        var archSuffix = tool.SelectedArch is not null && !string.IsNullOrEmpty(tool.SelectedArch.Arch)
+            ? $" ({tool.SelectedArch.Arch})" : "";
+        var shortcutPath = BuildDesktopShortcutPath(
+            ResolveDesktopDirectory(desktopDirectory), $"{tool.Name}{archSuffix}");
+
+        CreateShortcut(shortcutPath, target, tool.EffectiveWorkingDir, $"{tool.Name}{archSuffix}");
+        VerifyShortcutTarget(shortcutPath, target);
+        return shortcutPath;
+    }
+
+    /// <summary>
+    /// 「发送到桌面」内置工具快捷方式：双击以 --open-builtin 启动本程序直达工具，
+    /// 图标用该工具的字体图标（与卡片展示同源）。
+    /// </summary>
+    /// <param name="desktopDirectory">落盘目录，null = 当前用户桌面。</param>
+    /// <returns>生成的 .lnk 完整路径。</returns>
+    internal static string CreateDesktopShortcut(IBuiltinTool tool, string? desktopDirectory = null)
+    {
+        var appExe = Process.GetCurrentProcess().MainModule?.FileName;
+        if (string.IsNullOrWhiteSpace(appExe) || !File.Exists(appExe))
+            throw new InvalidOperationException("无法定位工具箱自身路径，无法创建快捷方式。");
+
+        var shortcutPath = BuildDesktopShortcutPath(ResolveDesktopDirectory(desktopDirectory), tool.Name);
+
+        // 图标渲染失败只影响显示，不阻断快捷方式本身（退回程序默认图标）
+        string? iconPath = null;
+        try { iconPath = EnsureBuiltinIcon(tool); }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[WindowsSearchIndex] 生成内置工具图标失败 [{tool.Id}]: {ex.Message}");
+        }
+
+        CreateShortcut(shortcutPath, appExe, AppContext.BaseDirectory,
+            $"{tool.Name} - {tool.Category}", $"--open-builtin {tool.Id}", iconPath);
+
+        VerifyShortcutTarget(shortcutPath, appExe);
+        return shortcutPath;
+    }
+
+    private static string ResolveDesktopDirectory(string? desktopDirectory)
+        => string.IsNullOrWhiteSpace(desktopDirectory)
+            ? Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)
+            : desktopDirectory;
+
+    /// <summary>
+    /// 快捷方式落盘路径：剔除非法文件名字符，避免显示名里的 \ / 把 .lnk 写进子目录。
+    /// </summary>
+    private static string BuildDesktopShortcutPath(string desktopDirectory, string name)
+        => Path.Combine(desktopDirectory, $"{SanitizeFileName(name)}.lnk");
+
+    /// <summary>
+    /// 写后回读校验：把「静默写出坏快捷方式」变成可见错误。
+    /// 读回同样走 WScript.Shell（BuiltinShortcutIconTests 已验证可原样读回目标路径）。
+    /// </summary>
+    private static void VerifyShortcutTarget(string shortcutPath, string expectedTarget)
+    {
+        var actual = string.Empty;
+        RunOnSta(() => actual = ReadShortcutTargetOnSta(shortcutPath));
+
+        if (SameTarget(actual, expectedTarget))
+            return;
+
+        throw new InvalidOperationException(
+            $"快捷方式写入校验失败：目标路径未被正确写入（期望「{expectedTarget}」，实际「{actual}」）。");
+    }
+
+    private static string ReadShortcutTargetOnSta(string shortcutPath)
+    {
+        var shellType = Type.GetTypeFromProgID("WScript.Shell");
+        if (shellType is null)
+            throw new InvalidOperationException("无法加载 WScript.Shell 组件。");
+
+        object? shell = null;
+        object? shortcut = null;
+        try
+        {
+            shell = Activator.CreateInstance(shellType)
+                ?? throw new InvalidOperationException("无法创建 WScript.Shell 组件。");
+            shortcut = ((dynamic)shell).CreateShortcut(shortcutPath);
+            return Convert.ToString(((dynamic)shortcut).TargetPath) ?? string.Empty;
+        }
+        finally
+        {
+            if (shortcut is not null)
+            {
+                try { Marshal.FinalReleaseComObject(shortcut); } catch { }
+            }
+            if (shell is not null)
+            {
+                try { Marshal.FinalReleaseComObject(shell); } catch { }
+            }
+        }
+    }
+
+    private static bool SameTarget(string actual, string expected)
+    {
+        actual = actual.Trim();
+        expected = expected.Trim();
+        if (string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        try
+        {
+            return string.Equals(
+                Path.GetFullPath(actual).TrimEnd(Path.DirectorySeparatorChar),
+                Path.GetFullPath(expected).TrimEnd(Path.DirectorySeparatorChar),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 按工具 Id 生成/复用 .ico（「文件占用查看」右键菜单的菜单图标也走这里）；
+    /// 已存在直接复用。
+    /// 文件名带版本后缀：图标从单色字形换成彩色矢量后，老版本留下的 <c>&lt;id&gt;.ico</c>
+    /// 必须重新生成，否则升级用户的桌面图标永远是旧的。
+    /// </summary>
+    internal static string? EnsureBuiltinIcon(IBuiltinTool tool)
+    {
+        try
+        {
+            Directory.CreateDirectory(IconCacheDir);
+        }
+        catch
+        {
+            return null;
+        }
+
+        var safeName = string.Concat((tool.Id ?? "builtin").Select(c => char.IsLetterOrDigit(c) ? c : '-'));
+        var path = Path.Combine(IconCacheDir,
+            string.IsNullOrWhiteSpace(safeName) ? "builtin" + IconCacheVersion : safeName + IconCacheVersion + ".ico");
+        if (File.Exists(path))
+            return path;
+
+        lock (_iconLock)
+        {
+            if (File.Exists(path))
+                return path;
+
+            Bitmap? master = null;
+            try
+            {
+                master = RenderBuiltinIconBitmap(tool.Id, tool.Glyph);
+                var bytes = EncodeIco(master);
+                File.WriteAllBytes(path, bytes);
+            }
+            finally
+            {
+                master?.Dispose();
+            }
+            return path;
+        }
+    }
+
+    /// <summary>桌面图标缓存版本后缀；换图标风格时改这里即可让所有缓存失效。</summary>
+    private const string IconCacheVersion = "-v3";
+
+    /// <summary>
+    /// 优先用彩色矢量图标；没有 SVG 或光栅化失败时回退到字体字形，
+    /// 保证任何情况下快捷方式都有图标（渲染失败只影响显示，不抛给调用方）。
+    /// </summary>
+    private static Bitmap RenderBuiltinIconBitmap(string toolId, string glyph)
+    {
+        var svgPath = BuiltinIconService.ResolveSvgPath(toolId);
+        if (svgPath is not null)
+        {
+            try
+            {
+                return SvgDocument.Open(svgPath).Draw(256, 256);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[BuiltinIcon] {toolId} 光栅化失败，回退字形：{ex.Message}");
+            }
+        }
+
+        return RenderGlyphBitmap(glyph);
+    }
+
+    /// <summary>256×256 透明底字形图：字形居中铺满、着系统强调色。</summary>
+    private static Bitmap RenderGlyphBitmap(string glyph)
+    {
+        const int canvas = 256;
+        var bmp = new Bitmap(canvas, canvas, PixelFormat.Format32bppArgb);
+        using var g = Graphics.FromImage(bmp);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.CompositingQuality = CompositingQuality.HighQuality;
+        g.Clear(Color.Transparent);
+
+        using var brush = new SolidBrush(AccentColor());
+        var familyName = FindIconFontFamilyName();
+        if (familyName is null || string.IsNullOrEmpty(glyph))
+            return bmp;
+
+        using var family = new FontFamily(familyName);
+        try
+        {
+            // 字形走路径填充：按实际轮廓测量缩放，居中与对齐不受字体度量影响
+            using var path = new GraphicsPath();
+            path.AddString(glyph, family, (int)FontStyle.Regular, 256f, new PointF(0f, 0f),
+                StringFormat.GenericTypographic);
+
+            var bounds = path.GetBounds();
+            if (bounds.Width > 2f && bounds.Height > 2f &&
+                !float.IsNaN(bounds.Width) && !float.IsNaN(bounds.Height) &&
+                !float.IsInfinity(bounds.Width) && !float.IsInfinity(bounds.Height))
+            {
+                const float pad = 26f;
+                var scale = Math.Min(1f, (canvas - pad * 2f) / Math.Max(bounds.Width, bounds.Height));
+                var matrix = new Matrix();
+                matrix.Translate(
+                    (canvas - bounds.Width * scale) / 2f - bounds.X * scale,
+                    (canvas - bounds.Height * scale) / 2f - bounds.Y * scale);
+                matrix.Scale(scale, scale);
+                path.Transform(matrix);
+                g.FillPath(brush, path);
+                return bmp;
+            }
+        }
+        catch
+        {
+            // 某些字体对个别码位 AddString 会抛异常，退回文本绘制
+        }
+
+        // 兜底：直接按字形框居中绘制
+        using var font = new Font(family, 200f, FontStyle.Regular, GraphicsUnit.Pixel);
+        using var fmt = new StringFormat
+        {
+            Alignment = StringAlignment.Center,
+            LineAlignment = StringAlignment.Center
+        };
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+        g.DrawString(glyph, font, brush, new RectangleF(0f, 0f, canvas, canvas), fmt);
+        return bmp;
+    }
+
+    private static string? FindIconFontFamilyName()
+    {
+        foreach (var name in new[] { "Segoe Fluent Icons", "Segoe MDL2 Assets", "Segoe UI Symbol" })
+        {
+            try
+            {
+                using var family = new FontFamily(name);
+                return name; // 构造成功即已安装
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    private static Color AccentColor()
+    {
+        try
+        {
+            var c = new Windows.UI.ViewManagement.UISettings()
+                .GetColorValue(Windows.UI.ViewManagement.UIColorType.Accent);
+            return Color.FromArgb(c.A, c.R, c.G, c.B);
+        }
+        catch
+        {
+            return Color.FromArgb(255, 0, 103, 192);
+        }
+    }
+
+    /// <summary>编码多尺寸 ICO（16/32/48/64/256，32bpp 未压缩 DIB + 全零 AND 掩码）。</summary>
+    private static byte[] EncodeIco(Bitmap master)
+    {
+        var sizes = new[] { 256, 64, 48, 32, 16 };
+        var images = new List<(int Size, Bitmap Bmp)>();
+        try
+        {
+            foreach (var size in sizes)
+            {
+                if (size == master.Width)
+                {
+                    images.Add((size, master));
+                    continue;
+                }
+
+                var small = new Bitmap(size, size, PixelFormat.Format32bppArgb);
+                using (var g = Graphics.FromImage(small))
+                {
+                    g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+                    g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    g.CompositingMode = CompositingMode.SourceCopy;
+                    g.DrawImage(master, 0, 0, size, size);
+                }
+                images.Add((size, small));
+            }
+
+            using var ms = new MemoryStream();
+            using (var bw = new BinaryWriter(ms))
+            {
+                const int headerSize = 6;
+                const int entrySize = 16;
+                var dataStart = headerSize + entrySize * images.Count;
+
+                bw.Write((ushort)0); // ICONDIR.reserved
+                bw.Write((ushort)1); // 类型:图标
+                bw.Write((ushort)images.Count);
+
+                var cursor = dataStart;
+                foreach (var (size, _) in images)
+                {
+                    var xorSize = size * size * 4;
+                    var maskRowBytes = ((size + 31) / 32) * 4;
+                    var bytesInRes = 40 + xorSize + maskRowBytes * size;
+
+                    bw.Write((byte)(size >= 256 ? 0 : size)); // 0 表示 256
+                    bw.Write((byte)(size >= 256 ? 0 : size));
+                    bw.Write((byte)0);   // 调色板颜色数
+                    bw.Write((byte)0);   // 保留
+                    bw.Write((ushort)1); // 颜色平面
+                    bw.Write((ushort)32); // 位深
+                    bw.Write(bytesInRes);
+                    bw.Write(cursor);
+                    cursor += bytesInRes;
+                }
+
+                foreach (var (_, bmp) in images)
+                    WriteDib(bw, bmp);
+            }
+            return ms.ToArray();
+        }
+        finally
+        {
+            foreach (var (_, bmp) in images)
+            {
+                if (!ReferenceEquals(bmp, master))
+                    bmp.Dispose();
+            }
+        }
+    }
+
+    private static void WriteDib(BinaryWriter bw, Bitmap bmp)
+    {
+        var w = bmp.Width;
+        var h = bmp.Height;
+        var maskRowBytes = ((w + 31) / 32) * 4;
+
+        bw.Write(40);      // BITMAPINFOHEADER.biSize
+        bw.Write(w);       // biWidth
+        bw.Write(h * 2);   // biHeight:XOR + AND
+        bw.Write((ushort)1);  // biPlanes
+        bw.Write((ushort)32); // biBitCount
+        bw.Write(0);       // biCompression:BI_RGB
+        bw.Write(0);       // biSizeImage（图标解码以 dwBytesInRes 为准）
+        bw.Write(0);       // biXPelsPerMeter
+        bw.Write(0);       // biYPelsPerMeter
+        bw.Write(0);       // biClrUsed
+        bw.Write(0);       // biClrImportant
+
+        var rect = new Rectangle(0, 0, w, h);
+        var data = bmp.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+        try
+        {
+            var stride = data.Stride;
+            var row = new byte[stride];
+            for (var y = h - 1; y >= 0; y--) // ICO 像素自下而上
+            {
+                Marshal.Copy(data.Scan0 + y * stride, row, 0, stride);
+                bw.Write(row, 0, w * 4); // BGRA
+            }
+        }
+        finally
+        {
+            bmp.UnlockBits(data);
+        }
+
+        var maskRow = new byte[maskRowBytes]; // 32bpp alpha 下 AND 掩码全零即可
+        for (var y = 0; y < h; y++)
+            bw.Write(maskRow);
+    }
+
+    #endregion
+}

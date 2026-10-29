@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="TubaWinUi3.Pages.GameTunnelPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:TubaWinUi3.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:TubaWinUi3.Pages"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Loaded="Page_Loaded"
+    Unloaded="Page_Unloaded">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <controls:ToolPageHeader ToolId="game-tunnel"
+            Grid.Row="0"
+            Title="游戏联机助手"
+            Subtitle="把两台电脑接进同一个虚拟网络 · 我的世界 / 泰拉瑞亚 / 帕鲁，不用公网 IP 也能一起玩"
+            Glyph="&#xE774;">
+            <controls:ToolPageHeader.Actions>
+                <Button x:Name="SettingsButton" Click="Settings_Click" Style="{StaticResource ToolHeaderActionButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="12" Glyph="&#xE713;" />
+                        <TextBlock Text="联机设置" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="DiagnosticsButton" Click="Diagnostics_Click" Style="{StaticResource ToolHeaderActionButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="12" Glyph="&#xE9D9;" />
+                        <TextBlock Text="网络检测" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="HelpButton" Click="Help_Click" Style="{StaticResource ToolHeaderActionButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="12" Glyph="&#xE897;" />
+                        <TextBlock Text="教程" />
+                    </StackPanel>
+                </Button>
+            </controls:ToolPageHeader.Actions>
+        </controls:ToolPageHeader>
+
+        <ScrollViewer
+            Grid.Row="1"
+            Padding="24,4,24,32"
+            HorizontalScrollMode="Disabled"
+            HorizontalScrollBarVisibility="Disabled"
+            VerticalScrollBarVisibility="Auto" HorizontalContentAlignment="Stretch" controls:ToolViewport.ConstrainContent="True">
+
+            <StackPanel Spacing="12" MaxWidth="1120">
+                <StackPanel.ChildrenTransitions>
+                    <TransitionCollection>
+                        <EntranceThemeTransition FromHorizontalOffset="0" FromVerticalOffset="24" IsStaggeringEnabled="True" />
+                    </TransitionCollection>
+                </StackPanel.ChildrenTransitions>
+
+                <!-- ═════════ 联机环境 / 当前房间 ═════════ -->
+                <Border
+                    Padding="16"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border x:Name="StatusIconTile" Width="52" Height="52" CornerRadius="8" Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}" VerticalAlignment="Top">
+                            <FontIcon x:Name="StatusIcon" FontSize="24" Glyph="&#xE9F5;" Foreground="{ThemeResource SystemFillColorSuccessBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                            <TextBlock x:Name="StatusTitle" Style="{StaticResource CardTitleStyle}" Text="正在检查联机环境…" />
+                            <TextBlock x:Name="StatusDetail" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                            <StackPanel x:Name="AddressRow" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
+                                <TextBlock x:Name="MyAddressText" Style="{StaticResource StatValueStyle}" FontFamily="Consolas" IsTextSelectionEnabled="True" VerticalAlignment="Center" />
+                                <Button x:Name="CopyAddressButton" Click="CopyAddress_Click" Padding="8,4" CornerRadius="4" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <FontIcon FontSize="12" Glyph="&#xE8C8;" />
+                                        <TextBlock FontSize="12" Text="复制" />
+                                    </StackPanel>
+                                </Button>
+                                <Border x:Name="LiveBadge" Style="{StaticResource StatusPillStyle}" Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}" VerticalAlignment="Center" Visibility="Collapsed">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <Ellipse Width="6" Height="6" Fill="{ThemeResource SystemFillColorSuccessBrush}" VerticalAlignment="Center" />
+                                        <TextBlock FontSize="12" FontWeight="SemiBold" Text="房间已开启" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                            <TextBlock x:Name="PeerLine" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" Visibility="Collapsed" />
+                            <TextBlock
+                                x:Name="TrayHint"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed"
+                                Text="房间在后台运行：离开这个页面不会断开，点「停止联机」才会关闭。" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Spacing="8" VerticalAlignment="Center">
+                            <Button
+                                x:Name="PrepareButton"
+                                Click="Prepare_Click"
+                                Style="{StaticResource AccentButtonStyle}"
+                                Padding="16,8"
+                                CornerRadius="4">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon FontSize="14" Glyph="&#xE896;" />
+                                    <TextBlock x:Name="PrepareButtonText" FontSize="14" FontWeight="SemiBold" Text="准备联机组件" />
+                                </StackPanel>
+                            </Button>
+                            <Button
+                                x:Name="StopButton"
+                                Click="Stop_Click"
+                                Padding="16,6"
+                                CornerRadius="4"
+                                Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontSize="12" Glyph="&#xE71A;" />
+                                    <TextBlock FontSize="12" Text="停止联机" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <InfoBar x:Name="HealthBar" IsOpen="False" IsClosable="True" Severity="Warning" />
+
+                <!-- ═════════ 和朋友连起来 ═════════ -->
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border
+                        x:Name="HostCard"
+                        Style="{StaticResource FluentCardStyle}">
+                        <StackPanel Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border Style="{StaticResource IconTileStyle}">
+                                    <FontIcon FontSize="18" Glyph="&#xE7FC;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel VerticalAlignment="Center" Spacing="4">
+                                    <TextBlock Style="{StaticResource CardTitleStyle}" Text="我当主机，邀请朋友" />
+                                    <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="游戏跑在我这台，朋友一条邀请码进来" />
+                                </StackPanel>
+                            </StackPanel>
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextWrapping="Wrap"
+                                Text="选一个游戏 → 拿到房间码 → 发给朋友。房间码里带着这个房间的网络密钥，朋友粘贴后直接进同一个虚拟网络，不需要账号，也不需要我点同意。" />
+                            <Button x:Name="StartHostButton" Click="StartHost_Click" Style="{StaticResource AccentButtonStyle}" CornerRadius="4" Padding="0,8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                                <TextBlock FontSize="14" FontWeight="SemiBold" Text="选择游戏并创建房间" />
+                            </Button>
+                            <Button
+                                x:Name="CurrentInviteButton"
+                                Click="ShowCurrentInvite_Click"
+                                CornerRadius="4"
+                                Padding="0,8"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon x:Name="CurrentInviteIcon" FontSize="12" Glyph="&#xE8F1;" />
+                                    <ProgressRing x:Name="CurrentInviteRing" Width="12" Height="12" IsActive="False" Visibility="Collapsed" />
+                                    <TextBlock x:Name="CurrentInviteText" FontSize="12" Text="查看当前房间与邀请" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <Border
+                        Grid.Column="1"
+                        x:Name="JoinCard"
+                        Style="{StaticResource FluentCardStyle}">
+                        <StackPanel Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border Style="{StaticResource IconTileStyle}">
+                                    <FontIcon FontSize="18" Glyph="&#xE8F1;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel VerticalAlignment="Center" Spacing="4">
+                                    <TextBlock Style="{StaticResource CardTitleStyle}" Text="我加入朋友" />
+                                    <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="朋友当主机，我连他的游戏" />
+                                </StackPanel>
+                            </StackPanel>
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextWrapping="Wrap"
+                                Text="粘贴朋友发来的邀请码（连说明文字一起粘也行），没装联机组件会自动下载。加入后本机会开一个本地端口指向他的游戏——我的世界会直接出现在「扫描局域网世界」里。" />
+                            <Button x:Name="StartJoinButton" Click="StartJoin_Click" CornerRadius="4" Padding="0,8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                                <TextBlock FontSize="14" FontWeight="SemiBold" Text="粘贴邀请码加入" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- ═════════ 我要玩的游戏（端口速查 + 一键邀请） ═════════ -->
+                <StackPanel x:Name="GamesSection" Spacing="8">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Border Width="3" Height="16" CornerRadius="4" Background="{ThemeResource SystemFillColorSuccessBrush}" VerticalAlignment="Center" />
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="我要玩的游戏" />
+                        </StackPanel>
+                        <TextBlock
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                            Text="点一下 = 选好端口并创建房间" />
+                    </Grid>
+
+                    <ScrollViewer
+                        HorizontalScrollBarVisibility="Auto"
+                        HorizontalScrollMode="Auto"
+                        VerticalScrollBarVisibility="Disabled"
+                        VerticalScrollMode="Disabled">
+                        <ItemsControl x:Name="GamesList">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="8" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="local:TunnelGameCard">
+                                    <Button
+                                        Click="GameChip_Click"
+                                        Tag="{x:Bind Self}"
+                                        Padding="0"
+                                        CornerRadius="4"
+                                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1">
+                                        <StackPanel Width="122" Padding="12,8" Spacing="8">
+                                            <Grid Height="34">
+                                                <FontIcon
+                                                    FontSize="16"
+                                                    Glyph="{x:Bind Glyph}"
+                                                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    Visibility="{x:Bind GlyphVisibility, Mode=OneWay}" />
+                                                <Image Source="{x:Bind Logo, Mode=OneWay}" Stretch="Uniform" />
+                                            </Grid>
+                                            <TextBlock
+                                                FontSize="14"
+                                                FontWeight="SemiBold"
+                                                Text="{x:Bind Name}"
+                                                MaxLines="1"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind PortText}" />
+                                                <Border
+                                                    Style="{StaticResource StatusPillStyle}"
+                                                    Padding="4,0"
+                                                    Visibility="{x:Bind HasProtocolBadge}">
+                                                    <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ProtocolBadge}" />
+                                                </Border>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+
+                <!-- ═════════ 原理与说明 ═════════ -->
+                <Border
+                    Style="{StaticResource FluentCardStyle}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="它是怎么把两台电脑连起来的？" />
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextWrapping="Wrap">
+                            <Run Text="· 每次建房都会生成一张独立的加密虚拟网络：房间码的前半段是网络名、后半段是密钥，所以光有房间码就能入网，不需要账号，也没有第三方能看你的游戏数据。" />
+                            <LineBreak />
+                            <Run Text="· 联机组件 EasyTier 以「无网卡」模式工作：它不安装驱动、不创建虚拟网卡，只把游戏端口在虚拟网络里转发。房主只开放自己游戏用的那个端口，加入者不开放任何端口。" />
+                            <LineBreak />
+                            <Run Text="· 优先打洞直连（延迟接近局域网）；打不通时经发现节点中转，仍能玩但延迟略高。想保证别人看不到你的真实 IP，可以在设置里打开「隐藏我的 IP 地址」。" />
+                            <LineBreak />
+                            <Run Text="· 我的世界 Java 版额外支持局域网发现：加入后房间会直接出现在「扫描局域网世界」列表里，离线账号也能进。" />
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- 测试项目不含界面资源；关闭默认 resw→PRI 收集，避免主项目复制过来的本地化
+         resw（Key.Property 与 Key 同名项）在自定义 BaseOutputPath 下触发 PRI175/PRI278。 -->
+    <EnableDefaultPRIResourceItems>false</EnableDefaultPRIResourceItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+
+  <!-- ONNX Runtime GenAI 包用 None + CopyToOutputDirectory 硬拷原生库，ExcludeAssets 管不到：
+       测试输出同样不需要这些原生库（测试不跑本地推理），构建后从输出目录删除。 -->
+  <Target Name="StripAiRuntimeNativeCopiesForTests" AfterTargets="Build"
+          Condition="'$(BundleAiRuntime)' != 'true'">
+    <ItemGroup>
+      <_AiRuntimeLeftoverTests Include="$(OutDir)onnxruntime-genai.dll;$(OutDir)onnxruntime-genai-cuda.dll" />
+    </ItemGroup>
+    <Delete Files="@(_AiRuntimeLeftoverTests)" TreatErrorsAsWarnings="true" />
+  </Target>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Compile Include="..\TubaWinUI3.ShellExtension\ShellItemSelection.cs" Link="ShellItemSelection.cs" />
+    <!-- 孤儿测试：引用的 HardwareSceneModel/DeviceInspectionSession 等类型只存在于
+         .scene-verify/ 验证程序，从未进入主项目，留着会堵死测试编译（同 NavIconTests 先例）。
+         待 3D 场景类型真正落地主项目后移除此排除。 -->
+    <Compile Remove="NativeHardwareSceneTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TubaWinUi3.WinUI3\TubaWinUi3.csproj" />
+    <ProjectReference Include="..\TubaWinUI3.BackEnd\TubaWinUi3.BackEnd.csproj" Aliases="backend" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- xunit 运行配置：禁用集合并行，避免各测试类共享的全局静态
+         （ToolCatalog.ToolsRoot / ConfigManager / AgentToolRegistry）跨集合竞争 -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- CLI 工具文档：与主项目同源链接，保证测试环境 CliToolboxCatalog.Default 可读 -->
+    <Content Include="..\CLI工具使用文档.md" Link="Metadata\CLI工具使用文档.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,1058 @@
+﻿using System.ComponentModel;
+using System.IO.Compression;
+using System.Runtime.CompilerServices;
+
+namespace TubaWinUi3.Models;
+
+public sealed record DownloadQueueProgress(
+    long BytesReceived,
+    long TotalBytes,
+    double Percentage,
+    double SpeedMbps,
+    TimeSpan? EstimatedRemaining);
+
+public enum DownloadItemState
+{
+    Queued,
+    Resolving,
+    Downloading,
+    Paused,
+    Processing,
+    Completed,
+    Failed,
+    Cancelled
+}
+
+public sealed record ResolvedDownloadUrl(string Url, string FileName, long Size = 0);
+
+public sealed class DownloadQueueEntry
+{
+    public string Id { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string? Description { get; set; }
+    public string? Glyph { get; set; }
+    public string DestinationPath { get; set; } = "";
+    public string? DirectUrl { get; set; }
+    public DownloadItemState State { get; set; }
+    public string? ResolvedUrl { get; set; }
+    public string? ResolvedFileName { get; set; }
+    public long ResolvedSize { get; set; }
+    public long BytesReceived { get; set; }
+    public long TotalBytes { get; set; }
+    public string? PostProcessorKey { get; set; }
+    public string? ErrorMessage { get; set; }
+    public DateTimeOffset? CompletedAt { get; set; }
+}
+
+public static class PostProcessorRegistry
+{
+    private static readonly Dictionary<string, IDownloadPostProcessor> _processors = [];
+
+    public static void Register(IDownloadPostProcessor processor)
+    {
+        _processors[processor.DisplayName] = processor;
+    }
+
+    public static IDownloadPostProcessor? Find(string? key)
+    {
+        if (string.IsNullOrEmpty(key)) return null;
+        return _processors.TryGetValue(key, out var p) ? p : null;
+    }
+
+    public static string? GetKey(IDownloadPostProcessor? processor)
+    {
+        if (processor is null) return null;
+        return processor.DisplayName;
+    }
+
+    public static void RegisterDefaults()
+    {
+        Register(new ArchiveExtractProcessor());
+        Register(new InstallerLaunchProcessor());
+        Register(new MoveToDestinationProcessor());
+        Register(new ToolsBundleExtractProcessor());
+    }
+}
+
+public interface IDownloadPostProcessor
+{
+    string DisplayName { get; }
+    Task ExecuteAsync(string downloadedFilePath, string destinationPath,
+        IProgress<string>? statusProgress, CancellationToken ct);
+}
+
+public sealed class ArchiveExtractProcessor : IDownloadPostProcessor
+{
+    public string DisplayName => "解压文件";
+    public async Task ExecuteAsync(string downloadedFilePath, string destinationPath,
+        IProgress<string>? statusProgress, CancellationToken ct)
+    {
+        statusProgress?.Report("正在解压...");
+        await Task.Run(() =>
+        {
+            if (File.Exists(downloadedFilePath))
+            {
+                var skipped = ZipExtractHelper.ExtractTolerant(
+                    downloadedFilePath, destinationPath, statusProgress);
+                if (skipped.Count > 0)
+                {
+                    statusProgress?.Report($"已跳过 {skipped.Count} 个无法解压的文件（可能被占用或只读）");
+                }
+                try { File.Delete(downloadedFilePath); } catch { }
+            }
+        }, ct);
+    }
+}
+
+public sealed class InstallerLaunchProcessor : IDownloadPostProcessor
+{
+    public string DisplayName => "运行安装程序";
+    public Task ExecuteAsync(string downloadedFilePath, string destinationPath,
+        IProgress<string>? statusProgress, CancellationToken ct)
+    {
+        statusProgress?.Report("正在启动安装程序...");
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo(downloadedFilePath)
+            {
+                UseShellExecute = true
+            };
+            System.Diagnostics.Process.Start(psi);
+        }
+        catch (Win32Exception ex)
+        {
+            // 下载的文件可能被杀软移除/隔离或损坏，抛给队列以 Failed 状态呈现，避免崩溃
+            throw new IOException($"无法启动安装程序，文件已不可用（可能被安全软件移除或磁盘错误）：{ex.Message}", ex);
+        }
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class MoveToDestinationProcessor : IDownloadPostProcessor
+{
+    public string DisplayName => "移动文件";
+    public async Task ExecuteAsync(string downloadedFilePath, string destinationPath,
+        IProgress<string>? statusProgress, CancellationToken ct)
+    {
+        statusProgress?.Report("正在移动文件...");
+        await Task.Run(() =>
+        {
+            Directory.CreateDirectory(destinationPath);
+            var destFile = Path.Combine(destinationPath, Path.GetFileName(downloadedFilePath));
+            if (File.Exists(destFile)) File.Delete(destFile);
+            File.Move(downloadedFilePath, destFile);
+        }, ct);
+    }
+}
+
+public sealed class DelegatePostProcessor : IDownloadPostProcessor
+{
+    private readonly Func<string, string, IProgress<string>?, CancellationToken, Task> _action;
+    public string DisplayName { get; }
+
+    public DelegatePostProcessor(string displayName,
+        Func<string, string, IProgress<string>?, CancellationToken, Task> action)
+    {
+        DisplayName = displayName;
+        _action = action;
+    }
+
+    public Task ExecuteAsync(string downloadedFilePath, string destinationPath,
+        IProgress<string>? statusProgress, CancellationToken ct)
+        => _action(downloadedFilePath, destinationPath, statusProgress, ct);
+}
+
+public sealed class ChainedPostProcessor : IDownloadPostProcessor
+{
+    private readonly IDownloadPostProcessor[] _processors;
+    public string DisplayName { get; }
+
+    public ChainedPostProcessor(string displayName, params IDownloadPostProcessor[] processors)
+    {
+        DisplayName = displayName;
+        _processors = processors;
+    }
+
+    public async Task ExecuteAsync(string downloadedFilePath, string destinationPath,
+        IProgress<string>? statusProgress, CancellationToken ct)
+    {
+        var currentFile = downloadedFilePath;
+        for (var i = 0; i < _processors.Length; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            statusProgress?.Report($"{_processors[i].DisplayName} ({i + 1}/{_processors.Length})...");
+            await _processors[i].ExecuteAsync(currentFile, destinationPath, statusProgress, ct);
+            if (!File.Exists(currentFile) && i < _processors.Length - 1)
+                currentFile = Directory.GetFiles(destinationPath).FirstOrDefault() ?? currentFile;
+        }
+    }
+}
+
+public sealed class UpdateInstallProcessor : IDownloadPostProcessor
+{
+    private readonly bool _isPortableMode;
+
+    public string DisplayName => "准备安装更新";
+
+    public UpdateInstallProcessor(bool isPortableMode)
+    {
+        _isPortableMode = isPortableMode;
+    }
+
+    public Task ExecuteAsync(string downloadedFilePath, string destinationPath,
+        IProgress<string>? statusProgress, CancellationToken ct)
+    {
+        TubaWinUi3.Services.UpdateService.PruneDownloadedUpdates(downloadedFilePath);
+        var isExe = downloadedFilePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase);
+        var isZip = downloadedFilePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
+
+        if (isExe)
+        {
+            statusProgress?.Report("正在启动安装程序...");
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = downloadedFilePath,
+                    UseShellExecute = true
+                });
+            }
+            catch (Win32Exception ex)
+            {
+                // 下载的文件可能被杀软移除/隔离或损坏，抛给队列以 Failed 状态呈现，避免崩溃
+                throw new IOException($"无法启动更新安装程序，文件已不可用（可能被安全软件移除或磁盘错误）：{ex.Message}", ex);
+            }
+            // 安装包已经起来了，本进程必须真的退出（否则安装器替换文件时程序还在运行）。
+            // 走 App.RequestExit 而不是 Application.Exit：「关闭时最小化到系统托盘」会把
+            // 直接关窗口解读成隐藏，而且这里需要完整清理（ETW 会话/遥测/托盘图标）。
+            App.RequestExit();
+        }
+        else if (isZip && _isPortableMode)
+        {
+            statusProgress?.Report("正在打开文件夹...");
+            var folder = Path.GetDirectoryName(downloadedFilePath)!;
+            System.Diagnostics.Process.Start("explorer.exe", folder);
+        }
+        else
+        {
+            statusProgress?.Report("正在打开文件夹...");
+            var folder = Path.GetDirectoryName(downloadedFilePath)!;
+            System.Diagnostics.Process.Start("explorer.exe", folder);
+        }
+
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class DownloadItem : INotifyPropertyChanged
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..8];
+    public string DisplayName { get; }
+    public string? Description { get; }
+    public string? Glyph { get; }
+    public string DestinationPath { get; }
+    public object? Tag { get; }
+
+    private DownloadItemState _state = DownloadItemState.Queued;
+    public DownloadItemState State
+    {
+        get => _state;
+        internal set { if (_state != value) { _state = value; OnPropertyChanged(); } }
+    }
+
+    private DownloadQueueProgress? _progress;
+    public DownloadQueueProgress? Progress
+    {
+        get => _progress;
+        internal set { _progress = value; OnPropertyChanged(); }
+    }
+
+    private string? _processingStatus;
+    public string? ProcessingStatus
+    {
+        get => _processingStatus;
+        internal set { if (_processingStatus != value) { _processingStatus = value; OnPropertyChanged(); } }
+    }
+
+    private string? _errorMessage;
+    public string? ErrorMessage
+    {
+        get => _errorMessage;
+        internal set { if (_errorMessage != value) { _errorMessage = value; OnPropertyChanged(); } }
+    }
+
+    private DateTimeOffset? _completedAt;
+    public DateTimeOffset? CompletedAt
+    {
+        get => _completedAt;
+        internal set { _completedAt = value; OnPropertyChanged(); }
+    }
+
+    internal string? DirectUrl { get; }
+    internal Func<CancellationToken, Task<ResolvedDownloadUrl>>? UrlResolver { get; }
+    internal Func<CancellationToken, Task<List<ResolvedDownloadUrl>>>? MultiFileResolver { get; }
+    internal string? AlternateUrl { get; }
+    internal IDownloadPostProcessor? PostProcessor { get; }
+    internal CancellationTokenSource? Cts { get; set; }
+
+    internal string? ResolvedUrl { get; set; }
+    internal string? ResolvedFileName { get; set; }
+    internal long ResolvedSize { get; set; }
+    internal long ResumePosition { get; set; }
+
+    /// <summary>UI 进度节流：上次派发进度的 Environment.TickCount64。</summary>
+    internal long LastProgressTick;
+
+    private DownloadItem(
+        string displayName, string? directUrl,
+        Func<CancellationToken, Task<ResolvedDownloadUrl>>? urlResolver,
+        Func<CancellationToken, Task<List<ResolvedDownloadUrl>>>? multiFileResolver,
+        string destinationPath, IDownloadPostProcessor? postProcessor,
+        string? description, string? glyph, object? tag,
+        string? alternateUrl = null)
+    {
+        DisplayName = displayName;
+        DirectUrl = directUrl;
+        UrlResolver = urlResolver;
+        MultiFileResolver = multiFileResolver;
+        AlternateUrl = alternateUrl;
+        DestinationPath = destinationPath;
+        PostProcessor = postProcessor;
+        Description = description;
+        Glyph = glyph;
+        Tag = tag;
+    }
+
+    public static DownloadItem CreateDirect(
+        string displayName, string downloadUrl, string destinationPath,
+        IDownloadPostProcessor? postProcessor = null,
+        string? description = null, string? glyph = null, object? tag = null)
+        => new(displayName, downloadUrl, null, null, destinationPath, postProcessor, description, glyph, tag);
+
+    public static DownloadItem CreateWithResolver(
+        string displayName,
+        Func<CancellationToken, Task<ResolvedDownloadUrl>> urlResolver,
+        string destinationPath,
+        IDownloadPostProcessor? postProcessor = null,
+        string? description = null, string? glyph = null, object? tag = null,
+        string? alternateUrl = null)
+        => new(displayName, null, urlResolver, null, destinationPath, postProcessor, description, glyph, tag, alternateUrl);
+
+    public static DownloadItem CreateMultiFile(
+        string displayName,
+        Func<CancellationToken, Task<List<ResolvedDownloadUrl>>> multiFileResolver,
+        string destinationPath,
+        IDownloadPostProcessor? postProcessor = null,
+        string? description = null, string? glyph = null, object? tag = null)
+        => new(displayName, null, null, multiFileResolver, destinationPath, postProcessor, description, glyph, tag);
+
+    internal void SetState(DownloadItemState state) => State = state;
+    internal void SetProgress(DownloadQueueProgress? progress) => Progress = progress;
+    internal void SetProcessingStatus(string? status) => ProcessingStatus = status;
+    internal void SetErrorMessage(string? message) => ErrorMessage = message;
+    internal void SetCompleted()
+    {
+        CompletedAt = DateTimeOffset.Now;
+        State = DownloadItemState.Completed;
+    }
+
+    internal void Reset()
+    {
+        State = DownloadItemState.Queued;
+        Progress = null;
+        ProcessingStatus = null;
+        ErrorMessage = null;
+        CompletedAt = null;
+        Cts = new CancellationTokenSource();
+        ResolvedUrl = null;
+        ResolvedFileName = null;
+        ResolvedSize = 0;
+        ResumePosition = 0;
+        LastProgressTick = 0;
+    }
+
+    internal void PrepareResume()
+    {
+        Cts = new CancellationTokenSource();
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    internal void OnPropertyChanged([CallerMemberName] string? name = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+}
+
+internal static class ZipExtractHelper
+{
+    private const int EntryRetryCount = 3;
+    private static readonly TimeSpan EntryRetryDelay = TimeSpan.FromMilliseconds(300);
+
+    /// <summary>
+    /// 容错解压：逐条目处理，重复条目去重、文件/目录同名冲突时先移除冲突文件、
+    /// 写入前清除只读属性、单条目瞬时失败自动重试，个别条目失败仅记录并跳过，
+    /// 不影响其余文件。
+    /// </summary>
+    public static List<string> ExtractTolerant(string zipPath, string destinationDir,
+        IProgress<string>? statusProgress = null)
+    {
+        var skipped = new List<string>();
+        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        Directory.CreateDirectory(destinationDir);
+
+        using var archive = ZipFile.OpenRead(zipPath);
+        foreach (var entry in archive.Entries)
+        {
+            var isDir = entry.FullName.EndsWith('/') || entry.Name.Length == 0;
+            var fullName = entry.FullName.Replace('/', Path.DirectorySeparatorChar);
+            var targetPath = Path.Combine(destinationDir, fullName);
+
+            if (!IsSafeTarget(destinationDir, targetPath))
+            {
+                skipped.Add(entry.FullName);
+                continue;
+            }
+
+            var dedupeKey = fullName.TrimEnd(Path.DirectorySeparatorChar);
+            if (!seenPaths.Add(dedupeKey))
+                continue;
+
+            try
+            {
+                if (isDir)
+                {
+                    TryCreateDirectory(targetPath);
+                    continue;
+                }
+
+                var parent = Path.GetDirectoryName(targetPath);
+                if (!string.IsNullOrEmpty(parent))
+                    TryCreateDirectory(parent);
+
+                if (!TryExtractEntry(entry, targetPath))
+                    skipped.Add(entry.FullName);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                skipped.Add(entry.FullName);
+            }
+        }
+
+        TryClearReadOnlyAttributes(destinationDir);
+        return skipped;
+    }
+
+    private static bool IsSafeTarget(string root, string target)
+    {
+        try
+        {
+            var rootFull = Path.GetFullPath(root);
+            var targetFull = Path.GetFullPath(target);
+            return targetFull.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void TryCreateDirectory(string dir)
+    {
+        if (Directory.Exists(dir)) return;
+
+        // 目标路径被同名文件占用：先移除该文件再建目录
+        if (File.Exists(dir))
+        {
+            TryDeleteFile(dir);
+        }
+
+        Directory.CreateDirectory(dir);
+    }
+
+    private static bool TryExtractEntry(ZipArchiveEntry entry, string targetPath)
+    {
+        for (var attempt = 1; attempt <= EntryRetryCount; attempt++)
+        {
+            try
+            {
+                if (File.Exists(targetPath))
+                    TryClearReadOnlyAttribute(targetPath);
+
+                entry.ExtractToFile(targetPath, overwrite: true);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                if (attempt >= EntryRetryCount) return false;
+                Thread.Sleep(EntryRetryDelay);
+            }
+        }
+        return false;
+    }
+
+    public static void TryClearReadOnlyAttributes(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                TryClearReadOnlyAttribute(path);
+                return;
+            }
+            if (!Directory.Exists(path)) return;
+
+            TryClearReadOnlyAttribute(path);
+            foreach (var file in Directory.EnumerateFiles(path))
+                TryClearReadOnlyAttribute(file);
+            foreach (var dir in Directory.EnumerateDirectories(path))
+                TryClearReadOnlyAttributes(dir);
+        }
+        catch { }
+    }
+
+    public static void TryClearReadOnlyAttribute(string path)
+    {
+        try
+        {
+            var attrs = File.GetAttributes(path);
+            if ((attrs & FileAttributes.ReadOnly) != 0)
+                File.SetAttributes(path, attrs & ~FileAttributes.ReadOnly);
+        }
+        catch { }
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        for (var attempt = 1; attempt <= EntryRetryCount; attempt++)
+        {
+            try
+            {
+                TryClearReadOnlyAttribute(path);
+                File.Delete(path);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                if (attempt >= EntryRetryCount) throw;
+                Thread.Sleep(EntryRetryDelay);
+            }
+        }
+    }
+
+    // ---------- 解压 + 原子目录替换（工具包 / 社区工具共用；文案按 profile 区分） ----------
+
+    private const int ReplaceMaxAttempts = 3;      // 首次 + 自动重试 2 次
+    private const int ReplaceRetryDelayMs = 500;
+    private const int CleanupAttempts = 3;
+
+    private const uint HResultEncryptionFailed = 0x80071770; // HRESULT_FROM_WIN32(ERROR_ENCRYPTION_FAILED)
+
+    /// <summary>
+    /// 0x1770 (ERROR_ENCRYPTION_FAILED)：目录带「加密」属性，但所在卷无法完成 EFS 加密。
+    /// 常见于把 TEMP / 数据目录重定向到内存盘、exFAT/FAT32 分区或 Dev Drive（ReFS）。
+    /// </summary>
+    internal static bool IsEncryptionFailure(Exception ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            if (unchecked((uint)e.HResult) == HResultEncryptionFailed) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 创建解压暂存目录：优先目标目录的同级目录（同卷，最终替换是原子重命名），
+    /// 其次系统 TEMP。每个候选都做一次真实写入探测 —— 目录带「加密」属性而所在卷
+    /// 不支持 EFS 时，创建/写入会立刻失败并切到下一个候选，而不是解压到一半再报错。
+    /// </summary>
+    internal static string CreateStagingDirectory(string destinationDir)
+    {
+        Exception? firstError = null;
+
+        foreach (var parent in GetStagingCandidates(destinationDir))
+        {
+            var staging = Path.Combine(parent, $".tuba_extract_{Guid.NewGuid():N}");
+            try
+            {
+                Directory.CreateDirectory(staging);
+                ProbeWritable(staging);
+                return staging;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                           or NotSupportedException or ArgumentException)
+            {
+                firstError ??= ex;
+                TryDeleteDirectory(staging);
+            }
+        }
+
+        throw new IOException(
+            "无法创建解压暂存目录：目标目录与系统临时目录均不可写。" +
+            "请检查文件夹是否带「加密」属性、磁盘是否已满或只读。", firstError);
+    }
+
+    private static IEnumerable<string> GetStagingCandidates(string destinationDir)
+    {
+        string? parent = null;
+        try { parent = GetStagingParent(Path.GetFullPath(destinationDir)); }
+        catch { }
+
+        if (!string.IsNullOrEmpty(parent)) yield return parent;
+
+        var temp = Path.GetTempPath();
+        if (string.IsNullOrEmpty(parent) || !PathsEqual(parent, temp))
+            yield return temp;
+    }
+
+    /// <summary>
+    /// 暂存目录的落点：目标所在 Tools 根目录的上一级（内核包目标是 Tools 本身、
+    /// 社区工具在 Tools\分类\工具 下）。与目标同卷，替换是原子重命名；
+    /// 同时不会被 ToolCatalog 扫描到 —— 解压中的暂存目录里满是 exe，
+    /// 放在分类目录下会短暂出现一张幽灵工具卡。
+    /// </summary>
+    private static string GetStagingParent(string destinationDir)
+    {
+        var full = Path.TrimEndingDirectorySeparator(destinationDir);
+        string? toolsRoot = null;
+
+        // 取最靠近卷根的 Tools 目录（工具自身可能也带名为 Tools 的子目录）
+        for (var dir = new DirectoryInfo(full); dir is not null; dir = dir.Parent)
+        {
+            if (string.Equals(dir.Name, "Tools", StringComparison.OrdinalIgnoreCase))
+                toolsRoot = dir.FullName;
+        }
+
+        return toolsRoot is not null && Path.GetDirectoryName(toolsRoot) is { Length: > 0 } rootParent
+            ? rootParent
+            : Path.GetDirectoryName(full) ?? full;
+    }
+
+    private static bool PathsEqual(string a, string b) => string.Equals(
+        Path.TrimEndingDirectorySeparator(Path.GetFullPath(a)),
+        Path.TrimEndingDirectorySeparator(Path.GetFullPath(b)),
+        StringComparison.OrdinalIgnoreCase);
+
+    private static void ProbeWritable(string dir)
+    {
+        var probe = Path.Combine(dir, ".probe");
+        using var _ = new FileStream(probe, FileMode.CreateNew, FileAccess.Write,
+            FileShare.None, 1, FileOptions.DeleteOnClose);
+    }
+
+    /// <summary>
+    /// 解压到临时目录后原子替换目标目录（临时解压 → 备份旧目录 → 移动新目录 → 删备份），
+    /// 失败自动重试（覆盖文件占用），最终以逐文件拷贝兜底；个别文件写入失败仅跳过并提示。
+    /// 成功后删除下载的压缩包并调用 <paramref name="onCompleted"/>。
+    /// </summary>
+    public static void ExtractTolerantAndReplace(
+        string archivePath,
+        string destinationDir,
+        ExtractReplaceProfile profile,
+        IProgress<string>? statusProgress = null,
+        Action? onCompleted = null,
+        bool preserveExistingFiles = false)
+    {
+        Exception? lastError = null;
+
+        for (var attempt = 1; attempt <= ReplaceMaxAttempts; attempt++)
+        {
+            if (attempt > 1)
+            {
+                statusProgress?.Report($"解压遇到文件占用，正在自动重试（第 {attempt}/{ReplaceMaxAttempts} 次）...");
+                Thread.Sleep(ReplaceRetryDelayMs * attempt);
+            }
+
+            var extractDir = CreateStagingDirectory(destinationDir);
+            try
+            {
+                ExtractOnce(archivePath, destinationDir, extractDir, profile, statusProgress,
+                    allowCopyFallback: attempt == ReplaceMaxAttempts, onCompleted, preserveExistingFiles);
+                return;
+            }
+            catch (Exception ex)
+            {
+                lastError = ex;
+                TryDeleteDirectory(extractDir);
+                if (attempt >= ReplaceMaxAttempts)
+                    throw new IOException(DescribeReplaceFailure(ex, profile), ex);
+            }
+        }
+
+        if (lastError is not null) throw lastError;
+    }
+
+    /// <summary>
+    /// 失败文案：目标文件被占用/只读是最常见的失败原因（工具正在运行会锁住自身文件），
+    /// 单独给出可操作提示；其余情况保留原始错误内容。
+    /// </summary>
+    private static string DescribeReplaceFailure(Exception ex, ExtractReplaceProfile profile)
+    {
+        // 0x1770 的原始文案「无法加密指定的文件」对用户没有指导意义，单独给出排查方向
+        if (IsEncryptionFailure(ex)) return profile.EncryptionHint;
+
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            if (e is not UnauthorizedAccessException) continue;
+
+            var path = ExtractQuotedPath(e.Message);
+            return string.IsNullOrEmpty(path)
+                ? profile.BusyHint
+                : string.Format(profile.BusyHintFormat, path);
+        }
+
+        var message = ex.InnerException?.Message ?? ex.Message;
+        return string.Format(profile.GenericFailureFormat, ReplaceMaxAttempts - 1, message);
+    }
+
+    private static string? ExtractQuotedPath(string message)
+    {
+        var start = message.IndexOf('\'');
+        if (start < 0) return null;
+        var end = message.IndexOf('\'', start + 1);
+        return end > start ? message[(start + 1)..end] : null;
+    }
+
+    private static void ExtractOnce(string archivePath, string destinationDir, string extractDir,
+        ExtractReplaceProfile profile, IProgress<string>? statusProgress, bool allowCopyFallback,
+        Action? onCompleted, bool preserveExistingFiles)
+    {
+        if (!File.Exists(archivePath))
+            throw new FileNotFoundException("下载的文件不存在", archivePath);
+
+        try
+        {
+            statusProgress?.Report("正在解压文件...");
+            var skipped = ExtractTolerant(archivePath, extractDir, statusProgress);
+            if (skipped.Count > 0)
+            {
+                statusProgress?.Report($"已跳过 {skipped.Count} 个无法解压的文件（可能被占用或只读）");
+            }
+        }
+        catch
+        {
+            TryDeleteDirectory(extractDir);
+            throw;
+        }
+
+        // 内核包没有旧文件的所有权清单。新包未包含的旧文件必须保留，
+        // 不能因更新删掉手工添加的工具、工具配置或旧版用户工具。
+        if (preserveExistingFiles && Directory.Exists(destinationDir))
+            PreserveExistingFiles(destinationDir, extractDir);
+
+        var backupDir = destinationDir + "_bak";
+
+        try
+        {
+            if (Directory.Exists(destinationDir))
+            {
+                TryDeleteDirectory(backupDir);
+                Directory.Move(destinationDir, backupDir);
+            }
+
+            var destParent = Path.GetDirectoryName(destinationDir);
+            if (!string.IsNullOrEmpty(destParent))
+                Directory.CreateDirectory(destParent);
+
+            try
+            {
+                Directory.Move(extractDir, destinationDir);
+            }
+            catch
+            {
+                TryRestoreDirectory(backupDir, destinationDir);
+                throw;
+            }
+
+            TryDeleteDirectory(backupDir);
+            try { File.Delete(archivePath); } catch { }
+            onCompleted?.Invoke();
+        }
+        catch
+        {
+            if (!allowCopyFallback) throw;
+
+            // 兜底：目录原子替换行不通（文件被占用）时，逐文件复制覆盖
+            statusProgress?.Report("正在使用文件拷贝模式完成安装...");
+            TryRestoreDirectory(backupDir, destinationDir);
+            try
+            {
+                var skippedCount = CopyDirectoryContents(extractDir, destinationDir, statusProgress);
+                if (skippedCount >= Directory.GetFiles(extractDir, "*", SearchOption.AllDirectories).Length)
+                    throw new IOException("目标目录不可写，文件拷贝全部失败");
+
+                TryDeleteDirectory(extractDir);
+                try { File.Delete(archivePath); } catch { }
+                onCompleted?.Invoke();
+            }
+            catch (Exception fallbackEx)
+            {
+                throw new IOException(string.Format(profile.CopyFailureFormat, fallbackEx.Message), fallbackEx);
+            }
+        }
+    }
+
+    private static void PreserveExistingFiles(string source, string destination)
+    {
+        foreach (var entry in Directory.EnumerateFileSystemEntries(source))
+        {
+            if ((File.GetAttributes(entry) & FileAttributes.ReparsePoint) != 0)
+                throw new IOException($"工具目录含链接，已停止整体替换以保留用户文件：{entry}");
+            var target = Path.Combine(destination, Path.GetFileName(entry));
+            if (Directory.Exists(entry))
+            {
+                Directory.CreateDirectory(target);
+                PreserveExistingFiles(entry, target);
+            }
+            else if (!File.Exists(target))
+            {
+                // 保留失败必须中断安装；不能跳过后删除旧备份。
+                File.Copy(entry, target, false);
+            }
+        }
+    }
+
+    private static void TryDeleteDirectory(string dir)
+    {
+        for (var i = 0; i < CleanupAttempts && Directory.Exists(dir); i++)
+        {
+            try
+            {
+                // 只读文件会导致 Directory.Delete 抛异常，先清除属性
+                TryClearReadOnlyAttributes(dir);
+                Directory.Delete(dir, true);
+                return;
+            }
+            catch
+            {
+                if (i < CleanupAttempts - 1) Thread.Sleep(300);
+            }
+        }
+    }
+
+    private static void TryRestoreDirectory(string backupDir, string destinationDir)
+    {
+        if (Directory.Exists(destinationDir) && Directory.Exists(backupDir))
+        {
+            try
+            {
+                TryClearReadOnlyAttributes(destinationDir);
+                Directory.Delete(destinationDir, true);
+            }
+            catch { }
+        }
+        if (Directory.Exists(backupDir) && !Directory.Exists(destinationDir))
+        {
+            try { Directory.Move(backupDir, destinationDir); } catch { }
+        }
+    }
+
+    private static int CopyDirectoryContents(string sourceDir, string destinationDir,
+        IProgress<string>? statusProgress = null)
+    {
+        Directory.CreateDirectory(destinationDir);
+        var files = Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories);
+        var skipped = 0;
+        foreach (var file in files)
+        {
+            var relative = Path.GetRelativePath(sourceDir, file);
+            var target = Path.Combine(destinationDir, relative);
+            var parent = Path.GetDirectoryName(target);
+            if (!string.IsNullOrEmpty(parent))
+                Directory.CreateDirectory(parent);
+
+            if (!TryCopyWithRetry(file, target)) skipped++;
+        }
+
+        if (skipped > 0)
+        {
+            statusProgress?.Report($"已跳过 {skipped} 个无法写入的文件（可能被占用或只读）");
+        }
+
+        return skipped;
+    }
+
+    private static bool TryCopyWithRetry(string source, string target)
+    {
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            try
+            {
+                if (File.Exists(target))
+                    TryClearReadOnlyAttribute(target);
+
+                File.Copy(source, target, true);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                if (attempt >= 3) return false;
+                Thread.Sleep(300);
+            }
+        }
+        return false;
+    }
+}
+
+/// <summary>解压 + 原子替换的文案集合（工具包与社区工具各按上下文区分，行为逻辑共享）。</summary>
+public sealed record ExtractReplaceProfile(
+    string BusyHint,
+    string BusyHintFormat,        // {0} = 被占用/只读的路径
+    string GenericFailureFormat,  // {0} = 重试次数，{1} = 原始错误
+    string CopyFailureFormat,     // {0} = 原始错误
+    string EncryptionHint)        // 0x1770 ERROR_ENCRYPTION_FAILED 的排查提示
+{
+    public static readonly ExtractReplaceProfile ToolsBundle = new(
+        "内核安装失败：目标文件被占用或只读，请关闭正在运行的工具（如 DirectX Repair）后重试。",
+        "内核安装失败：无法写入 {0}（文件被占用或只读）。请关闭正在运行的工具（如 DirectX Repair）后重试。",
+        "解压工具包失败（已自动重试 {0} 次）：{1}",
+        "解压工具包失败：{0}",
+        "内核安装失败：目标文件夹带「加密」属性，但系统无法完成 EFS 加密。" +
+        "若 TEMP 或数据目录在内存盘、exFAT/FAT32、Dev Drive 上，请改回 C 盘默认目录；" +
+        "NTFS 磁盘上多为 EFS 证书/密钥失效（重装系统、改密码或文件夹加密工具造成），" +
+        "可在文件夹属性→高级中取消「加密内容以便保护数据」后重试。");
+
+    public static readonly ExtractReplaceProfile CommunityTool = new(
+        "安装失败：目标文件被占用或只读，请关闭正在运行的工具后重试。",
+        "安装失败：无法写入 {0}（文件被占用或只读）。请关闭正在运行的工具后重试。",
+        "解压社区工具失败（已自动重试 {0} 次）：{1}",
+        "解压社区工具失败：{0}",
+        "安装失败：目标文件夹带「加密」属性，但系统无法完成 EFS 加密。" +
+        "若 TEMP 在内存盘、exFAT/FAT32、Dev Drive 上，请改回 C 盘默认目录；" +
+        "NTFS 磁盘上多为 EFS 证书/密钥失效，可在文件夹属性→高级中取消「加密内容以便保护数据」后重试。");
+}
+
+public sealed class ToolsBundleExtractProcessor : IDownloadPostProcessor
+{
+    private readonly string? _version;
+    private readonly string? _kind;
+
+    public string DisplayName => "解压工具包";
+
+    public ToolsBundleExtractProcessor(string? version = null, string? kind = null)
+    {
+        _version = version;
+        _kind = kind;
+    }
+
+    public async Task ExecuteAsync(string downloadedFilePath, string destinationPath,
+        IProgress<string>? statusProgress, CancellationToken ct)
+    {
+        statusProgress?.Report("正在解压工具包...");
+        await Task.Run(() =>
+            ZipExtractHelper.ExtractTolerantAndReplace(
+                downloadedFilePath, destinationPath, ExtractReplaceProfile.ToolsBundle,
+                statusProgress, onCompleted: ApplyCompletedState, preserveExistingFiles: true), ct);
+    }
+
+    private void ApplyCompletedState()
+    {
+        if (!string.IsNullOrEmpty(_version))
+        {
+            Services.AppSettings.Set("ToolsBundleVersion", _version);
+        }
+
+        if (!string.IsNullOrEmpty(_kind))
+        {
+            Services.ToolsBundleService.SetInstalledKind(_kind);
+        }
+
+        Services.ToolCatalog.RefreshToolsRoot();
+
+        // 强制刷新侧边栏 / 标签页的工具分类（MSIX 内核安装完成后立即生效）
+        if (App.MainWindow is MainWindow mainWindow)
+        {
+            mainWindow.DispatcherQueue.TryEnqueue(mainWindow.RefreshToolCategories);
+        }
+    }
+}
+
+/// <summary>社区工具安装所需的全部信息（队列后处理器使用；来自 plugin.json + 索引里的文件 sha）。</summary>
+public sealed record CommunityToolInstallRequest(
+    string ToolId,
+    string DisplayName,
+    string Category,
+    string? Description,
+    string? Publisher,
+    IReadOnlyList<string> Tags,
+    string? LaunchTarget,
+    string? Version,
+    string? Author,
+    string? RepoPath,
+    string? FileName,
+    string? Sha);
+
+/// <summary>
+/// 社区工具安装：解压/就位 → 写 tools.json（让 ToolCatalog 收录）→ 写安装记录（更新检测）→ 刷新界面。
+/// 目录原子替换 + 容错解压与工具包共用（ZipExtractHelper.ExtractTolerantAndReplace），
+/// 已有安装在失败时保持完好。参数化处理器不注册进 PostProcessorRegistry：
+/// 解析器型队列项重启后本来就不恢复，注册只会误导恢复语义。
+/// </summary>
+public sealed class CommunityToolInstallProcessor : IDownloadPostProcessor
+{
+    private readonly CommunityToolInstallRequest _request;
+
+    public string DisplayName => "安装社区工具";
+
+    public CommunityToolInstallProcessor(CommunityToolInstallRequest request)
+    {
+        _request = request;
+    }
+
+    public async Task ExecuteAsync(string downloadedFilePath, string destinationPath,
+        IProgress<string>? statusProgress, CancellationToken ct)
+    {
+        statusProgress?.Report("正在安装社区工具...");
+        await Task.Run(() => Install(downloadedFilePath, destinationPath, statusProgress), ct);
+    }
+
+    private void Install(string downloadedFilePath, string destinationPath, IProgress<string>? statusProgress)
+    {
+        var isArchive = downloadedFilePath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
+
+        if (isArchive)
+        {
+            ZipExtractHelper.ExtractTolerantAndReplace(
+                downloadedFilePath, destinationPath, ExtractReplaceProfile.CommunityTool, statusProgress);
+        }
+        else
+        {
+            Directory.CreateDirectory(destinationPath);
+            var targetPath = Path.Combine(destinationPath, Path.GetFileName(downloadedFilePath));
+            if (!string.Equals(Path.GetFullPath(downloadedFilePath), Path.GetFullPath(targetPath), StringComparison.OrdinalIgnoreCase))
+                File.Move(downloadedFilePath, targetPath, true);
+        }
+
+        // 用户工具登记：卡片名称/描述/标签/启动目标。
+        // 写入失败会抛 IOException → 队列项 Failed 并给出原因，不静默。
+        Services.ToolMetadataService.UpsertToolMetadataEntry(
+            _request.ToolId,
+            name: _request.DisplayName,
+            description: _request.Description,
+            publisher: _request.Publisher,
+            tags: _request.Tags,
+            launchTarget: _request.LaunchTarget,
+            toolDirectory: destinationPath,
+            category: _request.Category,
+            communityId: _request.ToolId);
+        Services.ToolMetadataService.InvalidateCache();
+
+        Services.CommunityToolRegistry.Upsert(new Services.CommunityInstallRecord(
+            _request.ToolId,
+            _request.Category,
+            _request.Sha,
+            _request.Version,
+            _request.Author,
+            _request.RepoPath,
+            _request.FileName,
+            _request.LaunchTarget,
+            DateTimeOffset.Now));
+
+        Services.ToolCatalog.RefreshToolsRoot();
+
+        if (App.MainWindow is MainWindow mainWindow)
+        {
+            mainWindow.DispatcherQueue.TryEnqueue(mainWindow.RefreshToolCategories);
+        }
+
+        statusProgress?.Report("安装完成");
+    }
+}

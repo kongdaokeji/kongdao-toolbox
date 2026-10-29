@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <pe-file product-name="空岛图吧工具箱"
+           product-version="1.8.0.0"
+           file-version="1.8.0.0"
+           company-name="空岛科技">
+    <authenticode-sign />
+  </pe-file>
+</artifact-configuration>

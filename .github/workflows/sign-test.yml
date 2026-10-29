@@ -1,0 +1,86 @@
+name: Sign Test (SignPath)
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: 'Launcher architecture to sign'
+        required: true
+        default: x64
+        type: choice
+        options:
+          - x64
+          - x86
+          - arm64
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  sign-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # metadata 必须与 SignPath 上的 artifact configuration 完全一致，否则签名请求会被拒绝
+      - name: Show launcher metadata
+        shell: pwsh
+        run: |
+          $v = (Get-Item -LiteralPath 'Launcher/bin/图吧工具箱WinUI3_${{ inputs.arch }}.exe').VersionInfo
+          "ProductName    = $($v.ProductName)"
+          "ProductVersion = $($v.ProductVersion)"
+          "FileVersion    = $($v.FileVersion)"
+          "CompanyName    = $($v.CompanyName)"
+
+      # 先上传为 GitHub Actions artifact，来源验证依赖它
+      # archive: false 需要 upload-artifact v7+（v4/v5 无此参数，传入会被忽略并打成 zip）
+      - name: Upload unsigned launcher
+        id: upload-unsigned-artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: launcher-unsigned-${{ inputs.arch }}
+          path: Launcher/bin/图吧工具箱WinUI3_${{ inputs.arch }}.exe
+          archive: false
+          if-no-files-found: error
+
+      - name: Submit signing request
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: '78a9f5a2-00d0-440d-a4d2-943a8ab33dbd'
+          project-slug: tubatools
+          signing-policy-slug: test-signing
+          artifact-configuration-slug: initial
+          github-artifact-id: ${{ steps.upload-unsigned-artifact.outputs.artifact-id }}
+          skip-decompress: true
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: '3600'
+          output-artifact-directory: signed
+
+      # 测试证书不受系统信任，Status 非 Valid 属正常；只校验签名是否存在且签名者正确
+      - name: Verify signature
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -LiteralPath 'signed' -Filter '*.exe' -Recurse | Select-Object -First 1
+          if (-not $exe) {
+            Write-Host '::error::签名产物为空，未找到 .exe'
+            exit 1
+          }
+          $sig = Get-AuthenticodeSignature -LiteralPath $exe.FullName
+          "文件: $($exe.Name)"
+          "大小: $([math]::Round($exe.Length / 1KB, 1)) KB"
+          "签名状态: $($sig.Status)"
+          if (-not $sig.SignerCertificate) {
+            Write-Host '::error::文件未包含签名'
+            exit 1
+          }
+          "签名者: $($sig.SignerCertificate.Subject)"
+          "有效期至: $($sig.SignerCertificate.NotAfter)"
+
+      - name: Upload signed launcher
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-signed-${{ inputs.arch }}
+          path: signed/**
+          if-no-files-found: error

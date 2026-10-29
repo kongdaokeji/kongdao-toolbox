@@ -1,0 +1,119 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        空岛图吧工具箱 Fluent 设计令牌（基准：Windows 11 设计规范 / WinUI 3）
+        - 间距遵循 8px 网格：4 / 8 / 12 / 16 / 24 / 32
+        - 圆角：控件 4 / 卡片与浮层 8 / 药丸 12（对齐官方 ControlsCornerRadius / OverlayCornerRadius）
+        - 版式阶梯派生自官方 TextBlock 样式：
+          Caption 12 / Body 14 / BodyStrong 14 / BodyLarge(+Strong) 18 / Subtitle 20 / Title 28
+          官方规范：强调用 Semibold，不用 Bold；正文不覆盖 FontFamily
+        - 颜色一律使用官方 {ThemeResource} 语义画刷，禁止硬编码字面量
+        官方依据：
+        - https://learn.microsoft.com/windows/apps/design/signature-experiences/typography
+        - https://learn.microsoft.com/windows/apps/develop/platform/xaml/xaml-theme-resources
+    -->
+
+    <!-- 数据可视化系列色板（图表/仪表盘专用，跟随主题） -->
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <SolidColorBrush x:Key="DataSeries1Brush" Color="{ThemeResource SystemAccentColor}" />
+            <SolidColorBrush x:Key="DataSeries2Brush" Color="{ThemeResource SystemAccentColorDark1}" />
+            <SolidColorBrush x:Key="DataSeries3Brush" Color="{ThemeResource SystemFillColorSuccess}" />
+            <SolidColorBrush x:Key="DataSeries4Brush" Color="{ThemeResource SystemFillColorCaution}" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+            <SolidColorBrush x:Key="DataSeries1Brush" Color="{ThemeResource SystemAccentColorLight2}" />
+            <SolidColorBrush x:Key="DataSeries2Brush" Color="{ThemeResource SystemAccentColor}" />
+            <SolidColorBrush x:Key="DataSeries3Brush" Color="{ThemeResource SystemFillColorSuccess}" />
+            <SolidColorBrush x:Key="DataSeries4Brush" Color="{ThemeResource SystemFillColorCaution}" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <SolidColorBrush x:Key="DataSeries1Brush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="DataSeries2Brush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="DataSeries3Brush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="DataSeries4Brush" Color="{ThemeResource SystemColorHighlightColor}" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+    <!-- 间距令牌（8px 网格；double 型，用于 Spacing / Width 等 double 属性） -->
+    <x:Double x:Key="SpaceXxSmall">4</x:Double>
+    <x:Double x:Key="SpaceXSmall">8</x:Double>
+    <x:Double x:Key="SpaceSmall">12</x:Double>
+    <x:Double x:Key="SpaceMedium">16</x:Double>
+    <x:Double x:Key="SpaceLarge">24</x:Double>
+    <x:Double x:Key="SpaceXLarge">32</x:Double>
+
+    <!-- 圆角令牌（CornerRadius 型：可直接用于 CornerRadius 属性与 Style Setter） -->
+    <CornerRadius x:Key="ControlCornerRadiusToken">4</CornerRadius>
+    <CornerRadius x:Key="CardCornerRadiusToken">8</CornerRadius>
+    <CornerRadius x:Key="DialogCornerRadiusToken">8</CornerRadius>
+    <CornerRadius x:Key="PillCornerRadiusToken">12</CornerRadius>
+
+    <!-- 版式阶梯（派生自官方样式；页面文本一律用这些样式，不再手写 FontSize） -->
+    <Style x:Key="CaptionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextBlockStyle}" />
+    <Style x:Key="PageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource TitleTextBlockStyle}" />
+    <Style x:Key="PageSubtitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextBlockStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+    </Style>
+    <Style x:Key="SectionHeaderStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongTextBlockStyle}" />
+    <Style x:Key="CardTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyLargeStrongTextBlockStyle}" />
+    <Style x:Key="StatValueStyle" TargetType="TextBlock" BasedOn="{StaticResource SubtitleTextBlockStyle}" />
+
+    <!-- 卡片：官方 Card 背景 + 描边，圆角 8，内边距 16 -->
+    <Style x:Key="FluentCardStyle" TargetType="Border">
+        <Setter Property="Padding" Value="16" />
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadiusToken}" />
+        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <!-- 工具概览采用连续状态带，避免指标卡片重复嵌套。 -->
+    <Style x:Key="ToolSummaryStyle" TargetType="Grid">
+        <Setter Property="Padding" Value="24,16" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <Style x:Key="ToolResultItemStyle" TargetType="ListViewItem">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0,0,0,4" />
+        <Setter Property="CornerRadius" Value="4" />
+    </Style>
+
+    <!-- 图标瓦片 -->
+    <Style x:Key="IconTileStyle" TargetType="Border">
+        <Setter Property="Width" Value="40" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadiusToken}" />
+    </Style>
+
+    <!--
+        内置工具页统一页头（Controls/ToolPageHeader）
+        - 返回按钮直接复用 WinUI 3 官方独立返回按钮规范 TitleBarBackButtonStyle：
+          40×32 前导箭头（\uE72B）、淡雅底色（SubtleFillColorTransparent/Secondary/Tertiary）、
+          模板内含 AnimatedIcon + AnimatedBackVisualSource 回退动画。
+          官方依据：https://learn.microsoft.com/windows/apps/develop/ui/navigation/navigation-history-and-backwards-navigation
+        - 版式：标题 20 SemiBold、副标题 12 次要色，均单行省略
+    -->
+    <Style x:Key="ToolPageBackButtonStyle" TargetType="Button" BasedOn="{StaticResource TitleBarBackButtonStyle}">
+        <Setter Property="Width" Value="40" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="0" />
+    </Style>
+    <Style x:Key="ToolPageTitleTextStyle" TargetType="TextBlock" BasedOn="{StaticResource TitleTextBlockStyle}">
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style x:Key="ToolPageSubtitleTextStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextBlockStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+</ResourceDictionary>

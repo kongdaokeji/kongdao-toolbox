@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>隐私政策 - 空岛图吧工具箱</title>
+    <style>
+        body { max-width: 800px; margin: 40px auto; padding: 0 20px; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; color: #333; line-height: 1.8; }
+        h1 { font-size: 1.8em; }
+        h2 { font-size: 1.2em; margin-top: 2em; color: #555; }
+        hr { margin: 2em 0; border: none; border-top: 1px solid #eee; }
+        .lang-en { color: #888; }
+        code { background: #f5f5f5; padding: 1px 4px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<h1>隐私政策</h1>
+<p><strong>空岛图吧工具箱</strong> — 最后更新：2026年9月</p>
+
+<h2>一、数据收集</h2>
+<p>空岛图吧工具箱 <strong>不收集任何可识别您个人身份的信息</strong>（姓名、邮箱、电话号码、账号、文件内容、地理位置等）。</p>
+<p>为统计活跃用户、定位崩溃与改进软件，应用默认会发送<strong>匿名的运行与错误数据</strong>，您可以随时在「设置 → 常规 → 发送匿名使用数据」中关闭。</p>
+<p><strong>会发送的数据：</strong></p>
+<ul>
+    <li><strong>运行信息</strong> — 应用版本、Windows 版本与内部版本号、CPU 架构、界面语言、运行模式（便携版 / 微软商店版 / 精简版）、是否以管理员身份运行</li>
+    <li><strong>匿名设备标识</strong> — 由 Windows 机器 GUID 加固定盐值做 SHA-256 哈希后截断生成的随机字符串，<strong>无法反推出您的机器或身份</strong>，仅用于区分不同设备（统计活跃设备数 / 在线用户数）</li>
+    <li><strong>使用事件</strong> — 应用启动、每 10 分钟一次的运行心跳（用于统计在线与活跃设备）、启动的工具名称（工具目录名或内置工具 ID，不含文件路径）</li>
+    <li><strong>错误日志</strong> — 未处理异常的类型、消息与调用堆栈（其中的用户名与用户目录路径已在本地替换为 <code>&lt;用户&gt;</code>），以及异常来源分类</li>
+</ul>
+<p><strong>不会发送的数据：</strong></p>
+<ul>
+    <li>姓名、邮箱、电话、账号等任何个人身份信息</li>
+    <li>您的文件内容、文件路径、硬件序列号</li>
+    <li>键盘输入、屏幕截图、剪贴板内容</li>
+    <li>用于广告、用户画像或任何商业营销的数据</li>
+</ul>
+<p>数据发送至 Microsoft Azure Application Insights（东亚·日本东部区域）。除该服务作为托管方外，我们不会将上述数据出售或分享给任何第三方。与所有网络服务一样，接收服务器可能在服务运维日志中记录来源 IP 地址。</p>
+
+<h2>二、关闭数据发送</h2>
+<p>在「设置 → 常规 → 发送匿名使用数据」关闭开关后：</p>
+<ul>
+    <li>应用立即停止采集，并删除本地尚未发送的待传数据</li>
+    <li>关闭状态会被记住，后续启动不再发送任何数据</li>
+</ul>
+<p>由于采集的数据不包含任何可识别身份的信息，我们无法将已上报的数据定位到具体设备或个人，因此无法针对个人进行删除；如需彻底清除，请在关闭开关后联系我们。</p>
+
+<h2>三、数据保留</h2>
+<p>匿名遥测数据遵循 Azure Application Insights 的默认保留策略（当前为 30 天），到期后自动删除。</p>
+
+<h2>四、本地数据存储</h2>
+<p>应用仅在您的设备本地存储以下数据：</p>
+<ul>
+    <li><strong>收藏夹与使用记录</strong> — 您标记为「收藏」的工具路径、启动历史、排序偏好，存储在本地数据目录</li>
+    <li><strong>图标缓存</strong> — 工具可执行文件的图标提取缓存，存储在 <code>%LocalAppData%\TubaWinUi3\IconCache\</code></li>
+    <li><strong>设置与日志</strong> — 界面设置、AI 助手会话与记忆、诊断日志（<code>agent-debug.log</code> 等），存储在本地数据目录</li>
+</ul>
+<p>以上数据<strong>均保存在您的本地设备上</strong>，除「错误日志打包上传」（仅在您手动导出并自行提交时发生）外不会上传。卸载应用时，这些数据可一并清除。</p>
+
+<h2>五、网络访问</h2>
+<p>除匿名遥测外，应用会在您使用相关功能时访问网络，用于：</p>
+<ul>
+    <li><strong>检查更新与下载</strong> — 从 GitHub / GitCode 等镜像获取应用更新、工具内核与内置工具</li>
+    <li><strong>元数据与榜单同步</strong> — 获取工具元数据、CPU / GPU 性能榜、社区工具列表</li>
+    <li><strong>AI 助手</strong> — 仅在您自行配置并主动使用时，将对话内容发送至您所配置的 AI 服务商（密钥由您自行填写与保管）</li>
+    <li><strong>系统镜像下载</strong> — UUP dump 与微软官方镜像源，仅在您主动使用时</li>
+    <li><strong>游戏联机助手</strong> — Tailscale 网络与登录，仅在您主动使用时</li>
+</ul>
+<p>上述网络请求遵循各服务提供方自身的隐私政策。您可以随时在设置中关闭遥测，或通过代理设置控制网络访问。</p>
+
+<h2>六、所需权限</h2>
+<p>应用声明以下权限用于核心功能：</p>
+<ul>
+    <li><strong>runFullTrust</strong> — 用于启动第三方诊断工具、读取 WMI 硬件信息、编辑系统 Hosts 文件、管理证书存储、清理系统垃圾文件等系统级操作</li>
+</ul>
+
+<h2>七、第三方工具</h2>
+<p>本应用集成了多个第三方 PC 硬件诊断工具。这些工具作为独立程序运行，各有其自身的功能和数据处理方式。本应用仅提供统一的快捷启动入口，不干涉、不监控这些工具的数据行为。</p>
+
+<h2>八、儿童隐私</h2>
+<p>本应用不面向 13 岁以下儿童，也不会有意收集儿童的个人信息。</p>
+
+<h2>九、政策变更</h2>
+<p>如本隐私政策有任何变更，将在应用内及本页面公布。建议定期查阅本页面。</p>
+
+<h2>十、联系我们</h2>
+<p>如有任何疑问，请联系：<a href="mailto:xiaohuzi12323@163.com">xiaohuzi12323@163.com</a></p>
+
+<hr>
+
+<h1 class="lang-en">Privacy Policy</h1>
+<p class="lang-en"><strong>Kongdao Tuba Toolbox</strong> — Last updated: September 2026</p>
+
+<h2 class="lang-en">1. Data Collection</h2>
+<p class="lang-en">Kongdao Tuba Toolbox <strong>does not collect any personally identifiable information</strong> (name, email, phone number, account, file contents, geolocation, etc.).</p>
+<p class="lang-en">To count active users, diagnose crashes and improve the app, the app sends <strong>anonymous runtime and error data</strong> by default. You can turn this off at any time in <em>Settings → General → Send anonymous usage data</em>.</p>
+<p class="lang-en"><strong>What is sent:</strong></p>
+<ul class="lang-en">
+    <li><strong>Runtime info</strong> — app version, Windows version and build number, CPU architecture, UI language, run mode (portable / Microsoft Store / lite), whether running as administrator</li>
+    <li><strong>Anonymous device identifier</strong> — a truncated SHA-256 hash of the Windows machine GUID plus a fixed salt. It <strong>cannot be reverse-engineered</strong> into your machine or identity and is only used to distinguish devices (active devices / online users)</li>
+    <li><strong>Usage events</strong> — app start, a heartbeat every 10 minutes (used to count online and active devices), and the name of a launched tool (folder name or built-in tool ID, never a file path)</li>
+    <li><strong>Error logs</strong> — type, message and call stack of unhandled exceptions (usernames and user-folder paths are replaced with <code>&lt;user&gt;</code> locally before sending), plus an error source category</li>
+</ul>
+<p class="lang-en"><strong>What is never sent:</strong></p>
+<ul class="lang-en">
+    <li>Personal identifiers such as name, email, phone number or account</li>
+    <li>Your file contents, file paths or hardware serial numbers</li>
+    <li>Keystrokes, screenshots or clipboard contents</li>
+    <li>Data used for advertising, profiling or any commercial marketing</li>
+</ul>
+<p class="lang-en">Data is sent to Microsoft Azure Application Insights (East Asia · Japan East). Apart from this service as the hosting provider, we do not sell or share this data with any third party. As with any network service, the receiving server may log source IP addresses for operational purposes.</p>
+
+<h2 class="lang-en">2. Turning Data Collection Off</h2>
+<p class="lang-en">When you switch off <em>Settings → General → Send anonymous usage data</em>:</p>
+<ul class="lang-en">
+    <li>Collection stops immediately and locally queued, unsent data is deleted</li>
+    <li>The setting is remembered; nothing is sent on future launches</li>
+</ul>
+<p class="lang-en">Because the collected data contains no identifiable information, we cannot trace reported data back to a specific device or person, and therefore cannot delete it per individual. To have any data removed, please contact us after switching the setting off.</p>
+
+<h2 class="lang-en">3. Data Retention</h2>
+<p class="lang-en">Anonymous telemetry follows the default retention policy of Azure Application Insights (currently 30 days), after which it is deleted automatically.</p>
+
+<h2 class="lang-en">4. Local Data Storage</h2>
+<p class="lang-en">The app stores only the following data locally on your device:</p>
+<ul class="lang-en">
+    <li><strong>Favorites and usage records</strong> — favorited tool paths, launch history and sorting preferences, stored in the local data directory</li>
+    <li><strong>Icon cache</strong> — extracted icons from tool executables, stored under <code>%LocalAppData%\TubaWinUi3\IconCache\</code></li>
+    <li><strong>Settings and logs</strong> — UI settings, AI assistant sessions and memory, diagnostic logs (e.g. <code>agent-debug.log</code>), stored in the local data directory</li>
+</ul>
+<p class="lang-en">All of the above stays <strong>on your local device</strong>. Apart from the "error report bundle" (which is only uploaded if you export it and submit it yourself), it is not uploaded. It can be removed when you uninstall the app.</p>
+
+<h2 class="lang-en">5. Network Access</h2>
+<p class="lang-en">Besides anonymous telemetry, the app accesses the network when you use the corresponding features, to:</p>
+<ul class="lang-en">
+    <li><strong>Check for updates and download</strong> — app updates, tool bundles and built-in tools from GitHub / GitCode mirrors</li>
+    <li><strong>Metadata and ranking sync</strong> — tool metadata, CPU / GPU performance rankings, community tool lists</li>
+    <li><strong>AI assistant</strong> — only when you configure and use it, your conversation is sent to the AI provider you configured (keys are entered and kept by you)</li>
+    <li><strong>Windows image downloads</strong> — UUP dump and official Microsoft sources, only when you use this feature</li>
+    <li><strong>Game tunnel</strong> — Tailscale networking and login, only when you use this feature</li>
+</ul>
+<p class="lang-en">These requests are governed by the privacy policies of the respective service providers. You can turn telemetry off at any time, or control network access through the proxy settings.</p>
+
+<h2 class="lang-en">6. Required Permissions</h2>
+<p class="lang-en">The app declares the following capabilities for core functionality:</p>
+<ul class="lang-en">
+    <li><strong>runFullTrust</strong> — Required for launching third-party diagnostic tools, querying WMI hardware information, editing the system Hosts file, managing certificate stores, cleaning system junk files, and other system-level operations</li>
+</ul>
+
+<h2 class="lang-en">7. Third-Party Tools</h2>
+<p class="lang-en">This application integrates multiple third-party PC hardware diagnostic tools. These tools run as independent programs with their own functionality and data handling. This application only provides a unified launcher and does not interfere with or monitor the data behavior of these tools.</p>
+
+<h2 class="lang-en">8. Children's Privacy</h2>
+<p class="lang-en">This application is not directed to children under 13 and does not knowingly collect personal information from children.</p>
+
+<h2 class="lang-en">9. Policy Changes</h2>
+<p class="lang-en">Any changes to this privacy policy will be announced within the application and on this page. Please check this page periodically.</p>
+
+<h2 class="lang-en">10. Contact Us</h2>
+<p class="lang-en">For any questions, contact: <a href="mailto:xiaohuzi12323@163.com">xiaohuzi12323@163.com</a></p>
+
+</body>
+</html>

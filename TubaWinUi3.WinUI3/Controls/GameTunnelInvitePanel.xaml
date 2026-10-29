@@ -1,0 +1,135 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="TubaWinUi3.Controls.GameTunnelInvitePanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <StackPanel MinWidth="470" Spacing="12">
+
+        <!-- 三种给朋友的方式 -->
+        <StackPanel x:Name="ReadyPanel" Spacing="12">
+
+            <!-- 邀请码 -->
+            <Border
+                Padding="14,12"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="10">
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="14" Glyph="&#xE8F1;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        <TextBlock FontSize="14" FontWeight="SemiBold" Text="邀请码（朋友也装了空岛图吧工具箱）" />
+                    </StackPanel>
+                    <TextBlock
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextWrapping="Wrap"
+                        Text="把那行邀请说明发给朋友，他在「游戏联机助手 → 我要加入」里粘贴即用。" />
+                    <TextBlock
+                        x:Name="InviteDirectNote"
+                        FontSize="11"
+                        Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                        TextWrapping="Wrap" />
+                    <TextBox
+                        x:Name="InviteCodeBox"
+                        IsReadOnly="True"
+                        TextWrapping="Wrap"
+                        AcceptsReturn="False"
+                        FontFamily="Consolas"
+                        FontSize="12"
+                        MaxHeight="70" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="CopyCodeButton" Click="CopyCode_Click" Style="{StaticResource AccentButtonStyle}" CornerRadius="7" Padding="14,7">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontSize="12" Glyph="&#xE8C8;" />
+                                <TextBlock FontSize="13" Text="复制邀请码" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="CopyMessageButton" Click="CopyMessage_Click" CornerRadius="7" Padding="14,7">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontSize="12" Glyph="&#xE8A5;" />
+                                <TextBlock FontSize="13" Text="复制完整说明" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- 一键加入脚本 -->
+            <Border
+                Padding="14,12"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="10">
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="14" Glyph="&#xE756;" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock FontSize="14" FontWeight="SemiBold" Text="一键加入脚本（朋友没装工具箱）" />
+                    </StackPanel>
+                    <TextBlock
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextWrapping="Wrap"
+                        Text="生成一个 .cmd 文件发给朋友，双击后它会自动下载联机组件、加入房间并建立端口转发。" />
+                    <TextBlock
+                        x:Name="ScriptDirectNote"
+                        FontSize="11"
+                        Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                        TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="SaveScriptButton" Click="SaveScript_Click" Style="{StaticResource AccentButtonStyle}" CornerRadius="7" Padding="14,7">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontSize="12" Glyph="&#xE74E;" />
+                                <TextBlock FontSize="13" Text="保存脚本…" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="OpenScriptsFolderButton" Click="OpenScriptsFolder_Click" CornerRadius="7" Padding="14,7">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontSize="12" Glyph="&#xE838;" />
+                                <TextBlock FontSize="13" Text="打开所在文件夹" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock x:Name="ScriptHint" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <!-- 游戏地址 -->
+            <Border
+                Padding="14,12"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="10">
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="14" Glyph="&#xE774;" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock FontSize="14" FontWeight="SemiBold" Text="游戏里填的地址" />
+                    </StackPanel>
+                    <TextBlock
+                        x:Name="AddressOnlyPreconditionText"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Border
+                            Padding="12,7"
+                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                            CornerRadius="7"
+                            VerticalAlignment="Center">
+                            <TextBlock x:Name="AddressText" FontFamily="Consolas" FontSize="14" FontWeight="SemiBold" Text="--" IsTextSelectionEnabled="True" />
+                        </Border>
+                        <Button x:Name="CopyAddressButton" Click="CopyAddress_Click" CornerRadius="7" Padding="14,7" Content="复制地址" FontSize="13" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <InfoBar x:Name="StatusBar" IsOpen="False" IsClosable="True" Severity="Success" />
+    </StackPanel>
+</UserControl>

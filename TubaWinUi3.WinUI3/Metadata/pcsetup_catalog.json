@@ -1,0 +1,257 @@
+{
+  "categories": [
+    {
+      "name": "AI Agent",
+      "glyph": "",
+      "packages": [
+        {
+          "id": "Anthropic.ClaudeCode",
+          "name": "Claude Code",
+          "desc": "Anthropic 的编程助手，在终端中理解项目、修改代码和运行验证。",
+          "installNotes": "通过 WinGet 安装终端版；安装完成后新开终端并运行 claude。"
+        },
+        {
+          "id": "OpenAI.Codex",
+          "name": "Codex",
+          "desc": "OpenAI 的终端编程助手，理解项目、编写代码并运行验证（CLI 版）。",
+          "installNotes": "通过 WinGet 安装 Codex CLI；安装完成后新开终端并运行 codex。"
+        },
+        {
+          "id": "SST.OpenCodeDesktop",
+          "name": "OpenCode",
+          "desc": "开源 AI 编程助手，可在桌面、终端和编辑器中连接多种模型。",
+          "installNotes": "通过 WinGet 安装 OpenCode 桌面版。"
+        },
+        {
+          "id": "ZhipuAI.ZCode",
+          "name": "ZCode",
+          "desc": "智谱的 AI 编程工具，通过智能体协作处理开发任务。",
+          "installNotes": "通过 WinGet 安装 ZCode 桌面版。"
+        },
+        {
+          "id": "deepseek-harness",
+          "name": "DeepSeek Harness",
+          "desc": "DeepSeek 的智能体工具，通过插件扩展编程与任务执行能力。",
+          "installNotes": "下载 DeepSeek 官方 Windows x64 安装包；完成后自动启动安装程序。可在下载中心查看进度。",
+          "downloadUrl": "https://download.deepseek.com/desktop/dsh-latest-windows-x64.exe"
+        },
+        {
+          "id": "Tencent.WorkBuddy",
+          "name": "WorkBuddy",
+          "desc": "腾讯的 AI 办公工作台，协助处理文档、资料研究和多步骤任务。",
+          "installNotes": "通过 WinGet 安装 WorkBuddy 桌面版。"
+        }
+      ]
+    },
+    {
+      "name": "日常必备",
+      "glyph": "",
+      "packages": [
+        {
+          "id": "Google.Chrome",
+          "name": "Google Chrome",
+          "desc": "谷歌浏览器",
+          "recommended": true
+        },
+        {
+          "id": "Mozilla.Firefox",
+          "name": "Firefox",
+          "desc": "火狐浏览器",
+          "recommended": false
+        },
+        {
+          "id": "7zip.7zip",
+          "name": "7-Zip",
+          "desc": "开源文件压缩工具",
+          "recommended": true
+        },
+        {
+          "id": "M2Team.NanaZip",
+          "name": "NanaZip",
+          "desc": "现代化的7-Zip",
+          "recommended": false
+        },
+        {
+          "id": "SumatraPDF.SumatraPDF",
+          "name": "SumatraPDF",
+          "desc": "轻量PDF阅读器",
+          "recommended": true
+        },
+        {
+          "id": "qBittorrent.qBittorrent",
+          "name": "qBittorrent",
+          "desc": "开源BitTorrent客户端",
+          "recommended": false
+        }
+      ]
+    },
+    {
+      "name": "办公通讯",
+      "glyph": "",
+      "packages": [
+        {
+          "id": "TheDocumentFoundation.LibreOffice",
+          "name": "LibreOffice",
+          "desc": "开源办公套件",
+          "recommended": false
+        },
+        {
+          "id": "Kingsoft.WPSOffice.CN",
+          "name": "WPS Office",
+          "desc": "金山办公套件",
+          "recommended": false
+        },
+        {
+          "id": "Obsidian.Obsidian",
+          "name": "Obsidian",
+          "desc": "知识管理与笔记",
+          "recommended": false
+        },
+        {
+          "id": "Tencent.WeChat",
+          "name": "微信",
+          "desc": "微信桌面版",
+          "recommended": true
+        },
+        {
+          "id": "Tencent.QQ",
+          "name": "QQ",
+          "desc": "腾讯即时通讯",
+          "recommended": false
+        },
+        {
+          "id": "ByteDance.Feishu",
+          "name": "飞书",
+          "desc": "字节跳动办公套件",
+          "recommended": false
+        }
+      ]
+    },
+    {
+      "name": "影音创作",
+      "glyph": "",
+      "packages": [
+        {
+          "id": "VideoLAN.VLC",
+          "name": "VLC Media Player",
+          "desc": "开源多媒体播放器",
+          "recommended": false
+        },
+        {
+          "id": "Daum.PotPlayer",
+          "name": "PotPlayer",
+          "desc": "高性能多媒体播放器",
+          "recommended": false
+        },
+        {
+          "id": "OBSProject.OBSStudio",
+          "name": "OBS Studio",
+          "desc": "录屏与直播",
+          "recommended": false
+        },
+        {
+          "id": "liule.Snipaste",
+          "name": "Snipaste",
+          "desc": "截图贴图工具",
+          "recommended": false
+        },
+        {
+          "id": "BlenderFoundation.Blender",
+          "name": "Blender",
+          "desc": "3D建模与渲染",
+          "recommended": false
+        },
+        {
+          "id": "Audacity.Audacity",
+          "name": "Audacity",
+          "desc": "开源音频编辑器",
+          "recommended": false
+        }
+      ]
+    },
+    {
+      "name": "系统效率",
+      "glyph": "",
+      "packages": [
+        {
+          "id": "Microsoft.PowerToys",
+          "name": "PowerToys",
+          "desc": "微软官方系统增强工具集",
+          "recommended": true
+        },
+        {
+          "id": "voidtools.Everything",
+          "name": "Everything",
+          "desc": "极速文件搜索工具",
+          "recommended": true
+        },
+        {
+          "id": "Microsoft.WindowsTerminal",
+          "name": "Windows Terminal",
+          "desc": "现代终端",
+          "recommended": false
+        },
+        {
+          "id": "Rufus.Rufus",
+          "name": "Rufus",
+          "desc": "启动盘制作工具",
+          "recommended": false
+        },
+        {
+          "id": "Flow-Launcher.Flow-Launcher",
+          "name": "Flow Launcher",
+          "desc": "快捷启动器",
+          "recommended": false
+        },
+        {
+          "id": "Youqu.ToDesk",
+          "name": "ToDesk",
+          "desc": "国产远程控制",
+          "recommended": false
+        }
+      ]
+    },
+    {
+      "name": "开发工具",
+      "glyph": "",
+      "packages": [
+        {
+          "id": "Microsoft.VisualStudioCode",
+          "name": "VS Code",
+          "desc": "轻量代码编辑器",
+          "recommended": false
+        },
+        {
+          "id": "Git.Git",
+          "name": "Git for Windows",
+          "desc": "版本控制 + Git Bash",
+          "recommended": false
+        },
+        {
+          "id": "OpenJS.NodeJS.LTS",
+          "name": "Node.js LTS",
+          "desc": "JavaScript 运行时",
+          "recommended": false
+        },
+        {
+          "id": "Python.Python.3.12",
+          "name": "Python 3.12",
+          "desc": "Python 运行时",
+          "recommended": false
+        },
+        {
+          "id": "Docker.DockerDesktop",
+          "name": "Docker Desktop",
+          "desc": "容器化平台",
+          "recommended": false
+        },
+        {
+          "id": "DBeaver.DBeaver.Community",
+          "name": "DBeaver",
+          "desc": "通用数据库管理工具",
+          "recommended": false
+        }
+      ]
+    }
+  ]
+}

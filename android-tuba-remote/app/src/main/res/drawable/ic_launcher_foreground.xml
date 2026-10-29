@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 图标：手机轮廓 + 连接信号 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,26 L68,26 A4,4 0 0 1 72,30 L72,78 A4,4 0 0 1 68,82 L40,82 A4,4 0 0 1 36,78 L36,30 A4,4 0 0 1 40,26 Z M42,34 L42,70 L66,70 L66,34 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,74 L60,74 L60,77 L48,77 Z" />
+</vector>

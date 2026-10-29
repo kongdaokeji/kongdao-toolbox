@@ -1,0 +1,819 @@
+﻿{
+    "$schema":  "英文界面覆盖文件：加载 tools.json 后按 match 合并这些字段（未覆盖的字段与条目回退中文）。English overlay for tools.json; merged by match. Edited manually - keep match values identical to tools.json.",
+    "tools":  [
+                  {
+                      "match": "屏幕工具",
+                      "description": "Inspect monitor EDID, gamut coverage, HDR and ICC profiles, export a report and run full-screen display tests.",
+                      "tags": ["Display", "EDID", "HDR", "Gamut", "Dead pixels"]
+                  },
+                  {
+                      "match":  "CPU-Z",
+                      "description":  "CPU, motherboard, memory, and GPU basic information viewer.",
+                      "publisher":  "CPUID",
+                      "tags":  [
+                                   "CPU",
+                                   "Motherboard",
+                                   "Hardware Info"
+                               ]
+                  },
+                  {
+                      "match":  "CoreTemp",
+                      "description":  "Real-time CPU temperature monitor with per-core readings and system tray alerts.",
+                      "publisher":  "ALCPU",
+                      "tags":  [
+                                   "CPU",
+                                   "Temperature"
+                               ]
+                  },
+                  {
+                      "match":  "C2CLatency",
+                      "description":  "Cache-to-cache latency tester that measures L1/L2/L3 inter-core communication delays.",
+                      "tags":  [
+                                   "CPU",
+                                   "Latency Test"
+                               ]
+                  },
+                  {
+                      "match":  "LinX",
+                      "description":  "CPU stability tester based on Intel LINPACK, used for extreme stress testing and overclock validation.",
+                      "tags":  [
+                                   "CPU",
+                                   "Stress Test",
+                                   "Stability"
+                               ]
+                  },
+                  {
+                      "match":  "Prime95",
+                      "description":  "GIMPS distributed computing client, widely used for CPU stability testing and stress runs.",
+                      "publisher":  "GIMPS",
+                      "tags":  [
+                                   "CPU",
+                                   "Stress Test",
+                                   "Stability"
+                               ]
+                  },
+                  {
+                      "match":  "SuperPI",
+                      "description":  "CPU pi-calculation benchmark that measures single-core performance by computing π to a chosen digit count.",
+                      "tags":  [
+                                   "CPU",
+                                   "Benchmark"
+                               ]
+                  },
+                  {
+                      "match":  "ThrottleStop",
+                      "description":  "CPU throttling monitor and power control tool that can lift laptop CPU power limits.",
+                      "publisher":  "uWebb Software",
+                      "tags":  [
+                                   "CPU",
+                                   "Throttling",
+                                   "Power Control"
+                               ]
+                  },
+                  {
+                      "match":  "wPrime",
+                      "description":  "Multi-threaded CPU benchmark that measures multi-core compute power by calculating primes.",
+                      "publisher":  "wPrime",
+                      "tags":  [
+                                   "CPU",
+                                   "Benchmark"
+                               ]
+                  },
+                  {
+                      "match":  "xiangqi",
+                      "description":  "Fritz chess benchmark that evaluates multi-core CPU performance through chess algorithms.",
+                      "publisher":  "ChessBase",
+                      "tags":  [
+                                   "CPU",
+                                   "Benchmark"
+                               ]
+                  },
+                  {
+                      "match":  "GPU-Z",
+                      "description":  "GPU model, core specs, VRAM, sensors, and BIOS information viewer.",
+                      "publisher":  "TechPowerUp",
+                      "tags":  [
+                                   "GPU",
+                                   "Hardware Info"
+                               ]
+                  },
+                  {
+                      "match":  "DDU",
+                      "description":  "Complete GPU driver uninstaller that safely removes AMD/NVIDIA/Intel driver leftovers.",
+                      "publisher":  "Wagnardsoft",
+                      "tags":  [
+                                   "GPU",
+                                   "Driver Removal"
+                               ]
+                  },
+                  {
+                      "match":  "DXVAChecker",
+                      "description":  "DirectX Video Acceleration (DXVA) hardware decoding capability checker.",
+                      "tags":  [
+                                   "GPU",
+                                   "Decode Check"
+                               ]
+                  },
+                  {
+                      "match":  "GpuTest",
+                      "description":  "Cross-platform GPU benchmark with OpenGL stress testing and performance scoring.",
+                      "publisher":  "Geeks3D",
+                      "tags":  [
+                                   "GPU",
+                                   "Benchmark"
+                               ]
+                  },
+                  {
+                      "match":  "nvidiaInspector",
+                      "description":  "NVIDIA GPU information and overclocking tool for voltage, frequency, and fan curve tuning.",
+                      "publisher":  "Orbmu2k",
+                      "tags":  [
+                                   "GPU",
+                                   "NVIDIA",
+                                   "Overclocking"
+                               ]
+                  },
+                  {
+                      "match":  "nvidiaProfileInspector",
+                      "description":  "NVIDIA driver profile editor for hidden driver settings and SLI configuration.",
+                      "tags":  [
+                                   "GPU",
+                                   "NVIDIA",
+                                   "Driver Profile"
+                               ]
+                  },
+                  {
+                      "match":  "AMD显卡驱动",
+                      "description":  "Official AMD graphics driver download page.",
+                      "publisher":  "AMD",
+                      "tags":  [
+                                   "GPU",
+                                   "Driver Download"
+                               ]
+                  },
+                  {
+                      "match":  "Nvidia显卡驱动",
+                      "description":  "Official NVIDIA graphics driver download page.",
+                      "publisher":  "NVIDIA",
+                      "tags":  [
+                                   "GPU",
+                                   "Driver Download"
+                               ]
+                  },
+                  {
+                      "match":  "FurMark_win64",
+                      "description":  "FurMark 2 (64-bit) GPU stress and burn-in tool with Vulkan and OpenGL support for stability checking.",
+                      "publisher":  "Geeks3D",
+                      "tags":  [
+                                   "Stress Test",
+                                   "GPU",
+                                   "Stability",
+                                   "x64"
+                               ]
+                  },
+                  {
+                      "match":  "CrystalDiskInfo",
+                      "description":  "Disk SMART, health status, temperature, and power-on hours viewer.",
+                      "publisher":  "Crystal Dew World",
+                      "tags":  [
+                                   "Disk",
+                                   "SMART",
+                                   "Health"
+                               ]
+                  },
+                  {
+                      "match":  "CrystalDiskMark",
+                      "description":  "Disk read/write benchmark measuring sequential and random performance.",
+                      "publisher":  "Crystal Dew World",
+                      "tags":  [
+                                   "Disk",
+                                   "Benchmark"
+                               ]
+                  },
+                  {
+                      "match":  "AS SSD",
+                      "description":  "SSD benchmark measuring sequential/random read-write speeds and access time.",
+                      "publisher":  "Alex Schepeljanski",
+                      "tags":  [
+                                   "Disk",
+                                   "SSD",
+                                   "Benchmark"
+                               ]
+                  },
+                  {
+                      "match":  "ATTO",
+                      "description":  "ATTO disk benchmark measuring read/write speed across different block sizes.",
+                      "publisher":  "ATTO Technology",
+                      "tags":  [
+                                   "Disk",
+                                   "Benchmark"
+                               ]
+                  },
+                  {
+                      "match":  "DiskGenius",
+                      "description":  "Disk partitioning, data recovery, bad-sector detection, and partition table maintenance. Data recovery success rates on SSDs are usually low.",
+                      "publisher":  "Eassos",
+                      "tags":  [
+                                   "Disk",
+                                   "Partition",
+                                   "Data Recovery"
+                               ]
+                  },
+                  {
+                      "match":  "Defraggler",
+                      "description":  "Disk defragmentation tool with per-file and per-folder defrag support.",
+                      "publisher":  "Piriform",
+                      "tags":  [
+                                   "Disk",
+                                   "Defrag"
+                               ]
+                  },
+                  {
+                      "match":  "FinalData",
+                      "description":  "Data recovery tool for accidentally deleted, formatted, or virus-damaged files. Note: SSDs auto-clear data via TRIM, so recovery rates are usually low.",
+                      "publisher":  "FINALDATA Inc.",
+                      "tags":  [
+                                   "Disk",
+                                   "Data Recovery"
+                               ]
+                  },
+                  {
+                      "match":  "H2testw",
+                      "description":  "USB drive / memory card capacity verification tool that exposes fake-capacity devices.",
+                      "publisher":  "Harald Bögeholz",
+                      "tags":  [
+                                   "Disk",
+                                   "USB Drive",
+                                   "Fake Check"
+                               ]
+                  },
+                  {
+                      "match":  "HDTune",
+                      "description":  "Disk performance and health tester covering transfer rate, access time, and health status.",
+                      "publisher":  "EFD Software",
+                      "tags":  [
+                                   "Disk",
+                                   "Benchmark",
+                                   "Health"
+                               ]
+                  },
+                  {
+                      "match":  "LLFTOOL",
+                      "description":  "Low-level format tool that performs a thorough low-level erase and format of a disk.",
+                      "tags":  [
+                                   "Disk",
+                                   "Format"
+                               ]
+                  },
+                  {
+                      "match":  "MyDiskTest",
+                      "description":  "USB drive / memory card capacity and speed tester that identifies fake-capacity devices.",
+                      "tags":  [
+                                   "Disk",
+                                   "USB Drive",
+                                   "Fake Check"
+                               ]
+                  },
+                  {
+                      "match":  "SpaceSniffer",
+                      "description":  "Disk space visualization tool that shows folder usage as a treemap.",
+                      "publisher":  "Uderzo Software",
+                      "tags":  [
+                                   "Disk",
+                                   "Space Analysis"
+                               ]
+                  },
+                  {
+                      "match":  "SSD utils",
+                      "description":  "Online SSD utility portal with SSD detection and optimization tools.",
+                      "tags":  [
+                                   "Disk",
+                                   "SSD"
+                               ]
+                  },
+                  {
+                      "match":  "SSDZ",
+                      "description":  "SSD information viewer and health checker.",
+                      "tags":  [
+                                   "Disk",
+                                   "SSD",
+                                   "Health"
+                               ]
+                  },
+                  {
+                      "match":  "TxBENCH",
+                      "description":  "SSD benchmark with multiple read/write mode performance evaluations.",
+                      "publisher":  "Texim Corporation",
+                      "tags":  [
+                                   "Disk",
+                                   "SSD",
+                                   "Benchmark"
+                               ]
+                  },
+                  {
+                      "match":  "URWTEST",
+                      "description":  "USB drive read/write speed tester that measures real-world performance.",
+                      "tags":  [
+                                   "Disk",
+                                   "USB Drive",
+                                   "Benchmark"
+                               ]
+                  },
+                  {
+                      "match":  "WinDirStat",
+                      "description":  "Disk usage statistics tool that shows file types and space usage as colored blocks.",
+                      "publisher":  "Seifert",
+                      "tags":  [
+                                   "Disk",
+                                   "Space Analysis"
+                               ]
+                  },
+                  {
+                      "match":  "WizTree",
+                      "description":  "Ultra-fast disk space analyzer using the MFT to scan NTFS partitions.",
+                      "publisher":  "Antibody Software",
+                      "tags":  [
+                                   "Disk",
+                                   "Space Analysis"
+                               ]
+                  },
+                  {
+                      "match":  "FlashMaster",
+                      "description":  "USB drive mass-production tool for chip detection and repair.",
+                      "tags":  [
+                                   "Disk",
+                                   "USB Drive",
+                                   "Mass Production"
+                               ]
+                  },
+                  {
+                      "match":  "魔方数据恢复",
+                      "description":  "File data recovery tool for deleted, formatted, and lost partitions. Note: SSDs auto-clear data via TRIM, so recovery rates are usually low.",
+                      "publisher":  "Luomei (Tweaks.com)",
+                      "tags":  [
+                                   "Disk",
+                                   "Data Recovery"
+                               ]
+                  },
+                  {
+                      "match":  "memtest",
+                      "description":  "Memory stability tester that detects errors through repeated reads and writes.",
+                      "tags":  [
+                                   "Memory",
+                                   "Stability"
+                               ]
+                  },
+                  {
+                      "match":  "MemTest64",
+                      "description":  "64-bit memory stability tester supporting error detection on large memory capacities.",
+                      "publisher":  "TechPowerUp",
+                      "tags":  [
+                                   "Memory",
+                                   "Stability"
+                               ]
+                  },
+                  {
+                      "match":  "memtestpro",
+                      "description":  "Professional memory tester with multi-threading and more thorough error detection.",
+                      "tags":  [
+                                   "Memory",
+                                   "Stability"
+                               ]
+                  },
+                  {
+                      "match":  "Thaiphoon",
+                      "description":  "Memory SPD reader for module manufacturer, timings, frequency, and other details.",
+                      "tags":  [
+                                   "Memory",
+                                   "SPD",
+                                   "Hardware Info"
+                               ]
+                  },
+                  {
+                      "match":  "TestMem5",
+                      "description":  "Fifth-generation memory stability tester (TM5) with multiple test configs and extreme stress modes.",
+                      "tags":  [
+                                   "Memory",
+                                   "Stability"
+                               ]
+                  },
+                  {
+                      "match":  "魔方内存盘",
+                      "description":  "Virtual RAM disk creator that turns part of memory into a high-speed disk.",
+                      "publisher":  "Luomei (Tweaks.com)",
+                      "tags":  [
+                                   "Memory",
+                                   "RAM Disk"
+                               ]
+                  },
+                  {
+                      "match":  "ZenTimings",
+                      "description":  "Real-time memory timing and frequency viewer for AMD Zen platforms, covering DDR4/DDR5 timings, sub-timings, and voltages.",
+                      "publisher":  "ZenTimings",
+                      "tags":  [
+                                   "Memory",
+                                   "AMD",
+                                   "Timings",
+                                   "Hardware Info"
+                               ]
+                  },
+                  {
+                      "match":  "UFO",
+                      "description":  "UFO Test online refresh rate and motion blur tester.",
+                      "tags":  [
+                                   "Monitor",
+                                   "Refresh Rate"
+                               ]
+                  },
+                  {
+                      "match":  "Windows HDR Calibration",
+                      "description":  "Microsoft official HDR calibration tool for display brightness and color; installs from the Microsoft Store.",
+                      "publisher":  "Microsoft",
+                      "tags":  [
+                                   "Monitor",
+                                   "HDR",
+                                   "Calibration"
+                               ]
+                  },
+                  {
+                      "match":  "AresonMouseTest",
+                      "description":  "Mouse button and scroll wheel tester that checks whether every button responds.",
+                      "publisher":  "Areson",
+                      "tags":  [
+                                   "Peripherals",
+                                   "Mouse Test"
+                               ]
+                  },
+                  {
+                      "match":  "Keyboard Test Utility",
+                      "description":  "Keyboard key tester that checks each key one by one.",
+                      "publisher":  "Javad Taheri",
+                      "tags":  [
+                                   "Peripherals",
+                                   "Keyboard Test"
+                               ]
+                  },
+                  {
+                      "match":  "KeyTweak",
+                      "description":  "Keyboard key remapping tool for customizing key mappings.",
+                      "publisher":  "Travis Krumsick",
+                      "tags":  [
+                                   "Peripherals",
+                                   "Keyboard",
+                                   "Remap"
+                               ]
+                  },
+                  {
+                      "match":  "MOUSERATE",
+                      "description":  "Mouse polling rate tester that measures USB report rate (Hz) in real time.",
+                      "tags":  [
+                                   "Peripherals",
+                                   "Mouse",
+                                   "Polling Rate"
+                               ]
+                  },
+                  {
+                      "match":  "MouseTester",
+                      "description":  "Mouse performance tester for movement tracking, jitter, and click latency.",
+                      "tags":  [
+                                   "Peripherals",
+                                   "Mouse Test"
+                               ]
+                  },
+                  {
+                      "match":  "鼠标单击变双击",
+                      "description":  "Mouse switch fault detector that identifies aging switches causing single clicks to register as double clicks.",
+                      "tags":  [
+                                   "Peripherals",
+                                   "Mouse Test"
+                               ]
+                  },
+                  {
+                      "match":  "在线外设测试",
+                      "description":  "Online peripheral test center for mice, keyboards, and monitors in the browser.",
+                      "tags":  [
+                                   "Peripherals",
+                                   "Online Test"
+                               ]
+                  },
+                  {
+                      "match":  "AIDA64",
+                      "description":  "System hardware information, sensor monitoring, and stability testing.",
+                      "publisher":  "FinalWire",
+                      "tags":  [
+                                   "System Info",
+                                   "Sensors"
+                               ]
+                  },
+                  {
+                      "match":  "HWiNFO",
+                      "description":  "Professional hardware information, sensor monitoring, and logging tool.",
+                      "publisher":  "REALiX",
+                      "tags":  [
+                                   "System Info",
+                                   "Sensors"
+                               ]
+                  },
+                  {
+                      "match":  "HWMonitor",
+                      "description":  "Hardware temperature, voltage, and fan speed monitor with live sensor data.",
+                      "publisher":  "CPUID",
+                      "tags":  [
+                                   "System Info",
+                                   "Temperature"
+                               ]
+                  },
+                  {
+                      "match":  "RWEverything",
+                      "description":  "Hardware register read/write tool for PCI, SMBus, Super I/O, and other low-level access.",
+                      "tags":  [
+                                   "System Info",
+                                   "Low-level Access"
+                               ]
+                  },
+                  {
+                      "match":  "Speccy",
+                      "description":  "Quick system hardware information viewer with a concise configuration summary.",
+                      "publisher":  "Piriform",
+                      "tags":  [
+                                   "System Info",
+                                   "Hardware Info"
+                               ]
+                  },
+                  {
+                      "match":  "LatencyMon",
+                      "description":  "Real-time audio latency checker analyzing DPC/ISR latency and hard page faults to troubleshoot audio dropouts and crackling.",
+                      "publisher":  "Resplendence Software",
+                      "tags":  [
+                                   "Other",
+                                   "Latency",
+                                   "DPC"
+                               ]
+                  },
+                  {
+                      "match":  "BatteryInfoView",
+                      "description":  "Laptop battery capacity, cycle count, wear, and live status viewer.",
+                      "publisher":  "NirSoft",
+                      "tags":  [
+                                   "Battery",
+                                   "Hardware Info"
+                               ]
+                  },
+                  {
+                      "match":  "BlueScreenView",
+                      "description":  "Blue-screen crash dump analyzer for BSOD error codes and the drivers that caused them.",
+                      "publisher":  "NirSoft",
+                      "tags":  [
+                                   "System",
+                                   "BSOD Analysis"
+                               ]
+                  },
+                  {
+                      "match":  "DesktopOK",
+                      "description":  "Desktop icon position save/restore tool that keeps icon layout intact after resolution changes.",
+                      "publisher":  "SoftwareOK",
+                      "tags":  [
+                                   "System",
+                                   "Desktop"
+                               ]
+                  },
+                  {
+                      "match":  "DirectX Repair",
+                      "description":  "DirectX repair tool that detects and fixes missing or damaged DirectX components.",
+                      "tags":  [
+                                   "System",
+                                   "DirectX",
+                                   "Repair"
+                               ]
+                  },
+                  {
+                      "match":  "Dism++",
+                      "description":  "Windows slimming and optimization tool; a graphical system manager built on DISM.",
+                      "publisher":  "Chuyu Team",
+                      "tags":  [
+                                   "System",
+                                   "Optimize",
+                                   "Slimming"
+                               ]
+                  },
+                  {
+                      "match":  "Everything",
+                      "description":  "Ultra-fast file search based on the NTFS USN journal for instant filename lookups.",
+                      "publisher":  "voidtools",
+                      "tags":  [
+                                   "System",
+                                   "File Search"
+                               ]
+                  },
+                  {
+                      "match":  "HiBit Uninstaller",
+                      "description":  "Powerful software uninstaller with forced and batch uninstall plus registry leftover cleanup.",
+                      "publisher":  "HiBitSoft",
+                      "tags":  [
+                                   "System",
+                                   "Uninstall"
+                               ]
+                  },
+                  {
+                      "match":  "GifCam",
+                      "description":  "GIF animation recorder that captures a selected window region straight to GIF.",
+                      "publisher":  "Bahraniapps",
+                      "tags":  [
+                                   "System",
+                                   "GIF Recording"
+                               ]
+                  },
+                  {
+                      "match":  "MSIAfterburner",
+                      "description":  "Download page for MSI Afterburner GPU overclocking and monitoring, supporting all GPU brands.",
+                      "publisher":  "MSI",
+                      "tags":  [
+                                   "GPU",
+                                   "Overclocking",
+                                   "Monitoring"
+                               ]
+                  },
+                  {
+                      "match":  "next_itellyou",
+                      "description":  "MSDN I Tell You online portal for genuine Microsoft system images.",
+                      "tags":  [
+                                   "System",
+                                   "System Image"
+                               ]
+                  },
+                  {
+                      "match":  "Process Explorer",
+                      "description":  "Advanced process manager showing process trees and detailed system resource usage.",
+                      "publisher":  "Sysinternals",
+                      "tags":  [
+                                   "System",
+                                   "Processes"
+                               ]
+                  },
+                  {
+                      "match":  "Rufus",
+                      "description":  "USB boot disk creator for quickly building bootable USB installers.",
+                      "publisher":  "Akeo Consulting",
+                      "tags":  [
+                                   "System",
+                                   "USB Boot"
+                               ]
+                  },
+                  {
+                      "match":  "UltraISO",
+                      "description":  "Disc image creation and editing tool supporting ISO creation, editing, and burning.",
+                      "publisher":  "EZB Systems",
+                      "tags":  [
+                                   "System",
+                                   "ISO",
+                                   "Disc Image"
+                               ]
+                  },
+                  {
+                      "match":  "Ventoy",
+                      "description":  "Multi-boot USB creator: just copy ISO files to boot them, no repeated formatting.",
+                      "tags":  [
+                                   "System",
+                                   "USB Boot"
+                               ]
+                  },
+                  {
+                      "match":  "WinDbg",
+                      "description":  "Microsoft official kernel-level debugger for deep driver and system-level analysis.",
+                      "publisher":  "Microsoft",
+                      "tags":  [
+                                   "System",
+                                   "Debugging"
+                               ]
+                  },
+                  {
+                      "match":  "fptw64",
+                      "description":  "Intel Flash Programming Tool (64-bit) for flashing and backing up Intel motherboard BIOS/ME firmware.",
+                      "publisher":  "Intel",
+                      "tags":  [
+                                   "Motherboard",
+                                   "BIOS Flash",
+                                   "Intel"
+                               ]
+                  },
+                  {
+                      "match":  "FanControl",
+                      "description":  "Open-source fan curve controller with custom speed policies and multi-fan linking.",
+                      "publisher":  "Rem0o",
+                      "tags":  [
+                                   "Fan",
+                                   "Thermal Control",
+                                   "Open Source"
+                               ]
+                  },
+                  {
+                      "match":  "PowerToys",
+                      "description":  "Microsoft official system enhancement suite: window management, color picker, bulk rename, shortcut guide, and more.",
+                      "publisher":  "Microsoft",
+                      "tags":  [
+                                   "System",
+                                   "Enhancement",
+                                   "Microsoft"
+                               ]
+                  },
+                  {
+                      "match":  "USBDeview",
+                      "description":  "USB device history viewer and manager showing details and power information for every USB device ever connected.",
+                      "publisher":  "NirSoft",
+                      "tags":  [
+                                   "USB",
+                                   "Device Management",
+                                   "Hardware Info"
+                               ]
+                  },
+                  {
+                      "match":  "USBTreeView",
+                      "description":  "USB controller topology viewer that shows controllers, hubs, and devices as a tree.",
+                      "publisher":  "Uwe Sieber",
+                      "tags":  [
+                                   "USB",
+                                   "Topology",
+                                   "Hardware Info"
+                               ]
+                  },
+                  {
+                      "match":  "RAMMap",
+                      "description":  "Detailed physical memory allocation viewer with multiple views for usage, cache, and process consumption.",
+                      "publisher":  "Sysinternals",
+                      "tags":  [
+                                   "Memory",
+                                   "Memory Analysis",
+                                   "System Tools"
+                               ]
+                  },
+                  {
+                      "match":  "Autoruns",
+                      "description":  "Startup and auto-registration manager covering drivers, services, and scheduled tasks.",
+                      "publisher":  "Sysinternals",
+                      "tags":  [
+                                   "System",
+                                   "Startup",
+                                   "Optimize"
+                               ]
+                  },
+                  {
+                      "match":  "Procmon",
+                      "description":  "Real-time process activity monitor for file, registry, network, and thread activity — great for troubleshooting.",
+                      "publisher":  "Sysinternals",
+                      "tags":  [
+                                   "System",
+                                   "Process Monitor",
+                                   "Diagnostics"
+                               ]
+                  },
+                  {
+                      "match":  "BOOTICE",
+                      "description":  "Disk boot sector manager supporting MBR/GPT editing, boot record backup/restore, and USB boot creation.",
+                      "publisher":  "Pauly",
+                      "tags":  [
+                                   "Disk",
+                                   "Boot Sector",
+                                   "MBR",
+                                   "GPT"
+                               ]
+                  },
+                  {
+                      "match":  "FreeMove",
+                      "description":  "Move installed programs from C: to another partition without breaking shortcuts or registry links.",
+                      "publisher":  "ImbaSoft",
+                      "tags":  [
+                                   "Disk",
+                                   "App Migration",
+                                   "Partition"
+                               ]
+                  },
+                  {
+                      "match":  "卡巴斯基",
+                      "description":  "Currently one of the strongest antivirus products",
+                      "publisher":  "Kaspersky",
+                      "tags":  [
+                                   "Antivirus",
+                                   "Security"
+                               ]
+                  },
+                  {
+                      "match":  "RoboCopyEx",
+                      "description":  "High-performance file copy tool that replaces Windows copy and paste",
+                      "publisher":  "RoboCopyEx",
+                      "tags":  [
+                                   "File Copy",
+                                   "File Management"
+                               ]
+                  },
+                  {
+                      "match":  "360驱动大师",
+                      "description":  "360 Driver Master clean edition: automatically detect, install, and update hardware drivers.",
+                      "publisher":  "Qihoo 360",
+                      "tags":  [
+                                   "Driver",
+                                   "Driver Update",
+                                   "Hardware Info"
+                               ]
+                  }
+              ]
+}

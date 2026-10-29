@@ -1,0 +1,133 @@
+隐私政策 / Privacy Policy
+
+空岛图吧工具箱  —  最后更新：2026年9月
+Kongdao Tuba Toolbox  —  Last updated: September 2026
+
+=======================================
+一、数据收集 / Data Collection
+=======================================
+
+空岛图吧工具箱 不收集任何可识别您个人身份的信息（姓名、邮箱、电话号码、账号、文件内容、地理位置等）。
+Kongdao Tuba Toolbox does not collect any personally identifiable information (name, email, phone number, account, file contents, geolocation, etc.).
+
+为统计活跃用户、定位崩溃与改进软件，应用默认会发送匿名的运行与错误数据，您可以随时在「设置 → 常规 → 发送匿名使用数据」中关闭。
+To count active users, diagnose crashes and improve the app, the app sends anonymous runtime and error data by default. You can turn this off at any time in Settings → General → Send anonymous usage data.
+
+会发送的数据 / What is sent:
+- 运行信息：应用版本、Windows 版本与内部版本号、CPU 架构、界面语言、运行模式（便携版 / 微软商店版 / 精简版）、是否以管理员身份运行
+  Runtime info: app version, Windows version and build number, CPU architecture, UI language, run mode (portable / Microsoft Store / lite), whether running as administrator
+- 匿名设备标识：由 Windows 机器 GUID 加固定盐值做 SHA-256 哈希后截断生成，无法反推出您的机器或身份，仅用于区分设备（统计活跃设备数 / 在线用户数）
+  Anonymous device identifier: a truncated SHA-256 hash of the Windows machine GUID plus a fixed salt. It cannot be reverse-engineered into your machine or identity and is only used to distinguish devices (active devices / online users)
+- 使用事件：应用启动、每 10 分钟一次的运行心跳（用于统计在线与活跃设备）、启动的工具名称（工具目录名或内置工具 ID，不含文件路径）
+  Usage events: app start, a heartbeat every 10 minutes (to count online and active devices), and the name of a launched tool (folder name or built-in tool ID, never a file path)
+- 错误日志：未处理异常的类型、消息与调用堆栈（其中的用户名与用户目录路径已在本地替换为 <用户>），以及异常来源分类
+  Error logs: type, message and call stack of unhandled exceptions (usernames and user-folder paths are replaced with <user> locally before sending), plus an error source category
+
+不会发送的数据 / What is never sent:
+- 姓名、邮箱、电话、账号等任何个人身份信息
+  Personal identifiers such as name, email, phone number or account
+- 您的文件内容、文件路径、硬件序列号
+  Your file contents, file paths or hardware serial numbers
+- 键盘输入、屏幕截图、剪贴板内容
+  Keystrokes, screenshots or clipboard contents
+- 用于广告、用户画像或任何商业营销的数据
+  Data used for advertising, profiling or any commercial marketing
+
+数据发送至 Microsoft Azure Application Insights（东亚·日本东部区域）。除该服务作为托管方外，我们不会将上述数据出售或分享给任何第三方。与所有网络服务一样，接收服务器可能在服务运维日志中记录来源 IP 地址。
+Data is sent to Microsoft Azure Application Insights (East Asia · Japan East). Apart from this service as the hosting provider, we do not sell or share this data with any third party. As with any network service, the receiving server may log source IP addresses for operational purposes.
+
+=======================================
+二、关闭数据发送 / Turning Data Collection Off
+=======================================
+
+在「设置 → 常规 → 发送匿名使用数据」关闭开关后：
+When you switch off Settings → General → Send anonymous usage data:
+
+- 应用立即停止采集，并删除本地尚未发送的待传数据
+  Collection stops immediately and locally queued, unsent data is deleted
+- 关闭状态会被记住，后续启动不再发送任何数据
+  The setting is remembered; nothing is sent on future launches
+
+由于采集的数据不包含任何可识别身份的信息，我们无法将已上报的数据定位到具体设备或个人，因此无法针对个人进行删除；如需彻底清除，请在关闭开关后联系我们。
+Because the collected data contains no identifiable information, we cannot trace reported data back to a specific device or person, and therefore cannot delete it per individual. To have any data removed, please contact us after switching the setting off.
+
+=======================================
+三、数据保留 / Data Retention
+=======================================
+
+匿名遥测数据遵循 Azure Application Insights 的默认保留策略（当前为 30 天），到期后自动删除。
+Anonymous telemetry follows the default retention policy of Azure Application Insights (currently 30 days), after which it is deleted automatically.
+
+=======================================
+四、本地数据存储 / Local Data Storage
+=======================================
+
+应用仅在您的设备本地存储以下数据：
+The app stores only the following data locally on your device:
+
+1. 收藏夹与使用记录 — 您标记为「收藏」的工具路径、启动历史、排序偏好，存储在本地数据目录
+   Favorites and usage records — favorited tool paths, launch history and sorting preferences, stored in the local data directory
+
+2. 图标缓存 — 工具可执行文件的图标提取缓存，存储在 %LocalAppData%\TubaWinUi3\IconCache\ 目录下
+   Icon cache — extracted icons from tool executables, stored under %LocalAppData%\TubaWinUi3\IconCache\
+
+3. 设置与日志 — 界面设置、AI 助手会话与记忆、诊断日志（agent-debug.log 等），存储在本地数据目录
+   Settings and logs — UI settings, AI assistant sessions and memory, diagnostic logs (e.g. agent-debug.log), stored in the local data directory
+
+以上数据均保存在您的本地设备上，除「错误日志打包上传」（仅在您手动导出并自行提交时发生）外不会上传。卸载应用时，这些数据可一并清除。
+All of the above stays on your local device. Apart from the "error report bundle" (which is only uploaded if you export it and submit it yourself), it is not uploaded. It can be removed when you uninstall the app.
+
+=======================================
+五、网络访问 / Network Access
+=======================================
+
+除匿名遥测外，应用会在您使用相关功能时访问网络，用于：
+Besides anonymous telemetry, the app accesses the network when you use the corresponding features, to:
+
+- 检查更新与下载 — 从 GitHub / GitCode 等镜像获取应用更新、工具内核与内置工具
+  Check for updates and download — app updates, tool bundles and built-in tools from GitHub / GitCode mirrors
+- 元数据与榜单同步 — 获取工具元数据、CPU / GPU 性能榜、社区工具列表
+  Metadata and ranking sync — tool metadata, CPU / GPU performance rankings, community tool lists
+- AI 助手 — 仅在您自行配置并主动使用时，将对话内容发送至您所配置的 AI 服务商（密钥由您自行填写与保管）
+  AI assistant — only when you configure and use it, your conversation is sent to the AI provider you configured (keys are entered and kept by you)
+- 系统镜像下载 — UUP dump 与微软官方镜像源，仅在您主动使用时
+  Windows image downloads — UUP dump and official Microsoft sources, only when you use this feature
+- 游戏联机助手 — Tailscale 网络与登录，仅在您主动使用时
+  Game tunnel — Tailscale networking and login, only when you use this feature
+
+上述网络请求遵循各服务提供方自身的隐私政策。您可以随时在设置中关闭遥测，或通过代理设置控制网络访问。
+These requests are governed by the privacy policies of the respective service providers. You can turn telemetry off at any time, or control network access through the proxy settings.
+
+=======================================
+六、所需权限 / Required Permissions
+=======================================
+
+- runFullTrust — 用于启动第三方诊断工具、读取WMI硬件信息、编辑系统Hosts文件、管理证书存储、清理系统垃圾文件等
+  Required for launching third-party diagnostic tools, querying WMI hardware info, editing Hosts file, managing certificate stores, cleaning junk files, etc.
+
+=======================================
+七、第三方工具 / Third-Party Tools
+=======================================
+
+本应用集成了多个第三方PC硬件诊断工具。这些工具作为独立程序运行。本应用仅提供统一的快捷启动入口，不干涉也不监控这些工具的数据行为。
+This application integrates multiple third-party PC hardware diagnostic tools that run as independent programs. This app only provides a unified launcher and does not interfere with or monitor the data behavior of these tools.
+
+=======================================
+八、儿童隐私 / Children's Privacy
+=======================================
+
+本应用不面向13岁以下儿童，也不会有意收集儿童的个人信息。
+This application is not directed to children under 13 and does not knowingly collect personal information from children.
+
+=======================================
+九、政策变更 / Policy Changes
+=======================================
+
+如本隐私政策有任何变更，将在应用内及本页面公布。建议定期查阅。
+Any changes to this privacy policy will be announced within the application and on this page. Please check this page periodically.
+
+=======================================
+十、联系我们 / Contact Us
+=======================================
+
+邮箱 / Email: xiaohuzi12323@163.com

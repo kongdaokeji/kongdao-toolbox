@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentDialog
+    x:Class="TubaWinUi3.Pages.GameTunnelSetupDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="联机组件"
+    PrimaryButtonText="下载联机组件"
+    CloseButtonText="关闭"
+    DefaultButton="Primary"
+    PrimaryButtonClick="OnPrimaryButtonClick"
+    SecondaryButtonClick="OnSecondaryButtonClick">
+
+    <ContentDialog.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+            <CornerRadius x:Key="DialogCornerRadius">12</CornerRadius>
+        </ResourceDictionary>
+    </ContentDialog.Resources>
+
+    <Grid MinWidth="480" RowSpacing="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock
+            FontSize="12"
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            TextWrapping="Wrap"
+            Text="联机靠 EasyTier 把两台电脑接进同一个加密虚拟网络：不装驱动、不建虚拟网卡、不需要账号。第一次联机需要下载一次组件（约 30MB），之后直接可用。" />
+
+        <!-- 步骤 1：组件 -->
+        <Border
+            Grid.Row="1"
+            Style="{StaticResource FluentCardStyle}">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border x:Name="Step1Badge" Width="28" Height="28" CornerRadius="12" Background="{ThemeResource SubtleFillColorSecondaryBrush}" VerticalAlignment="Top">
+                    <FontIcon x:Name="Step1Icon" FontSize="12" Glyph="&#xE9F5;" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="下载联机组件" />
+                    <TextBlock x:Name="Step1Status" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Text="检测中…" />
+                    <ProgressBar x:Name="Step1Progress" Visibility="Collapsed" Margin="0,4,0,0" />
+                    <TextBlock x:Name="Step1ProgressText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Visibility="Collapsed" TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 步骤 2：就绪 -->
+        <Border
+            Grid.Row="2"
+            Style="{StaticResource FluentCardStyle}">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border x:Name="Step2Badge" Width="28" Height="28" CornerRadius="12" Background="{ThemeResource SubtleFillColorSecondaryBrush}" VerticalAlignment="Top">
+                    <FontIcon x:Name="Step2Icon" FontSize="12" Glyph="&#xE774;" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="可以开始联机" />
+                    <TextBlock x:Name="Step2Status" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Text="组件下载完成后即可建房或加入" />
+                    <TextBlock x:Name="ComponentVersionText" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" Visibility="Collapsed" />
+                    <TextBlock x:Name="ComponentPathText" FontSize="12" FontFamily="Consolas" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" IsTextSelectionEnabled="True" Visibility="Collapsed" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <InfoBar x:Name="StatusBar" Grid.Row="3" IsOpen="False" IsClosable="True" Severity="Informational" />
+
+        <TextBlock
+            Grid.Row="4"
+            FontSize="12"
+            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+            TextWrapping="Wrap"
+            Text="联机组件为开源项目 EasyTier（LGPL-3.0），每个文件都会与本程序内置的 SHA-256 比对，来源不可信的文件会被丢弃。它只在本机转发游戏端口，不会把你的电脑暴露到公网。" />
+    </Grid>
+</ContentDialog>

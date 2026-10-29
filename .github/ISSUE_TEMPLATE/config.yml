@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 官方文档
+    url: https://tubawinui3.cn
+    about: 使用手册、安装教程、内置工具与开发文档，提问前请先查阅
+  - name: 社区工具提交（无需代码）
+    url: https://tubawinui3.cn/guide/contribute-tools
+    about: 想收录新的第三方工具？在软件内「社区 → 提交工具」一键提交即可
+  - name: 交流群
+    url: https://github.com/luolangaga/tubatool/issues
+    about: 欢迎加入 QQ 群 485079194 交流讨论（群号见 README）

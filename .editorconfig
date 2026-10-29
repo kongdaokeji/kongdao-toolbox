@@ -1,0 +1,90 @@
+# 顶层 EditorConfig —— 图吧工具箱 TubaWinUi3
+# 参考：https://editorconfig.org / https://learn.microsoft.com/dotnet/fundamentals/code-analysis/style-rules
+
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+end_of_line = crlf
+
+[*.{cs,csx}]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+
+[*.{xaml,xml}]
+indent_style = space
+indent_size = 4
+
+[*.{csproj,props,targets,sln,config,json}]
+indent_style = space
+indent_size = 2
+
+[*.{md,markdown}]
+trim_trailing_whitespace = false
+end_of_line = crlf
+
+[*.{ps1,psm1}]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+
+[*.{py}]
+indent_style = space
+indent_size = 4
+
+# ---------------- C# 代码风格规则（dotnet format 可识别） ----------------
+
+[*.cs]
+# 排序
+dotnet_sort_system_directives_first = true
+
+# 命名规则（IDE1006）
+dotnet_naming_rule.private_members_with_underscore.symbols = private_members
+dotnet_naming_rule.private_members_with_underscore.style = underscore_prefix
+dotnet_naming_rule.private_members_with_underscore.severity = suggestion
+
+dotnet_naming_symbols.private_members.applicable_kinds = field,event,method,property,constant
+dotnet_naming_symbols.private_members.applicable_accessibilities = private,internal
+
+dotnet_naming_style.underscore_prefix.required_prefix = _
+dotnet_naming_style.underscore_prefix.required_suffix =
+dotnet_naming_style.underscore_prefix.word_separator =
+dotnet_naming_style.underscore_prefix.capitalization = camel_case
+
+# 风格
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_constructors = false:suggestion
+csharp_style_expression_bodied_operators = false:suggestion
+csharp_prefer_braces = true:warning
+csharp_style_namespace_declarations = file_scoped:suggestion
+
+# 可空性
+dotnet_diagnostic.CS8602.severity = warning
+dotnet_diagnostic.CS8600.severity = suggestion
+
+# 格式（dotnet format whitespace/style）
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+csharp_indent_case_contents_when_block = true
+csharp_space_around_binary_operators = before_and_after
+
+# ---------------- 忽略（构建产物 / 第三方目录） ----------------
+[**/{bin,obj}/**]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+[**/node_modules/**]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset

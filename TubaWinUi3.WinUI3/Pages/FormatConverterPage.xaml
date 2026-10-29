@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="TubaWinUi3.Pages.FormatConverterPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:controls="using:TubaWinUi3.Controls"
+    mc:Ignorable="d">
+
+    <Page.Resources>
+        <DataTemplate x:Key="QueueItemTemplate">
+            <Grid ColumnSpacing="8" Padding="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <FontIcon Glyph="{Binding CategoryGlyph}" FontSize="16"
+                          Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                          VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" Style="{StaticResource SectionHeaderStyle}"
+                               TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding FullPath}" />
+                    <TextBlock Text="{Binding StatusText}" FontSize="12"
+                               Foreground="{Binding StatusBrush}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Detail}" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                               TextWrapping="Wrap" MaxLines="3" Visibility="{Binding DetailVisibility}" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding SizeText}" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               VerticalAlignment="Center" />
+                    <Button Click="RemoveItemBtn_Click" FontSize="14" Padding="8,4" VerticalAlignment="Center"
+                            Background="Transparent" BorderThickness="0">
+                        <FontIcon Glyph="&#xE711;" FontSize="12" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <controls:ToolPageHeader ToolId="format-converter"
+            Grid.Row="0"
+            Title="格式转换"
+            Subtitle="图片 · 音视频 · 文档 · 表格 · 演示 · PDF · 文本 · 任意文件打包，拖入即用"
+            Glyph="&#xE8B2;"
+            ShowDivider="False" />
+
+        <Grid x:Name="ConverterWorkspace" SizeChanged="ConverterWorkspace_SizeChanged" Grid.Row="1" Padding="24,4,24,24" ColumnSpacing="24" RowSpacing="16">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition x:Name="InspectorColumn" Width="0" /></Grid.ColumnDefinitions>
+            <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+
+            <Grid x:Name="MainPanel" RowSpacing="16">
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition x:Name="IntakeRow" Height="*" /><RowDefinition x:Name="QueueRow" Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <Grid.ChildrenTransitions><TransitionCollection><EntranceThemeTransition FromHorizontalOffset="0" FromVerticalOffset="24" IsStaggeringEnabled="True" /></TransitionCollection></Grid.ChildrenTransitions>
+                <InfoBar Grid.Row="0" x:Name="ToastBar" IsClosable="True" IsOpen="False" />
+<Border Grid.Row="1" x:Name="DropZone" MinHeight="220" Padding="24" CornerRadius="8"
+                        BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <StackPanel Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE8A5;" FontSize="40" Foreground="{ThemeResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center" />
+                        <TextBlock Text="把文件拖到这里（支持多选）" Style="{StaticResource CardTitleStyle}" HorizontalAlignment="Center" />
+                        <TextBlock x:Name="DropHintText" FontSize="12"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" TextAlignment="Center"
+                                   Text="图片 / 视频 / 音频 / Word / Excel / PPT / PDF / Markdown / TXT / HTML / JSON&#x0a;旧版 .doc / .ppt / .wps / .et / .dps 需要本机安装 Office 或 WPS；任意文件均可打包为 ZIP" />
+                        <Button Click="BrowseBtn_Click" Style="{StaticResource AccentButtonStyle}" FontSize="14" Padding="12,8"
+                                HorizontalAlignment="Center" Content="浏览文件" />
+                    </StackPanel>
+                </Border><Border Grid.Row="2" x:Name="QueuePanel" Style="{StaticResource FluentCardStyle}" Visibility="Collapsed">
+                    <Grid RowSpacing="16">
+<Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <FontIcon Glyph="&#xE8FD;" FontSize="14" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                <TextBlock x:Name="QueueTitleText" Style="{StaticResource SectionHeaderStyle}" Text="文件队列" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <Button x:Name="ConvertBtn" Grid.Column="1" Click="ConvertBtn_Click"
+                                    Style="{StaticResource AccentButtonStyle}" Content="转换为…" MinWidth="110" />
+                            <Button Grid.Column="2" Click="BrowseBtn_Click" Content="添加文件" />
+                            <Button Grid.Column="3" Click="ClearQueueBtn_Click" Content="清空" />
+                        </Grid>
+                        <ListView x:Name="QueueList" ItemTemplate="{StaticResource QueueItemTemplate}"
+                                  Grid.Row="1" SelectionMode="None" MinHeight="120"
+                                  Background="{ThemeResource SubtleFillColorTransparentBrush}" CornerRadius="8" />
+                    </Grid>
+                </Border><Border Grid.Row="3" x:Name="ProgressPanel" Style="{StaticResource FluentCardStyle}" Visibility="Collapsed">
+                    <StackPanel Spacing="8">
+                        <ProgressBar x:Name="TaskProgress" IsIndeterminate="True" />
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="ProgressText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       Text="准备中..." TextWrapping="Wrap" />
+                            <Button Grid.Column="1" x:Name="CancelBtn" Click="CancelBtn_Click" Content="取消" FontSize="14" Padding="8,4" />
+                        </Grid>
+                        <ProgressBar x:Name="DownloadProgress" Visibility="Collapsed" />
+                    </StackPanel>
+                </Border><Border Grid.Row="4" x:Name="ResultPanel" Style="{StaticResource FluentCardStyle}" Visibility="Collapsed">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon x:Name="ResultIcon" Glyph="&#xE73E;" FontSize="16" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                            <TextBlock x:Name="ResultTitleText" Style="{StaticResource SectionHeaderStyle}" Text="转换完成" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock x:Name="ResultText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap" MaxLines="8" TextTrimming="CharacterEllipsis" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Click="OpenFolderBtn_Click" Content="打开输出文件夹" />
+                            <Button Click="ResetBtn_Click" Content="继续转换" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+            <ScrollViewer x:Name="EngineInspector" Grid.Row="1" MaxHeight="240" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch">
+                <Expander x:Name="EngineExpander" Header="转换引擎" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="按需下载，首次转换时会引导安装所需引擎。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" />
+<Border Style="{StaticResource FluentCardStyle}">
+        <StackPanel Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE8B2;" FontSize="20" /><TextBlock Text="FFmpeg" Style="{StaticResource BodyStrongTextBlockStyle}" /></StackPanel>
+            <TextBlock Text="音频与视频" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <TextBlock x:Name="FfmpegStatusText" Text="检查中…" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+<Button x:Name="FfmpegActionBtn" Click="EngineActionBtn_Click" HorizontalAlignment="Left" /></StackPanel></Border><Border Style="{StaticResource FluentCardStyle}">
+        <StackPanel Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE91B;" FontSize="20" /><TextBlock Text="ImageMagick" Style="{StaticResource BodyStrongTextBlockStyle}" /></StackPanel>
+            <TextBlock Text="图片格式" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <TextBlock x:Name="MagickStatusText" Text="检查中…" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+<Button x:Name="MagickActionBtn" Click="EngineActionBtn_Click" HorizontalAlignment="Left" /></StackPanel></Border><Border Style="{StaticResource FluentCardStyle}">
+        <StackPanel Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE8A5;" FontSize="20" /><TextBlock Text="OfficeCLI" Style="{StaticResource BodyStrongTextBlockStyle}" /></StackPanel>
+            <TextBlock Text="Office 文档渲染" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <TextBlock x:Name="OfficeCliStatusText" Text="检查中…" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+<Button x:Name="OfficeCliActionBtn" Click="EngineActionBtn_Click" HorizontalAlignment="Left" /></StackPanel></Border><Border Style="{StaticResource FluentCardStyle}">
+        <StackPanel Spacing="12">
+            <StackPanel Orientation="Horizontal" Spacing="12"><FontIcon Glyph="&#xE945;" FontSize="20" /><TextBlock Text="系统组件" Style="{StaticResource BodyStrongTextBlockStyle}" /></StackPanel>
+            <TextBlock Text="OCR · Office / WPS" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <TextBlock x:Name="SystemStatusText" Text="检查中…" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+</StackPanel></Border>
+                    </StackPanel>
+                </Expander>
+            </ScrollViewer>
+            <WebView2 x:Name="DocWeb" Width="1" Height="1" HorizontalAlignment="Left" VerticalAlignment="Top" IsHitTestVisible="False" Opacity="0.02" />
+        </Grid>
+    </Grid>
+</Page>

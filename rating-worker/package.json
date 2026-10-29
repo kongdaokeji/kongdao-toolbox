@@ -1,0 +1,16 @@
+{
+  "name": "tuba-rating-api",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute tuba-ratings --file=./schema.sql",
+    "db:init:remote": "wrangler d1 execute tuba-ratings --remote --file=./schema.sql"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260820.1",
+    "typescript": "^5.6.0",
+    "wrangler": "^4.125.0"
+  }
+}

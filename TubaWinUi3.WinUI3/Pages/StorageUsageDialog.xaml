@@ -1,0 +1,64 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentDialog
+    x:Class="TubaWinUi3.Pages.StorageUsageDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="空岛图吧工具箱存储占用"
+    PrimaryButtonText="删除所选"
+    CloseButtonText="关闭"
+    DefaultButton="Close"
+    PrimaryButtonClick="PrimaryButton_Click">
+
+    <Grid MinWidth="680" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 总览与扫描状态 -->
+        <StackPanel Grid.Row="0" Spacing="8">
+            <StackPanel x:Name="ScanPanel" Spacing="8">
+                <TextBlock x:Name="ScanText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="正在统计占用…" />
+                <ProgressBar x:Name="ScanBar" IsIndeterminate="True" />
+            </StackPanel>
+
+            <StackPanel x:Name="SummaryPanel" Spacing="8" Visibility="Collapsed">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                        <TextBlock x:Name="TotalText" Style="{StaticResource StatValueStyle}" Text="—" />
+                        <TextBlock x:Name="TotalHintText" Margin="0,0,0,4" VerticalAlignment="Bottom" FontSize="12"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <TextBlock x:Name="SelectionText" Grid.Column="1" Margin="0,0,0,4" VerticalAlignment="Bottom" FontSize="12" />
+                </Grid>
+                <Border Height="8" CornerRadius="4" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <Grid x:Name="UsageBarGrid" />
+                </Border>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- 分组清单 -->
+        <ScrollViewer
+            x:Name="ListScroll"
+            Grid.Row="1"
+            MaxHeight="420"
+            HorizontalScrollMode="Disabled"
+            VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="GroupsPanel" Spacing="8" />
+        </ScrollViewer>
+
+        <!-- 提示与结果 -->
+        <StackPanel Grid.Row="2" Spacing="8">
+            <InfoBar x:Name="WarningBar" IsClosable="False" IsOpen="False" Severity="Warning" />
+            <TextBlock x:Name="StatusText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+        </StackPanel>
+    </Grid>
+</ContentDialog>

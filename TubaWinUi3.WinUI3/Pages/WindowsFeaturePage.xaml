@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:local="using:TubaWinUi3.Pages" xmlns:controls="using:TubaWinUi3.Controls" x:Class="TubaWinUi3.Pages.WindowsFeaturePage" mc:Ignorable="d" Loaded="WindowsFeaturePage_Loaded">
+    <Page.Resources>
+        <Style x:Key="FeatureItemContainer" TargetType="ListViewItem">
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+        <DataTemplate x:Key="FeatureCardTemplate" x:DataType="local:FeatureRowVm">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="4" VerticalAlignment="Center">
+                    <TextBlock Text="{x:Bind DisplayName}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind DisplayName}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <TextBlock Text="{x:Bind IdText}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock Text="{x:Bind StateText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </StackPanel>
+                    <TextBlock Text="{x:Bind RestartText, Mode=OneWay}" Visibility="{x:Bind RestartVisibility, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <Button Content="恢复默认" Tag="{x:Bind Self}" IsEnabled="{x:Bind CanReset, Mode=OneWay}" Click="ResetFeature_Click" Style="{StaticResource SubtleButtonStyle}"/>
+                    <ToggleSwitch IsOn="{x:Bind IsOn, Mode=OneWay}" IsEnabled="{x:Bind CanToggle, Mode=OneWay}" Tag="{x:Bind Self}" Toggled="FeatureToggle_Toggled" OnContent="" OffContent="" MinWidth="0" AutomationProperties.Name="{x:Bind ActionLabel}" ToolTipService.ToolTip="直接启用或禁用；未配置的功能显示为关闭"/>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+    </Page.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <controls:ToolPageHeader ToolId="windows-feature" Grid.Row="0" Title="Windows 隐藏功能" Subtitle="按 ID 配置或搜索实验性功能 · 修改后建议重启 Windows" Glyph="&#xE950;">
+            <controls:ToolPageHeader.Actions>
+                <Button x:Name="RefreshButton" Click="RefreshButton_Click" Style="{StaticResource ToolHeaderActionButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon x:Name="RefreshIcon" Glyph="&#xE72C;" FontSize="12"/>
+                        <TextBlock x:Name="RefreshText" Text="重新加载"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource ToolHeaderActionButtonStyle}" AutomationProperties.Name="使用说明" ToolTipService.ToolTip="使用说明">
+                    <FontIcon Glyph="&#xE897;" FontSize="16"/>
+                    <Button.Flyout>
+                        <Flyout>
+                            <ScrollViewer MaxHeight="400" MaxWidth="440" VerticalScrollBarVisibility="Auto">
+                    <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16,12">
+                        <StackPanel Spacing="8">
+                            <TextBlock FontSize="14" FontWeight="SemiBold">
+                                <Run Text="使用说明"/>
+                                <Run Text="　"/>
+                                <Run Text="(需求 Windows 10 1903+ 系统)" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                            </TextBlock>
+                            <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" LineHeight="19">
+                                <Run Text="· 功能列表合并当前配置、重启后的配置与功能字典，每个 ID 只显示一次，按 ID 升序分批加载。名称为 Windows 内部标识，不代表当前版本一定支持该功能。"/>
+                                <LineBreak/>
+                                <Run Text="· 上方输入一个或多个 ID，逗号分隔，可批量启用、禁用或恢复默认；下方搜索统一匹配名称和 ID。未配置表示没有读取到配置，不等于已禁用。"/>
+                                <LineBreak/>
+                                <Run Text="· 修改同时应用到当前配置并保存到重启后的配置；恢复默认仅删除 User 优先级的自定义配置，系统原有策略仍然有效。状态不同的条目会显示重启后的配置。"/>
+                                <LineBreak/>
+                                <Run Text="· 实验性功能可能不稳定或引发系统异常，请按需开启、谨慎操作。"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                            </ScrollViewer>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+            </controls:ToolPageHeader.Actions>
+        </controls:ToolPageHeader>
+        <!-- 正文 -->
+        <Grid Grid.Row="1" Padding="24,4,24,16" RowSpacing="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Spacing="8">
+                <InfoBar x:Name="ErrorBar" Visibility="{x:Bind InfoBarVisibility(ErrorBar.IsOpen), Mode=OneWay}" Severity="Error" IsOpen="False" IsClosable="True" Title="操作失败"/>
+                <InfoBar x:Name="SuccessBar" Visibility="{x:Bind InfoBarVisibility(SuccessBar.IsOpen), Mode=OneWay}" Severity="Success" IsOpen="False" IsClosable="True"/>
+                <InfoBar x:Name="BootPendingBar" Severity="Informational" IsOpen="True" IsClosable="False" Visibility="Collapsed" Title="部分功能配置将在下次重启后生效"/>
+                <InfoBar x:Name="NotAdminBar" Severity="Warning" IsOpen="True" IsClosable="False" Visibility="Collapsed" Title="当前未以管理员身份运行" Message="启用 / 禁用 / 重置操作将被系统拒绝，请以管理员身份重新启动工具箱。"/>
+                <InfoBar x:Name="DictMissingBar" Severity="Warning" IsOpen="True" IsClosable="False" Visibility="Collapsed" Title="未找到功能字典（FeatureDictionary.pfs）" Message="列表将只显示系统已有配置的编号，无法按名称搜索。"/>
+                <StackPanel x:Name="LoadingPanel" Visibility="Collapsed" Spacing="12" Padding="0,64">
+                    <ProgressRing Width="42" Height="42" IsActive="True" HorizontalAlignment="Center" Foreground="{ThemeResource AccentFillColorDefaultBrush}"/>
+                    <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" Text="正在读取功能配置存储…"/>
+                </StackPanel>
+                <Border x:Name="MissingPanel" Visibility="Collapsed" CornerRadius="8" Padding="24" BorderThickness="1" Background="{ThemeResource SystemFillColorCautionBackgroundBrush}" BorderBrush="{ThemeResource SystemFillColorCautionBrush}">
+                    <StackPanel Spacing="8" HorizontalAlignment="Center" Padding="0,16">
+                        <FontIcon Glyph="&#xE7BA;" FontSize="28" Foreground="{ThemeResource SystemFillColorCautionBrush}" HorizontalAlignment="Center"/>
+                        <TextBlock FontSize="14" FontWeight="SemiBold" Text="当前系统不支持功能配置 API" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="MissingText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" MaxWidth="560" TextAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+            <Grid x:Name="ContentPanel" Visibility="Collapsed" RowSpacing="12" Grid.Row="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid x:Name="IdInputRow" ColumnSpacing="8" SizeChanged="IdInputRow_SizeChanged">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <TextBox x:Name="FeatureIdsBox" Header="功能 ID（多个用逗号分隔）" PlaceholderText="48433719, 51243689" AutomationProperties.Name="功能 ID，多个用逗号分隔"/>
+                    <StackPanel x:Name="IdActionsPanel" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                        <Button Content="启用" Tag="启用" Click="BatchAction_Click" Style="{StaticResource AccentButtonStyle}"/>
+                        <Button Content="禁用" Tag="禁用" Click="BatchAction_Click"/>
+                        <Button Content="恢复默认" Tag="重置" Click="BatchAction_Click"/>
+                    </StackPanel>
+                </Grid>
+                <!-- 列表占据剩余高度，保留 ListView 自身的滚动与虚拟化。 -->
+                <Grid Grid.Row="1" RowSpacing="8">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <AutoSuggestBox x:Name="SearchBox" Header="功能列表" PlaceholderText="搜索名称或 ID" AutomationProperties.Name="搜索功能名称或 ID" QueryIcon="Find" QuerySubmitted="SearchBox_QuerySubmitted"/>
+                        <CheckBox x:Name="NamedOnlyToggle" Grid.Column="1" Content="仅显示有名称" IsChecked="True" Click="NamedOnlyToggle_Click" VerticalAlignment="Bottom"/>
+                    </Grid>
+                    <!-- 单一列表：浏览态 = 所选存储全量配置（按 ID 升序），搜索态 = 配置命中 + 字典补充 -->
+                    <ListView x:Name="FeatureList" IncrementalLoadingTrigger="Edge" IncrementalLoadingThreshold="0.5" DataFetchSize="0.5" SelectionMode="None" ItemContainerStyle="{StaticResource FeatureItemContainer}" ItemTemplate="{StaticResource FeatureCardTemplate}" Grid.Row="1"/>
+                    <!-- 空状态 / 无结果 -->
+                    <Border x:Name="NoResultsPanel" Background="{ThemeResource SubtleFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="24,16" Visibility="Collapsed" Grid.Row="1">
+                        <StackPanel Spacing="4" HorizontalAlignment="Center">
+                            <FontIcon Glyph="&#xE721;" FontSize="20" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="NoResultsText" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+                <Grid Grid.Row="2" ColumnSpacing="12">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center" Spacing="4">
+                        <TextBlock x:Name="ListStats" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <StackPanel Orientation="Horizontal" Spacing="4"><TextBlock Text="版本" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock x:Name="BuildValue" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="4"><TextBlock Text="字典" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock x:Name="DictValue" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="4"><TextBlock Text="已配置" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock x:Name="ConfiguredValue" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="4"><TextBlock Text="已启用" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock x:Name="EnabledValue" Style="{StaticResource CaptionTextBlockStyle}"/></StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+
+                </Grid>
+
+            </Grid>
+        </Grid>
+    </Grid>
+</Page>

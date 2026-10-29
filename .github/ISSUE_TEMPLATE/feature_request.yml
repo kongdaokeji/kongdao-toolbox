@@ -1,0 +1,46 @@
+name: 功能建议
+description: 提出新功能、新工具收录或改进建议
+title: "[建议] 简述建议"
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 提交前请检查
+        - 请先搜索 [已有 Issues](https://github.com/luolangaga/tubatool/issues) 是否已有相同建议
+        - 想提交新的第三方工具？推荐直接在软件内「社区 → 提交工具」一键提交，无需写代码
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 建议描述
+      description: 你想要的功能或改进是什么？解决什么问题？
+      placeholder: 希望新增「xxx」功能，因为……
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+      description: 你期望的交互/效果
+      placeholder: 例如：在硬件信息页展示内存时序信息……
+    validations:
+      required: false
+
+  - type: input
+    id: reference
+    attributes:
+      label: 参考软件 / 链接
+      description: 是否有类似软件实现了该功能？（可选）
+      placeholder: 例如：类似 HWiNFO 的内存时序展示
+    validations:
+      required: false
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: 优先级 / 影响
+      description: 这个功能对多少用户有帮助？紧急程度如何？（可选）
+    validations:
+      required: false

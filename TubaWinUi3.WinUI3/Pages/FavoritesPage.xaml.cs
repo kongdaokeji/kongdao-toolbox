@@ -1,0 +1,905 @@
+﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Navigation;
+using Microsoft.UI.Text;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using TubaWinUi3.Models;
+using TubaWinUi3.Services;
+
+namespace TubaWinUi3.Pages;
+
+public sealed partial class FavoritesPage : Page, ILocalizablePage
+{
+    private readonly ObservableCollection<ToolItem> _tools = [];
+    private readonly List<ToolItem> _frequentTools = [];
+    private CancellationTokenSource? _iconLoadCts;
+    private CancellationTokenSource? _frequentIconLoadCts;
+    private bool _isEditing;
+
+    public FavoritesPage()
+    {
+        InitializeComponent();
+        ToolsGrid.ItemsSource = _tools;
+    }
+
+    private void ToolsGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        ToolCardLayout.Apply(ToolsGrid);
+    }
+
+    protected override void OnNavigatedTo(NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+        _ = LoadFrequentToolsAsync();
+        _ = LoadToolsAsync();
+    }
+
+    protected override void OnNavigatedFrom(NavigationEventArgs e)
+    {
+        base.OnNavigatedFrom(e);
+        ExitEditMode();
+        _iconLoadCts?.Cancel();
+        _frequentIconLoadCts?.Cancel();
+    }
+
+    private async Task LoadFrequentToolsAsync()
+    {
+        _frequentIconLoadCts?.Cancel();
+        var cts = _frequentIconLoadCts = new CancellationTokenSource();
+        _frequentTools.Clear();
+
+        if (!AppSettings.GetBool(LaunchHistoryService.ShowFrequentRecommendationsSettingKey, true))
+        {
+            FrequentSection.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var frequentRecords = LaunchHistoryService.GetFrequentTools(12);
+        if (frequentRecords.Count == 0)
+        {
+            FrequentSection.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        List<ToolItem> allTools;
+        try
+        {
+            allTools = await Task.Run(() => ToolCatalog.GetAllToolsCached().ToList());
+        }
+        catch
+        {
+            FrequentSection.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (cts.IsCancellationRequested) return;
+        foreach (var record in frequentRecords)
+        {
+            var tool = allTools.FirstOrDefault(t =>
+                t.Path.Equals(record.Path, StringComparison.OrdinalIgnoreCase));
+            if (tool is not null)
+                _frequentTools.Add(tool);
+        }
+
+        if (_frequentTools.Count == 0)
+        {
+            FrequentSection.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        FrequentPanel.Children.Clear();
+        foreach (var tool in _frequentTools)
+        {
+            var card = CreateFrequentCard(tool);
+            FrequentPanel.Children.Add(card);
+        }
+
+        FrequentSection.Visibility = Visibility.Visible;
+        FrequentSubtitle.Text = _frequentTools.Count >= 12
+            ? string.Format(LocalizationService.L("Favorites_FrequentSubtitleTop", "基于使用频率智能排序 · 前 {0} 个"), _frequentTools.Count)
+            : string.Format(LocalizationService.L("Favorites_FrequentSubtitleCount", "基于使用频率智能排序 · {0} 个"), _frequentTools.Count);
+
+        _ = ToolIconService.LoadIconsAsync(_frequentTools.ToList(), DispatcherQueue, cts.Token);
+    }
+
+    private void HideFrequentButton_Click(object sender, RoutedEventArgs e)
+    {
+        AppSettings.Set(LaunchHistoryService.ShowFrequentRecommendationsSettingKey, false);
+        FrequentSection.Visibility = Visibility.Collapsed;
+        ShowStatus(
+            LocalizationService.L("Favorites_FrequentHiddenTitle", "已隐藏"),
+            LocalizationService.L("Favorites_FrequentHiddenMessage", "常用推荐已隐藏，可在「设置 - 常规」中重新开启"),
+            InfoBarSeverity.Informational);
+    }
+
+    private Border CreateFrequentCard(ToolItem tool)
+    {
+        var card = new Border
+        {
+            Padding = new Thickness(10, 10, 10, 8),
+            Background = (Microsoft.UI.Xaml.Media.Brush)Microsoft.UI.Xaml.Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
+            BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Microsoft.UI.Xaml.Application.Current.Resources["CardStrokeColorDefaultBrush"],
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Width = 100,
+            Tag = tool
+        };
+
+        var stack = new StackPanel
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Spacing = 6
+        };
+
+        var iconBorder = new Border
+        {
+            Width = 48,
+            Height = 48,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Background = (Microsoft.UI.Xaml.Media.Brush)Microsoft.UI.Xaml.Application.Current.Resources["SubtleFillColorSecondaryBrush"],
+            CornerRadius = new CornerRadius(8)
+        };
+
+        var iconGrid = new Grid();
+        var image = new Image
+        {
+            Width = 36,
+            Height = 36,
+            Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform
+        };
+        image.SetBinding(Image.SourceProperty, new Microsoft.UI.Xaml.Data.Binding
+        {
+            Path = new PropertyPath(nameof(ToolItem.IconPath)),
+            Source = tool,
+            Mode = Microsoft.UI.Xaml.Data.BindingMode.OneWay
+        });
+        image.SetBinding(Image.VisibilityProperty, new Microsoft.UI.Xaml.Data.Binding
+        {
+            Path = new PropertyPath(nameof(ToolItem.IconPath)),
+            Source = tool,
+            Mode = Microsoft.UI.Xaml.Data.BindingMode.OneWay,
+            Converter = (Microsoft.UI.Xaml.Data.IValueConverter)Resources["NullToCollapse"]
+        });
+        var fontIcon = new FontIcon
+        {
+            FontSize = 24,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Glyph = tool.IconGlyph ?? "",
+            Visibility = tool.IconGlyph is not null ? Visibility.Visible : Visibility.Collapsed
+        };
+        var colorIcon = new Image
+        {
+            Width = 36,
+            Height = 36,
+            Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform
+        };
+        colorIcon.SetBinding(Image.SourceProperty, new Microsoft.UI.Xaml.Data.Binding
+        {
+            Path = new PropertyPath(nameof(ToolItem.IconSource)),
+            Source = tool,
+            Mode = Microsoft.UI.Xaml.Data.BindingMode.OneWay
+        });
+        colorIcon.SetBinding(Image.VisibilityProperty, new Microsoft.UI.Xaml.Data.Binding
+        {
+            Path = new PropertyPath(nameof(ToolItem.IconSource)),
+            Source = tool,
+            Mode = Microsoft.UI.Xaml.Data.BindingMode.OneWay,
+            Converter = (Microsoft.UI.Xaml.Data.IValueConverter)Resources["NullToCollapse"]
+        });
+        iconGrid.Children.Add(image);
+        iconGrid.Children.Add(colorIcon);
+        iconGrid.Children.Add(fontIcon);
+        iconBorder.Child = iconGrid;
+        stack.Children.Add(iconBorder);
+
+        var nameBlock = new TextBlock
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            FontSize = 12,
+            MaxLines = 2,
+            Text = tool.Name,
+            TextAlignment = TextAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.Wrap,
+            Width = 80
+        };
+        stack.Children.Add(nameBlock);
+
+        card.Child = stack;
+
+        var toolTip = new ToolTip
+        {
+            Content = string.IsNullOrWhiteSpace(tool.Description) ? tool.Name : $"{tool.Name}\n{tool.Description}"
+        };
+        ToolTipService.SetToolTip(card, toolTip);
+
+        card.PointerPressed += (s, e) =>
+        {
+            LaunchTool(tool, runAsAdmin: false);
+        };
+
+        return card;
+    }
+
+    private async Task LoadToolsAsync()
+    {
+        _iconLoadCts?.Cancel();
+        var cts = _iconLoadCts = new CancellationTokenSource();
+        _tools.Clear();
+
+        var favPaths = FavoritesService.GetFavorites();
+        if (favPaths.Count == 0)
+        {
+            ToolCountText.Text = LocalizationService.L("Favorites_NoFavorites", "暂无收藏");
+            ClearAllButton.Visibility = Visibility.Collapsed;
+            EmptyState.Visibility = Visibility.Visible;
+            ToolsGrid.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        List<ToolItem> favTools;
+        try
+        {
+            favTools = await Task.Run(() =>
+            {
+                var all = ToolCatalog.GetCategories()
+                    .SelectMany(ToolCatalog.GetTools)
+                    .ToList();
+                // 按收藏列表顺序匹配,而不是目录分类顺序
+                return favPaths
+                    .Select(p => all.FirstOrDefault(t => t.Path.Equals(p, StringComparison.OrdinalIgnoreCase)))
+                    .OfType<ToolItem>() // 收藏了但工具已不存在的路径跳过
+                    .ToList();
+            });
+        }
+        catch
+        {
+            ToolCountText.Text = LocalizationService.L("Favorites_LoadFailed", "加载失败");
+            return;
+        }
+
+        if (cts.IsCancellationRequested) return;
+        foreach (var tool in favTools)
+        {
+            _tools.Add(tool);
+        }
+
+        ToolCountText.Text = string.Format(LocalizationService.L("Favorites_FavoriteCount", "已收藏 {0} 个工具"), _tools.Count);
+        var hasTools = _tools.Count > 0;
+        ClearAllButton.Visibility = hasTools ? Visibility.Visible : Visibility.Collapsed;
+        EditOrderButton.Visibility = hasTools ? Visibility.Visible : Visibility.Collapsed;
+        EmptyState.Visibility = hasTools ? Visibility.Collapsed : Visibility.Visible;
+        ToolsGrid.Visibility = hasTools ? Visibility.Visible : Visibility.Collapsed;
+
+        if (favTools.Count > 0)
+        {
+            _ = ToolIconService.LoadIconsAsync(favTools, DispatcherQueue, cts.Token);
+        }
+    }
+
+    /// <summary>编辑排序模式开关:进入后切换到专用排序列表,整行自实现拖拽。</summary>
+    private void EditOrderButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isEditing)
+            ExitEditMode();
+        else
+            EnterEditMode();
+    }
+
+    private void EnterEditMode()
+    {
+        _isEditing = true;
+        EditOrderIcon.Glyph = "\uE73E"; // CheckMark:完成
+        EditOrderButtonText.Text = LocalizationService.L("Common_Done", "完成");
+        ClearAllButton.Visibility = Visibility.Collapsed;
+        ToolsGrid.Visibility = Visibility.Collapsed;
+        FrequentSection.Visibility = Visibility.Collapsed;
+
+        EditRowsPanel.Children.Clear();
+        foreach (var tool in _tools)
+            EditRowsPanel.Children.Add(CreateEditRow(tool));
+        EditModePanel.Visibility = Visibility.Visible;
+    }
+
+    private void ExitEditMode()
+    {
+        if (!_isEditing) return;
+        _isEditing = false;
+        FinishDrag(); // 拖动到一半退出时归位
+        EditOrderIcon.Glyph = "\uE70F"; // Edit:编辑排序
+        EditOrderButtonText.Text = LocalizationService.L("Favorites_EditOrderButtonText", "编辑排序");
+        EditModePanel.Visibility = Visibility.Collapsed;
+        ClearAllButton.Visibility = _tools.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ToolsGrid.Visibility = _tools.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        FrequentSection.Visibility = _frequentTools.Count > 0 && AppSettings.GetBool(LaunchHistoryService.ShowFrequentRecommendationsSettingKey, true)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        // 拖拽过程已实时保存,这里兜底保证最终顺序落盘
+        FavoritesService.SaveOrder(_tools.Select(t => t.Path));
+    }
+
+    private const double EditRowHeight = 64;
+    private const double EditRowSpacing = 8;
+    private static double EditRowStride => EditRowHeight + EditRowSpacing;
+
+    private Border? _dragRow;
+    private uint _dragPointerId;
+    private double _dragStartY; // 按下时指针相对 EditRowsPanel 的 Y
+    private int _dragStartIndex;
+    private int _dragCurrentIndex;
+    private bool _dragging;
+    private TranslateTransform? _dragTranslate;
+
+    private Border CreateEditRow(ToolItem tool)
+    {
+        var row = new Border
+        {
+            Height = EditRowHeight,
+            Padding = new Thickness(12, 0, 12, 0),
+            Background = (Microsoft.UI.Xaml.Media.Brush)Microsoft.UI.Xaml.Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
+            BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Microsoft.UI.Xaml.Application.Current.Resources["CardStrokeColorDefaultBrush"],
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Tag = tool
+        };
+        row.PointerPressed += EditRow_PointerPressed;
+        row.PointerMoved += EditRow_PointerMoved;
+        row.PointerReleased += EditRow_PointerReleased;
+        row.PointerCaptureLost += EditRow_PointerCaptureLost;
+
+        var grid = new Grid { ColumnSpacing = 12 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        // 拖动手柄
+        grid.Children.Add(new FontIcon
+        {
+            Glyph = "\uE700",
+            FontSize = 16,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Opacity = 0.8
+        });
+
+        // 图标(与常用推荐卡片相同的双元素绑定)
+        var iconGrid = new Grid
+        {
+            Width = 36,
+            Height = 36,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var image = new Image
+        {
+            Width = 28,
+            Height = 28,
+            Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform
+        };
+        image.SetBinding(Image.SourceProperty, new Microsoft.UI.Xaml.Data.Binding
+        {
+            Path = new PropertyPath(nameof(ToolItem.IconPath)),
+            Source = tool,
+            Mode = Microsoft.UI.Xaml.Data.BindingMode.OneWay
+        });
+        image.SetBinding(Image.VisibilityProperty, new Microsoft.UI.Xaml.Data.Binding
+        {
+            Path = new PropertyPath(nameof(ToolItem.IconPath)),
+            Source = tool,
+            Mode = Microsoft.UI.Xaml.Data.BindingMode.OneWay,
+            Converter = (Microsoft.UI.Xaml.Data.IValueConverter)Resources["NullToCollapse"]
+        });
+        var fontIcon = new FontIcon
+        {
+            FontSize = 20,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Glyph = tool.IconGlyph ?? "",
+            Visibility = tool.IconGlyph is not null ? Visibility.Visible : Visibility.Collapsed
+        };
+        var colorIcon = new Image
+        {
+            Width = 28,
+            Height = 28,
+            Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform
+        };
+        colorIcon.SetBinding(Image.SourceProperty, new Microsoft.UI.Xaml.Data.Binding
+        {
+            Path = new PropertyPath(nameof(ToolItem.IconSource)),
+            Source = tool,
+            Mode = Microsoft.UI.Xaml.Data.BindingMode.OneWay
+        });
+        colorIcon.SetBinding(Image.VisibilityProperty, new Microsoft.UI.Xaml.Data.Binding
+        {
+            Path = new PropertyPath(nameof(ToolItem.IconSource)),
+            Source = tool,
+            Mode = Microsoft.UI.Xaml.Data.BindingMode.OneWay,
+            Converter = (Microsoft.UI.Xaml.Data.IValueConverter)Resources["NullToCollapse"]
+        });
+        iconGrid.Children.Add(image);
+        iconGrid.Children.Add(colorIcon);
+        iconGrid.Children.Add(fontIcon);
+        Grid.SetColumn(iconGrid, 1);
+        grid.Children.Add(iconGrid);
+
+        // 名称 + 分类
+        var textStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 2 };
+        textStack.Children.Add(new TextBlock
+        {
+            Text = tool.Name,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        textStack.Children.Add(new TextBlock
+        {
+            Text = tool.CategoryDisplay,
+            FontSize = 12,
+            Opacity = 0.7,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        Grid.SetColumn(textStack, 2);
+        grid.Children.Add(textStack);
+
+        row.Child = grid;
+        return row;
+    }
+
+    private void EditRow_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (_dragging || sender is not Border row) return;
+        _dragRow = row;
+        _dragPointerId = e.Pointer.PointerId;
+        _dragStartY = e.GetCurrentPoint(EditRowsPanel).Position.Y;
+        _dragStartIndex = EditRowsPanel.Children.IndexOf(row);
+        _dragCurrentIndex = _dragStartIndex;
+        _dragging = false;
+        row.CapturePointer(e.Pointer);
+    }
+
+    private void EditRow_PointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (_dragRow is null || e.Pointer.PointerId != _dragPointerId) return;
+
+        // 移动超过阈值才开始拖动,避免把普通点击当成拖动
+        var deltaY = e.GetCurrentPoint(EditRowsPanel).Position.Y - _dragStartY;
+        if (!_dragging)
+        {
+            if (Math.Abs(deltaY) < 6) return;
+            _dragging = true;
+            _dragTranslate = new TranslateTransform();
+            _dragRow.RenderTransform = _dragTranslate;
+            _dragRow.Opacity = 0.75;
+        }
+
+        // 限制拖动范围,行不会飞出列表
+        var minDelta = -_dragStartIndex * EditRowStride;
+        var maxDelta = (EditRowsPanel.Children.Count - 1 - _dragStartIndex) * EditRowStride;
+        var clampedDelta = Math.Clamp(deltaY, minDelta, maxDelta);
+
+        // 目标索引变化时实时重排行与数据源
+        var target = _dragStartIndex + (int)Math.Round(clampedDelta / EditRowStride);
+        if (target != _dragCurrentIndex)
+        {
+            EditRowsPanel.Children.Move((uint)_dragCurrentIndex, (uint)target);
+            _tools.Move(_dragCurrentIndex, target);
+            _dragCurrentIndex = target;
+        }
+
+        // 被拖行始终跟随指针:抵消重排带来的布局位移
+        _dragTranslate!.Y = clampedDelta - (_dragCurrentIndex - _dragStartIndex) * EditRowStride;
+    }
+
+    private void EditRow_PointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (e.Pointer.PointerId == _dragPointerId)
+            FinishDrag();
+    }
+
+    private void EditRow_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
+    {
+        if (e.Pointer.PointerId == _dragPointerId)
+            FinishDrag();
+    }
+
+    private void FinishDrag()
+    {
+        if (_dragRow is null) return;
+        if (_dragging)
+        {
+            _dragRow.RenderTransform = null;
+            _dragRow.Opacity = 1.0;
+            // 顺序已实时同步到 _tools,立即落盘
+            FavoritesService.SaveOrder(_tools.Select(t => t.Path));
+        }
+        _dragRow = null;
+        _dragTranslate = null;
+        _dragging = false;
+    }
+
+    private void ToolsGrid_ItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is ToolItem tool)
+        {
+            ShowToolDetail(tool);
+        }
+    }
+
+    private void LaunchButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { DataContext: ToolItem tool })
+        {
+            LaunchTool(tool, runAsAdmin: false);
+        }
+    }
+
+    private void RunAsAdminButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { DataContext: ToolItem tool })
+        {
+            LaunchTool(tool, runAsAdmin: true);
+        }
+    }
+
+    private void RemoveFavoriteButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: ToolItem tool })
+        {
+            FavoritesService.RemoveFavorite(tool.Path);
+            _tools.Remove(tool);
+            ToolCountText.Text = _tools.Count > 0
+                ? string.Format(LocalizationService.L("Favorites_FavoriteCount", "已收藏 {0} 个工具"), _tools.Count)
+                : LocalizationService.L("Favorites_NoFavorites", "暂无收藏");
+            ClearAllButton.Visibility = _tools.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            EditOrderButton.Visibility = _tools.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            EmptyState.Visibility = _tools.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            ToolsGrid.Visibility = _tools.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
+    private void SendToDesktopButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: ToolItem tool })
+        {
+            try
+            {
+                WindowsSearchIndexService.CreateDesktopShortcut(tool);
+                ShowStatus(
+                    LocalizationService.L("Common_Created", "已创建"),
+                    string.Format(LocalizationService.L("Common_DesktopShortcutCreated", "已将「{0}」快捷方式发送到桌面"), tool.Name),
+                    InfoBarSeverity.Success);
+            }
+            catch (Exception ex)
+            {
+                ShowStatus(LocalizationService.L("Common_CreateFailed", "创建失败"), ex.Message, InfoBarSeverity.Error);
+            }
+        }
+    }
+
+    // ===== 空岛卡片 3D 交互（对齐空岛安装器：鼠标跟随倾斜 + 辉光描边）=====
+    public void CardFx_Enter(object sender, PointerRoutedEventArgs e) => Services.KdCardFx.Enter(sender, e);
+    public void CardFx_Move(object sender, PointerRoutedEventArgs e) => Services.KdCardFx.Move(sender, e);
+    public void CardFx_Exit(object sender, PointerRoutedEventArgs e) => Services.KdCardFx.Exit(sender, e);
+
+    private void FavItem_RightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is ToolItem tool)
+        {
+            var flyout = (MenuFlyout)Resources["FavItemFlyout"];
+            PopulateArchSubmenu(flyout, tool);
+            UpdateTutorialVisibility(flyout, tool);
+            UpdateBuiltinLinkFlyoutItems(flyout, tool);
+            UpdateFavoriteMenuItem(flyout, tool);
+            flyout.ShowAt(fe, e.GetPosition(fe));
+        }
+    }
+
+    private static void UpdateFavoriteMenuItem(MenuFlyout flyout, ToolItem tool)
+    {
+        var item = flyout.Items.OfType<MenuFlyoutItem>().FirstOrDefault(i => i.Name == "FavMenuToggleFavorite");
+        if (item is null) return;
+        item.Text = tool.IsFavorite
+            ? LocalizationService.L("Common_Unfavorite", "取消收藏")
+            : LocalizationService.L("Common_Favorite", "收藏");
+        if (item.Icon is FontIcon icon)
+            icon.Glyph = tool.IsFavorite ? "\uE735" : "\uE734";
+    }
+
+    private void FavMenu_ToggleFavorite(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuFlyoutItem { DataContext: ToolItem tool })
+        {
+            FavoritesService.ToggleFavorite(tool.Path);
+            tool.IsFavorite = !tool.IsFavorite;
+            if (!tool.IsFavorite)
+            {
+                _tools.Remove(tool);
+                ToolCountText.Text = _tools.Count > 0
+                    ? string.Format(LocalizationService.L("Favorites_FavoriteCount", "已收藏 {0} 个工具"), _tools.Count)
+                    : LocalizationService.L("Favorites_NoFavorites", "暂无收藏");
+                ClearAllButton.Visibility = _tools.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+                EmptyState.Visibility = _tools.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+                ToolsGrid.Visibility = _tools.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+    }
+
+    private static void UpdateTutorialVisibility(MenuFlyout flyout, ToolItem tool)
+    {
+        var tutorialItem = flyout.Items.OfType<MenuFlyoutItem>()
+            .FirstOrDefault(i => i.Name == "FavMenuOpenTutorial");
+        if (tutorialItem is not null)
+            tutorialItem.Visibility = tool.HasTutorial ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static void UpdateBuiltinLinkFlyoutItems(MenuFlyout flyout, ToolItem tool)
+    {
+        // 按 x:Name 定位菜单项（不能按 Text 匹配：文本随界面语言变化）
+        var isBuiltin = tool.IsBuiltinLink;
+        var sendToDesktop = flyout.Items.OfType<MenuFlyoutItem>()
+            .FirstOrDefault(i => i.Name == "FavMenuSendToDesktop");
+        // 内置工具只要有注册 Id 也能发桌面快捷方式（--open-builtin 启动），
+        // 仅缺注册信息的旧链接才隐藏
+        if (sendToDesktop is not null)
+            sendToDesktop.Visibility = isBuiltin && string.IsNullOrWhiteSpace(tool.BuiltinToolId)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+
+        var runAsAdmin = flyout.Items.OfType<MenuFlyoutItem>()
+            .FirstOrDefault(i => i.Name == "FavMenuRunAsAdmin");
+        if (runAsAdmin is not null)
+            runAsAdmin.Visibility = isBuiltin ? Visibility.Collapsed : Visibility.Visible;
+
+        var openDir = flyout.Items.OfType<MenuFlyoutItem>()
+            .FirstOrDefault(i => i.Name == "FavMenuOpenDirectory");
+        if (openDir is not null)
+            openDir.Visibility = isBuiltin ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void FavMenu_SendToDesktop(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuFlyoutItem { DataContext: ToolItem tool })
+        {
+            try
+            {
+                WindowsSearchIndexService.CreateDesktopShortcut(tool);
+                ShowStatus(
+                    LocalizationService.L("Common_Created", "已创建"),
+                    string.Format(LocalizationService.L("Common_DesktopShortcutCreated", "已将「{0}」快捷方式发送到桌面"), tool.Name),
+                    InfoBarSeverity.Success);
+            }
+            catch (Exception ex)
+            {
+                ShowStatus(LocalizationService.L("Common_CreateFailed", "创建失败"), ex.Message, InfoBarSeverity.Error);
+            }
+        }
+    }
+
+    private void FavMenu_RunAsAdmin(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuFlyoutItem { DataContext: ToolItem tool })
+            LaunchTool(tool, runAsAdmin: true);
+    }
+
+    private void FavMenu_OpenDirectory(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuFlyoutItem { DataContext: ToolItem tool })
+            OpenToolDirectory(tool);
+    }
+
+    private void FavMenu_OpenTutorial(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuFlyoutItem { DataContext: ToolItem tool } && tool.HasTutorial)
+            BrowserPage.Open(tool.TutorialUrl!, string.Format(LocalizationService.L("HomePage_TutorialWindowTitle", "{0} - 使用教程"), tool.Name));
+    }
+
+    private static void OpenToolDirectory(ToolItem tool)
+    {
+        try
+        {
+            var dir = tool.EffectiveWorkingDir;
+            if (Directory.Exists(dir))
+                Process.Start(new ProcessStartInfo(dir) { UseShellExecute = true });
+        }
+        catch { }
+    }
+
+    private void PopulateArchSubmenu(MenuFlyout flyout, ToolItem tool)
+    {
+        var submenu = flyout.Items.OfType<MenuFlyoutSubItem>().FirstOrDefault(i => i.Name == "FavArchSubmenu");
+        if (submenu is null) return;
+
+        submenu.Items.Clear();
+
+        if (tool.ArchOptions.Count <= 1)
+        {
+            submenu.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        submenu.Visibility = Visibility.Visible;
+        foreach (var opt in tool.ArchOptions)
+        {
+            var item = new ToggleMenuFlyoutItem
+            {
+                Text = opt.DisplayText,
+                IsChecked = opt == tool.SelectedArch,
+                DataContext = opt
+            };
+            item.Click += (s, e) =>
+            {
+                if (s is ToggleMenuFlyoutItem { DataContext: ArchOption selected })
+                    tool.SelectedArch = selected;
+            };
+            submenu.Items.Add(item);
+        }
+    }
+
+    private void ClearAllButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ContentDialog
+        {
+            Title = LocalizationService.L("Favorites_ClearAllDialogTitle", "清空全部收藏"),
+            Content = LocalizationService.L("Favorites_ClearAllDialogMessage", "确定要取消所有工具的收藏吗？此操作不可撤销。"),
+            PrimaryButtonText = LocalizationService.L("Favorites_ClearAllDialogPrimary", "清空"),
+            CloseButtonText = LocalizationService.L("Common_Cancel", "取消"),
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = XamlRoot,
+            RequestedTheme = ThemeService.CurrentElementTheme
+        };
+
+        if (dialog.ShowAsync() is not null)
+        {
+            dialog.PrimaryButtonClick += (_, _) =>
+            {
+                FavoritesService.RemoveAll();
+                _ = LoadToolsAsync();
+            };
+        }
+    }
+
+    private void ShowToolDetail(ToolItem tool)
+    {
+        if (tool.IsBuiltinLink)
+        {
+            ToolDetailTip.Title = tool.Name;
+            ToolDetailTip.Subtitle = tool.CategoryDisplay;
+            DetailDescriptionText.Text = string.IsNullOrWhiteSpace(tool.Description)
+                ? LocalizationService.L("Common_NoDescription", "暂无介绍。")
+                : tool.Description;
+            DetailPublisherText.Text = string.Format(
+                LocalizationService.L("HomePage_DetailType", "类型：{0}"),
+                tool.BuiltinKindText ?? LocalizationService.L("Common_Builtin", "内置"));
+            DetailVersionText.Text = "";
+            DetailPathText.Text = "";
+            ToolDetailTip.IsOpen = true;
+            return;
+        }
+
+        ToolDetailTip.Title = tool.Name;
+        ToolDetailTip.Subtitle = tool.CategoryDisplay;
+        DetailDescriptionText.Text = string.IsNullOrWhiteSpace(tool.Description)
+            ? LocalizationService.L("Common_NoDescription", "暂无介绍。")
+            : tool.Description;
+        DetailPublisherText.Text = string.Format(LocalizationService.L("HomePage_DetailPublisher", "发布者：{0}"), ValueOrUnknown(tool.Publisher));
+        DetailVersionText.Text = string.Format(LocalizationService.L("HomePage_DetailVersion", "版本：{0}"), ValueOrUnknown(tool.Version));
+        DetailPathText.Text = tool.Path;
+        ToolDetailTip.IsOpen = true;
+    }
+
+    private void LaunchTool(ToolItem tool, bool runAsAdmin)
+    {
+        if (tool.IsBuiltinLink)
+        {
+            _ = LaunchBuiltinToolAsync(tool);
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(tool.RemoteUrl))
+        {
+            Pages.BrowserPage.Open(tool.RemoteUrl, tool.Name);
+            LaunchHistoryService.RecordLaunch(tool.Path);
+            ShowStatus(LocalizationService.L("Common_Opened", "已打开"), tool.Name, InfoBarSeverity.Success);
+            return;
+        }
+
+        var exePath = tool.EffectivePath;
+        if (!File.Exists(exePath))
+        {
+            ShowStatus(
+                LocalizationService.L("Common_LaunchFailed", "启动失败"),
+                string.Format(LocalizationService.L("HomePage_LaunchFileMissing", "找不到文件：{0}"), exePath),
+                InfoBarSeverity.Error);
+            return;
+        }
+
+        try
+        {
+            ToolProcessLauncher.Launch(exePath, tool.EffectiveWorkingDir, runAsAdmin);
+
+            LaunchHistoryService.RecordLaunch(tool.Path);
+            ShowStatus(
+                runAsAdmin
+                    ? LocalizationService.L("Common_LaunchedAsAdmin", "已以管理员身份启动")
+                    : LocalizationService.L("Common_Launched", "已启动"),
+                tool.Name,
+                InfoBarSeverity.Success);
+        }
+        catch (Exception ex)
+        {
+            ShowStatus(LocalizationService.L("Common_LaunchFailed", "启动失败"), ex.Message, InfoBarSeverity.Error);
+        }
+    }
+
+    private async Task LaunchBuiltinToolAsync(ToolItem tool)
+    {
+        var builtinTool = BuiltinToolRegistry.GetById(tool.BuiltinToolId!);
+        if (builtinTool is null)
+        {
+            ShowStatus(
+                LocalizationService.L("Common_LaunchFailed", "启动失败"),
+                LocalizationService.L("HomePage_BuiltinNotFound", "找不到对应的内置工具"),
+                InfoBarSeverity.Error);
+            return;
+        }
+
+        try
+        {
+            var context = new BuiltinToolContext
+            {
+                XamlRoot = XamlRoot,
+                OnProgress = msg => DispatcherQueue.TryEnqueue(() =>
+                    ShowStatus(builtinTool.Name, msg, InfoBarSeverity.Informational))
+            };
+            MainWindow.ActiveToolName = builtinTool.Name;
+            await builtinTool.ExecuteAsync(context);
+            LaunchHistoryService.RecordLaunch(tool.Path);
+            ShowStatus(LocalizationService.L("Common_Launched", "已启动"), tool.Name, InfoBarSeverity.Success);
+        }
+        catch (Exception ex)
+        {
+            ShowStatus(LocalizationService.L("Common_LaunchFailed", "启动失败"), ex.Message, InfoBarSeverity.Error);
+        }
+        finally
+        {
+            MainWindow.ActiveToolName = null;
+        }
+    }
+
+    private DispatcherTimer? _statusBarTimer;
+
+    private void ShowStatus(string title, string message, InfoBarSeverity severity)
+    {
+        StatusBar.Title = title;
+        StatusBar.Message = message;
+        StatusBar.Severity = severity;
+        StatusBar.IsOpen = true;
+
+        _statusBarTimer?.Stop();
+        _statusBarTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _statusBarTimer.Tick += (s, e) =>
+        {
+            StatusBar.IsOpen = false;
+            ((DispatcherTimer)s!).Stop();
+        };
+        _statusBarTimer.Start();
+    }
+
+    private static string ValueOrUnknown(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? LocalizationService.L("Common_Unknown", "未知") : value;
+    }
+
+    /// <summary>语言切换后刷新自绘文本（打了 Uid 的控件由 WinUI3Localizer 自动更新）。</summary>
+    public void ApplyLocalization()
+    {
+        foreach (var tool in _tools)
+            tool.RefreshLocalizedTexts();
+        _ = LoadToolsAsync();
+        _ = LoadFrequentToolsAsync();
+    }
+}

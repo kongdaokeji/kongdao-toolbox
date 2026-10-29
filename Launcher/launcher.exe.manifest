@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity version="1.0.0.0" name="TubaWinUi3.Launcher.app"/>
+  <!-- 启动器要求管理员：安装版/便携版快捷方式与双击都会先弹 UAC 再直接以管理员
+       身份启动主程序，避免主程序再用 runas 二次提权重启（省掉一次完整启动）。
+       TubaWinUi3.exe 本体保持 asInvoker，--copy-path 等免提权子模式不受影响。 -->
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <requestedExecutionLevel level="requireAdministrator" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>

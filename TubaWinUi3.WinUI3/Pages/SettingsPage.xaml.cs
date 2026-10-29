@@ -1,0 +1,2719 @@
+using System.Diagnostics;
+using System.Linq;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
+using Microsoft.UI.Xaml.Media.Imaging;
+using System.Drawing.Text;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using Microsoft.UI.Dispatching;
+using Windows.Foundation;
+using Shapes = Microsoft.UI.Xaml.Shapes;
+using TubaWinUi3.Services;
+using TubaWinUi3.Services.ActiveIntercept;
+using TubaWinUi3.Services.Telemetry;
+using TubaWinUi3.Models;
+using Windows.UI;
+using static TubaWinUi3.Services.ConfigManager;
+
+namespace TubaWinUi3.Pages;
+
+public sealed partial class SettingsPage : Page, ILocalizablePage
+{
+    private bool _isCheckingUpdate;
+    private bool _isCheckingToolsBundle;
+    private bool _compactModeInitializing;
+    private bool _navLayoutInitializing;
+    private bool _rememberWindowInitializing;
+    private bool _closeToTrayInitializing;
+    private bool _fastModeInitializing;
+    private bool _defaultPageInitializing;
+    private bool _showFrequentInitializing;
+    private bool _languageInitializing;
+    private bool _builtinToolOpenModeInitializing;
+    private bool _backdropInitializing;
+    private bool _opacityChanging;
+    private bool _brandLogoInitializing;
+    private bool _watermarkInitializing;
+    private bool _watermarkTextInitializing;
+    private bool _watermarkFontInitializing;
+    private Border[] _backdropOptions = [];
+    private Border[] _tintSwatches = [];
+    private Color _currentTintColor = BackdropSettings.DefaultTintColor;
+    private bool _hardwareFitScreenInitializing;
+    private bool _hardwareMultiDeviceNewLineInitializing;
+    private bool _cpuzBusy;
+    private bool _zenBusy;
+    private bool _proxySettingsInitializing;
+    private bool _proxyTesting;
+    private bool _storageUsageBusy;
+    private bool _storeRatingBusy;
+    private readonly List<Storyboard> _ratingThanksStoryboards = [];
+    private DispatcherQueueTimer? _ratingThanksTimer;
+
+    private const string StorePackageName = "DA3D64F4.winui3";
+    private const string StoreProductId = "9P15095X7MGB";
+
+
+    private static readonly (string Tag, string TitleKey, string Fallback)[] DefaultPageOptions =
+    [
+        ("home", "Settings_DefaultPageOptionHome", "首页"),
+        ("hardware", "Settings_DefaultPageOptionHardware", "硬件信息"),
+        ("builtin", "Settings_DefaultPageOptionBuiltin", "内置工具"),
+    ];
+
+    private string? _pendingHighlightKey;
+    private CancellationTokenSource? _highlightCts;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct OPENFILENAME
+    {
+        public int lStructSize;
+        public nint hwndOwner;
+        public nint hInstance;
+        public string lpstrFilter;
+        public string lpstrCustomFilter;
+        public int nMaxCustFilter;
+        public int nFilterIndex;
+        public string lpstrFile;
+        public int nMaxFile;
+        public string lpstrFileTitle;
+        public int nMaxFileTitle;
+        public string lpstrInitialDir;
+        public string lpstrTitle;
+        public int Flags;
+        public short nFileOffset;
+        public short nFileExtension;
+        public string lpstrDefExt;
+        public nint lCustData;
+        public nint lpfnHook;
+        public string lpTemplateName;
+        public nint pvReserved;
+        public int dwReserved;
+        public int FlagsEx;
+    }
+
+    [DllImport("comdlg32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool GetOpenFileName(ref OPENFILENAME ofn);
+
+    [DllImport("comdlg32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool GetSaveFileName(ref OPENFILENAME ofn);
+
+    private const int OFN_FILEMUSTEXIST = 0x00001000;
+    private const int OFN_NOCHANGEDIR = 0x00000008;
+    private const int OFN_OVERWRITEPROMPT = 0x00000002;
+    private const int OFN_PATHMUSTEXIST = 0x00000800;
+
+    private static readonly Dictionary<string, string> SettingKeyToExpander = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["CompactMode"] = "AppearanceExpander",
+        ["NavLayoutMode"] = "AppearanceExpander",
+        ["DefaultPage"] = "GeneralExpander",
+        ["ShowFrequentRecommendations"] = "GeneralExpander",
+        ["FastMode"] = "GeneralExpander",
+        ["RememberWindow"] = "GeneralExpander",
+        ["CloseToTray"] = "GeneralExpander",
+        ["Update"] = "UpdatesSection",
+        ["ToolsBundle"] = "UpdatesSection",
+        ["Background"] = "AppearanceExpander",
+        ["Theme"] = "AppearanceExpander",
+        ["Backdrop"] = "AppearanceExpander",
+        ["BrandLogo"] = "AppearanceExpander",
+        ["Watermark"] = "AppearanceExpander",
+        ["HardwareFitScreen"] = "HardwareAiExpander",
+        ["HardwareDiagramStyle"] = "HardwareAiExpander",
+        ["HardwareMultiDeviceNewLine"] = "HardwareAiExpander",
+        ["ProxyEnabled"] = "NetworkSection",
+        ["ProxyAddress"] = "NetworkSection",
+        ["HttpDownload"] = "NetworkSection",
+        ["HttpDownloadPath"] = "NetworkSection",
+        ["HttpDownloadAction"] = "NetworkSection",
+        ["ConfigManager"] = "ToolsCommunityExpander",
+        ["StorageUsage"] = "ToolsCommunityExpander",
+        ["ExportApp"] = "ToolsCommunityExpander",
+        ["CommunityTool"] = "CommunitySection",
+        ["ActiveInterceptEnabled"] = "IntegrationSection",
+        ["ActiveInterceptNotifyMode"] = "IntegrationSection",
+        ["WindowsSearchIndex"] = "IntegrationSection",
+    };
+
+    private static readonly Dictionary<string, string> SettingKeyToCardName = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["CompactMode"] = "SettingsCompactModeCard",
+        ["NavLayoutMode"] = "SettingsNavLayoutCard",
+        ["DefaultPage"] = "SettingsDefaultPageCard",
+        ["ShowFrequentRecommendations"] = "SettingsShowFrequentCard",
+        ["FastMode"] = "SettingsFastModeCard",
+        ["RememberWindow"] = "SettingsRememberWindowCard",
+        ["CloseToTray"] = "SettingsCloseToTrayCard",
+        ["Update"] = "SettingsUpdateCard",
+        ["ToolsBundle"] = "SettingsToolsBundleCard",
+        ["Background"] = "SettingsBackgroundCard",
+        ["Theme"] = "SettingsThemeCard",
+        ["Backdrop"] = "SettingsBackdropCard",
+        ["BrandLogo"] = "SettingsBrandLogoCard",
+        ["Watermark"] = "SettingsWatermarkCard",
+        ["HardwareFitScreen"] = "SettingsHardwareFitScreenCard",
+        ["HardwareDiagramStyle"] = "SettingsHardwareStyleCard",
+        ["HardwareMultiDeviceNewLine"] = "SettingsHardwareMultiDeviceNewLineCard",
+        ["ProxyEnabled"] = "SettingsProxyCard",
+        ["ProxyAddress"] = "SettingsProxyCard",
+        ["HttpDownload"] = "SettingsHttpDownloadCard",
+        ["HttpDownloadPath"] = "SettingsHttpDownloadCard",
+        ["HttpDownloadAction"] = "SettingsHttpDownloadCard",
+        ["ConfigManager"] = "SettingsConfigManagerCard",
+        ["StorageUsage"] = "SettingsStorageUsageCard",
+        ["ExportApp"] = "SettingsExportAppCard",
+        ["CommunityTool"] = "SettingsCommunityCard",
+        ["ActiveInterceptEnabled"] = "SettingsActiveInterceptCard",
+        ["ActiveInterceptNotifyMode"] = "SettingsActiveInterceptNotifyCard",
+        ["WindowsSearchIndex"] = "SettingsSearchIndexCard",
+    };
+
+    public SettingsPage()
+    {
+        InitializeComponent();
+        InitializeSettingsLayout();
+
+
+        var version = Assembly.GetExecutingAssembly().GetName().Version;
+        VersionText.Text = string.Format(
+            LocalizationService.L("Settings_VersionFormat", "版本 {0}"),
+            version is not null ? $"{version.Major}.{version.Minor}.{version.Build}" : "1.0.0");
+
+        AboutVersionText.Text = version is not null ? $"{version.Major}.{version.Minor}.{version.Build}" : "1.0.0";
+        // P1-5（空岛）：单个初始化失败（如文件/网络/注册表访问异常）不应导致整个设置页打不开。
+        // 逐段包 try/catch，出错仅记录并跳过该项，其余设置仍可用。
+        try
+        {
+            _ = LoadAppIconAsync();
+            InitCompactModeToggle();
+            InitNavLayoutComboBox();
+            InitDefaultPageComboBox();
+            InitShowFrequentToggle();
+            InitActiveInterceptToggle();
+            InitLanguageComboBox();
+            InitThemeSelector();
+            InitRememberWindowToggle();
+            InitCloseToTrayToggle();
+            InitFastModeToggle();
+            InitUpdateSection();
+            InitBackdropSettings();
+            LoadBackgroundSettings();
+            InitBrandLogoToggle();
+            InitWatermarkSettings();
+            InitHardwareFitScreenToggle();
+            InitHardwareStyle();
+            InitHardwareMultiDeviceNewLineToggle();
+            InitCpuzDataSourceStatus();
+            InitProxySettings();
+            InitGitHubLoginStatus();
+            InitBuiltinToolOpenModeComboBox();
+            InitHttpDownloadSettings();
+            InitActiveInterceptToggle();
+            InitActiveInterceptNotifyModeComboBox();
+            InitTelemetryToggle();
+            Loaded += (_, _) => AppSettings.SettingChanged += OnInterceptSettingChanged;
+            Unloaded += (_, _) => AppSettings.SettingChanged -= OnInterceptSettingChanged;
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                var logPath = Path.Combine(Path.GetTempPath(), "app_crash.log");
+                File.AppendAllText(logPath,
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] SettingsPage 初始化异常（已跳过，页面仍打开）：{ex}{Environment.NewLine}");
+            }
+            catch { }
+        }
+
+        if (RuntimeHelper.IsPackagedContext)
+        {
+            SettingsCommunityCard.Visibility = Visibility.Collapsed;
+            SettingsCommunitySubmitCard.Visibility = Visibility.Collapsed;
+            SettingsStoreRatingCard.Visibility = Visibility.Visible;
+        }
+
+        // 代码构建的画刷不会随主题自动刷新，切换主题后按当前设置重渲染
+        ActualThemeChanged += (_, _) =>
+        {
+            UpdateBackdropOptionSelection(BackdropService.GetBackdropType());
+            UpdateTintColorSelection(_currentTintColor);
+            PopulateBgList();
+            UpdateActiveInterceptStatus();
+        };
+    }
+
+    protected override void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+        DownloadQueueService.QueueChanged += UpdateDownloadQueueStatus;
+
+        // 页面被缓存，构造后不再重跑：开关可能被其它入口改过（如常用页的关闭按钮），进入时重新读取
+        InitShowFrequentToggle();
+        InitHardwareStyle();
+        RefreshLogDirCard();
+
+
+
+        if (e.Parameter is SearchNavigationTarget target && target.HighlightSettingKey is not null)
+        {
+            _pendingHighlightKey = target.HighlightSettingKey;
+        }
+
+        if (_pendingHighlightKey is not null)
+        {
+            StartHighlight(_pendingHighlightKey);
+            _pendingHighlightKey = null;
+        }
+    }
+
+    protected override void OnNavigatedFrom(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
+    {
+        base.OnNavigatedFrom(e);
+        DownloadQueueService.QueueChanged -= UpdateDownloadQueueStatus;
+    }
+
+    private void StartHighlight(string settingKey)
+    {
+        _highlightCts?.Cancel();
+        _highlightCts = new CancellationTokenSource();
+        _ = HighlightSettingAsync(settingKey, _highlightCts.Token);
+    }
+
+    private async Task HighlightSettingAsync(string settingKey, CancellationToken ct)
+    {
+        if (SettingKeyToExpander.TryGetValue(settingKey, out var expanderName) &&
+            SettingKeyToCardName.TryGetValue(settingKey, out var cardName))
+        {
+            if (FindName(expanderName) is Expander expander)
+            {
+                expander.IsExpanded = true;
+            }
+
+            try { await Task.Delay(300, ct); } catch (OperationCanceledException) { return; }
+
+            if (ct.IsCancellationRequested) return;
+
+            if (FindName(cardName) is FrameworkElement card)
+            {
+                ExpandSettingsCard(card);
+                card.UpdateLayout();
+                card.StartBringIntoView(new BringIntoViewOptions
+                {
+                    AnimationDesired = true,
+                    VerticalAlignmentRatio = 0.5
+                });
+
+                try { await Task.Delay(500, ct); } catch (OperationCanceledException) { return; }
+
+                if (ct.IsCancellationRequested) return;
+                if (card is Border border) SearchHighlightService.HighlightBorder(border);
+            }
+        }
+    }
+
+    public static string? ResolveExpanderName(string settingKey)
+    {
+        if (!SettingKeyToExpander.TryGetValue(settingKey, out var value))
+            return null;
+        return value;
+    }
+
+    /// <summary>
+    /// 加载 AppIcon.ico 中尺寸最大的帧（PNG 压缩）作为「关于」卡片的应用图标。
+    /// </summary>
+    private async Task LoadAppIconAsync()
+    {
+        try
+        {
+            var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
+            if (!File.Exists(iconPath)) return;
+
+            // ICO 目录：6 字节头 + 每条 16 字节；帧均为 PNG 压缩，取数据最大的一帧保证清晰度
+            using var fs = File.OpenRead(iconPath);
+            using var reader = new BinaryReader(fs);
+            reader.ReadUInt16(); // reserved
+            reader.ReadUInt16(); // type
+            var count = reader.ReadUInt16();
+            int bestOffset = 0, bestSize = 0;
+            for (var i = 0; i < count; i++)
+            {
+                reader.ReadByte(); // width
+                reader.ReadByte(); // height
+                reader.ReadByte(); // color count
+                reader.ReadByte(); // reserved
+                reader.ReadUInt16(); // planes
+                reader.ReadUInt16(); // bit count
+                var bytesInRes = reader.ReadInt32();
+                var imageOffset = reader.ReadInt32();
+                if (bytesInRes > bestSize)
+                {
+                    bestSize = bytesInRes;
+                    bestOffset = imageOffset;
+                }
+            }
+
+            reader.BaseStream.Seek(bestOffset, SeekOrigin.Begin);
+            var pngBytes = reader.ReadBytes(bestSize);
+
+            var bitmap = new BitmapImage();
+            using (var inMemStream = new Windows.Storage.Streams.InMemoryRandomAccessStream())
+            {
+                var winBuffer = System.Runtime.InteropServices.WindowsRuntime.WindowsRuntimeBufferExtensions.AsBuffer(pngBytes);
+                await inMemStream.WriteAsync(winBuffer);
+                inMemStream.Seek(0);
+                await bitmap.SetSourceAsync(inMemStream);
+            }
+
+            AppIconImage.Source = bitmap;
+        }
+        catch
+        {
+        }
+    }
+
+    private void NavWhatsNew_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        WhatsNewWindow.Show();
+    }
+
+    private void InitCompactModeToggle()
+    {
+        _compactModeInitializing = true;
+        CompactModeToggle.IsOn = CompactModeService.IsCompactModeEnabled();
+        _compactModeInitializing = false;
+    }
+
+    private void CompactModeToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_compactModeInitializing) return;
+        CompactModeService.SetCompactModeEnabled(CompactModeToggle.IsOn);
+    }
+
+    private void InitNavLayoutComboBox()
+    {
+        _navLayoutInitializing = true;
+        NavLayoutComboBox.Items.Add(LocalizationService.L("Settings_NavLayoutOptionSidebar", "侧边栏"));
+        NavLayoutComboBox.Items.Add(LocalizationService.L("Settings_NavLayoutOptionTabs", "顶部标签页"));
+        NavLayoutComboBox.SelectedIndex = NavLayoutModeService.IsTabMode() ? 1 : 0;
+        _navLayoutInitializing = false;
+    }
+
+    private void NavLayoutComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_navLayoutInitializing) return;
+        var mode = NavLayoutComboBox.SelectedIndex == 1 ? "tabs" : "sidebar";
+        NavLayoutModeService.SetNavLayoutMode(mode);
+    }
+
+    private void InitDefaultPageComboBox()
+    {
+        _defaultPageInitializing = true;
+        DefaultPageComboBox.Items.Clear();
+        var saved = AppSettings.Get("DefaultPage") ?? "home";
+
+        for (var i = 0; i < DefaultPageOptions.Length; i++)
+        {
+            DefaultPageComboBox.Items.Add(LocalizationService.L(DefaultPageOptions[i].TitleKey, DefaultPageOptions[i].Fallback));
+            if (DefaultPageOptions[i].Tag == saved)
+                DefaultPageComboBox.SelectedIndex = i;
+        }
+
+        if (DefaultPageComboBox.SelectedIndex < 0)
+            DefaultPageComboBox.SelectedIndex = 0;
+
+        _defaultPageInitializing = false;
+    }
+
+    private void DefaultPageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_defaultPageInitializing) return;
+        if (DefaultPageComboBox.SelectedIndex >= 0 && DefaultPageComboBox.SelectedIndex < DefaultPageOptions.Length)
+            AppSettings.Set("DefaultPage", DefaultPageOptions[DefaultPageComboBox.SelectedIndex].Tag);
+    }
+
+    private void InitLanguageComboBox()
+    {
+        _languageInitializing = true;
+        LanguageComboBox.Items.Clear();
+        var saved = AppSettings.Get(LocalizationService.LanguageKey) ?? LocalizationService.AutoLanguage;
+
+        // 语言名按各自母语显示（简体中文 / English），仅“跟随系统”随界面语言翻译
+        var options = new (string Tag, string DisplayName)[]
+        {
+            (LocalizationService.AutoLanguage, LocalizationService.L("Settings_LanguageAuto", "跟随系统")),
+            (LocalizationService.ChineseLanguage, "简体中文"),
+            (LocalizationService.EnglishLanguage, "English"),
+        };
+
+        for (var i = 0; i < options.Length; i++)
+        {
+            LanguageComboBox.Items.Add(options[i].DisplayName);
+            if (options[i].Tag == saved)
+                LanguageComboBox.SelectedIndex = i;
+        }
+
+        if (LanguageComboBox.SelectedIndex < 0)
+            LanguageComboBox.SelectedIndex = 0;
+
+        _languageInitializing = false;
+    }
+
+    private async void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_languageInitializing) return;
+
+        var language = LanguageComboBox.SelectedIndex switch
+        {
+            1 => LocalizationService.ChineseLanguage,
+            2 => LocalizationService.EnglishLanguage,
+            _ => LocalizationService.AutoLanguage,
+        };
+
+        await LocalizationService.SetLanguageAsync(language);
+
+        // 选项文本本身（“跟随系统”）随新语言刷新
+        InitLanguageComboBox();
+    }
+
+    /// <summary>主题选择器：0 跟随系统 / 1 浅色 / 2 深色。</summary>
+    private void InitThemeSelector()
+    {
+        ThemeSelector.SelectedIndex = ThemeService.CurrentTheme switch
+        {
+            AppTheme.Light => 1,
+            AppTheme.Dark => 2,
+            _ => 0,
+        };
+    }
+
+    private void ThemeSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        var tag = ((sender as ComboBox)?.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+        var theme = tag switch
+        {
+            "light" => AppTheme.Light,
+            "dark" => AppTheme.Dark,
+            _ => AppTheme.Default,
+        };
+        // SetTheme 对相同值有 no-op 守卫，初始化赋值不会重复应用主题
+        ThemeService.SetTheme(theme);
+    }
+
+    /// <summary>语言切换后刷新自绘文本（打了 Uid 的控件由 WinUI3Localizer 自动更新）。</summary>
+    public void ApplyLocalization()
+    {
+        InitLanguageComboBox();
+        InitDefaultPageComboBox();
+        InitNavLayoutComboBox();
+        InitBuiltinToolOpenModeComboBox();
+        InitActiveInterceptNotifyModeComboBox();
+        InitActiveInterceptToggle();
+        InitHttpDownloadSettings();
+        InitUpdateSection();
+        InitCpuzDataSourceStatus();
+        InitProxySettings();
+        InitGitHubLoginStatus();
+        ApplyLocalizedAppTitle();
+    }
+
+    private void ApplyLocalizedAppTitle()
+    {
+        AppTitleText.Text = LocalizationService.L("App_Title", "空岛图吧工具箱");
+    }
+
+    private void InitBuiltinToolOpenModeComboBox()
+    {
+        _builtinToolOpenModeInitializing = true;
+        BuiltinToolOpenModeComboBox.Items.Clear();
+        BuiltinToolOpenModeComboBox.Items.Add(LocalizationService.L("Settings_BuiltinOpenModeOptionEmbedded", "嵌入页面"));
+        BuiltinToolOpenModeComboBox.Items.Add(LocalizationService.L("Settings_BuiltinOpenModeOptionWindow", "独立窗口"));
+        BuiltinToolOpenModeComboBox.SelectedIndex = AppSettings.GetBool("BuiltinToolsOpenInWindow", false) ? 1 : 0;
+        _builtinToolOpenModeInitializing = false;
+    }
+
+    private void BuiltinToolOpenModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_builtinToolOpenModeInitializing) return;
+        AppSettings.Set("BuiltinToolsOpenInWindow", BuiltinToolOpenModeComboBox.SelectedIndex == 1);
+    }
+
+    private void InitShowFrequentToggle()
+    {
+        _showFrequentInitializing = true;
+        ShowFrequentToggle.IsOn = AppSettings.GetBool(LaunchHistoryService.ShowFrequentRecommendationsSettingKey, true);
+        _showFrequentInitializing = false;
+    }
+
+    private void ShowFrequentToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_showFrequentInitializing) return;
+        AppSettings.Set(LaunchHistoryService.ShowFrequentRecommendationsSettingKey, ShowFrequentToggle.IsOn);
+    }
+
+    private void InitRememberWindowToggle()
+    {
+        _rememberWindowInitializing = true;
+        RememberWindowToggle.IsOn = WindowSizeService.IsRememberEnabled();
+        _rememberWindowInitializing = false;
+    }
+
+    private void RememberWindowToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_rememberWindowInitializing) return;
+        WindowSizeService.SetRememberEnabled(RememberWindowToggle.IsOn);
+    }
+
+    private void InitCloseToTrayToggle()
+    {
+        _closeToTrayInitializing = true;
+        CloseToTrayToggle.IsOn = CloseToTrayService.IsEnabled;
+        _closeToTrayInitializing = false;
+    }
+
+    private void CloseToTrayToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_closeToTrayInitializing) return;
+        CloseToTrayService.SetEnabled(CloseToTrayToggle.IsOn);
+    }
+
+    private void InitFastModeToggle()
+    {
+        _fastModeInitializing = true;
+        FastModeToggle.IsOn = FastModeService.IsFastModeEnabled();
+        _fastModeInitializing = false;
+    }
+
+    private void FastModeToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_fastModeInitializing) return;
+        FastModeService.SetFastModeEnabled(FastModeToggle.IsOn);
+    }
+
+    private async void CheckUpdateButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isCheckingUpdate) return;
+        _isCheckingUpdate = true;
+        CheckUpdateButton.IsEnabled = false;
+        UpdateStatusText.Text = LocalizationService.L("Settings_UpdateChecking", "正在检查更新...");
+
+        try
+        {
+            var update = await UpdateService.CheckForUpdateAsync();
+
+            if (update is not null)
+            {
+                UpdateStatusText.Text = string.Format(LocalizationService.L("Settings_UpdateFound", "发现新版本 v{0}，请查看顶部更新提示"), update.Version);
+                (App.MainWindow as MainWindow)?.ShowUpdateBanner(update, false);
+            }
+            else
+            {
+                UpdateStatusText.Text = LocalizationService.L("Settings_UpdateLatest", "已是最新版本");
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusText.Text = string.Format(LocalizationService.L("Settings_UpdateCheckFailed", "检查失败: {0}"), ex.Message);
+        }
+        finally
+        {
+            _isCheckingUpdate = false;
+            CheckUpdateButton.IsEnabled = true;
+        }
+    }
+
+    private void InitUpdateSection()
+    {
+        if (RuntimeHelper.IsPackagedContext || RuntimeHelper.IsLiteBuild)
+        {
+            SettingsUpdateCard.Visibility = Visibility.Collapsed;
+            SettingsToolsBundleCard.Visibility = Visibility.Visible;
+            ToolsBundleStatusText.Text = DescribeToolsBundleStatus();
+        }
+        else
+        {
+            SettingsUpdateCard.Visibility = Visibility.Visible;
+            SettingsToolsBundleCard.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    /// <summary>按内核变种/来源生成状态文案（MSIX 商店版与精简版便携共用）。</summary>
+    private static string DescribeToolsBundleStatus()
+    {
+        var version = ToolsBundleService.GetCurrentVersion();
+        if (version is not null)
+        {
+            return ToolsBundleService.GetInstalledKind() == ToolsBundleService.KindLite
+                ? string.Format(LocalizationService.L("Settings_ToolsBundleLite", "当前精简版内核 v{0}，可升级完整版"), version)
+                : string.Format(LocalizationService.L("Settings_ToolsBundleFull", "当前完整版内核 v{0}"), version);
+        }
+
+        // 精简版便携随包内置工具（未通过内核包安装过）
+        if (RuntimeHelper.IsLiteBuild && Directory.Exists(
+                Path.Combine(ToolCatalog.AppDirectory, "Tools")))
+        {
+            return LocalizationService.L("Settings_ToolsBundleLiteBuiltIn", "已内置精简工具集，可下载完整版内核");
+        }
+
+        if (!ToolsBundleService.IsToolsBundleReady())
+        {
+            return LocalizationService.L("Settings_ToolsBundleNotDownloaded", "内核未下载");
+        }
+
+        return LocalizationService.L("Settings_ToolsBundleReadyUnknown", "内核已就绪（版本未知）");
+    }
+
+    private async void CheckToolsBundleButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isCheckingToolsBundle) return;
+        _isCheckingToolsBundle = true;
+        CheckToolsBundleButton.IsEnabled = false;
+        ToolsBundleStatusText.Text = LocalizationService.L("Settings_ToolsBundleChecking", "正在检查内核更新...");
+
+        try
+        {
+            var info = await ToolsBundleService.CheckForToolsUpdateAsync();
+
+            if (info is null)
+            {
+                ToolsBundleStatusText.Text = LocalizationService.L("Settings_ToolsBundleCheckFailedRetry", "检查失败，请稍后重试");
+                return;
+            }
+
+            // 完整版已是最新：无事可做（不可降级精简版）；其余情况打开对话框
+            // （有新版本 → 选版本下载；无新版本且非完整版 → 升级完整版）。
+            if (!info.HasUpdate && ToolsBundleService.GetInstalledKind() == ToolsBundleService.KindFull)
+            {
+                ToolsBundleStatusText.Text = string.Format(LocalizationService.L("Settings_ToolsBundleLatest", "当前内核已是最新版本 (v{0})"), info.Version);
+                return;
+            }
+
+            ToolsBundleStatusText.Text = info.HasUpdate
+                ? string.Format(LocalizationService.L("Settings_ToolsBundleNewVersion", "发现新版本 v{0}"), info.Version)
+                : DescribeToolsBundleStatus();
+
+            var dialog = new ToolsBundleDownloadDialog
+            {
+                XamlRoot = XamlRoot,
+                RequestedTheme = ThemeService.CurrentElementTheme
+            };
+            await dialog.ShowDownloadAsync(info);
+
+            ToolsBundleStatusText.Text = dialog.DownloadEnqueued
+                ? LocalizationService.L("Settings_ToolsBundleQueued", "已加入下载队列，可在标题栏下载按钮查看进度")
+                : info.HasUpdate
+                    ? LocalizationService.L("Settings_ToolsBundle_Status", "点击检查内核是否有新版本")
+                    : DescribeToolsBundleStatus();
+        }
+        catch (Exception ex)
+        {
+            ToolsBundleStatusText.Text = string.Format(LocalizationService.L("Settings_UpdateCheckFailed", "检查失败: {0}"), ex.Message);
+        }
+        finally
+        {
+            _isCheckingToolsBundle = false;
+            CheckToolsBundleButton.IsEnabled = true;
+        }
+    }
+
+    private void InitBackdropSettings()
+    {
+        _backdropInitializing = true;
+        _backdropOptions = [BackdropMicaOption, BackdropMicaAltOption, BackdropAcrylicOption, BackdropAcrylicThinOption];
+        _tintSwatches = TintSwatchPanel.Children.OfType<Border>().ToArray();
+
+        var currentType = BackdropService.GetBackdropType();
+        UpdateBackdropOptionSelection(currentType);
+
+        var customization = BackdropService.GetCustomization();
+        CustomTintToggle.IsOn = customization.UseCustomTint;
+        TintOpacitySlider.Minimum = 0;
+        TintOpacitySlider.Maximum = 100;
+        TintOpacitySlider.StepFrequency = 5;
+        TintOpacitySlider.Value = customization.TintOpacity * 100;
+        TintLuminositySlider.Minimum = 0;
+        TintLuminositySlider.Maximum = 100;
+        TintLuminositySlider.StepFrequency = 5;
+        TintLuminositySlider.Value = customization.LuminosityOpacity * 100;
+        TintOpacityText.Text = $"{(int)(customization.TintOpacity * 100)}%";
+        TintLuminosityText.Text = $"{(int)(customization.LuminosityOpacity * 100)}%";
+        UpdateTintColorSelection(customization.TintColor);
+        UpdateCustomTintPanelVisibility();
+        _backdropInitializing = false;
+    }
+
+    private void UpdateBackdropOptionSelection(BackdropType selected)
+    {
+        foreach (var border in _backdropOptions)
+        {
+            if (border is null) continue;
+            var tag = border.Tag?.ToString();
+            var isSelected = tag == selected.ToString();
+            border.BorderBrush = isSelected
+                ? new SolidColorBrush(ThemeColors.AccentBlue)
+                : (Brush)App.Current.Resources["SubtleFillColorSecondaryBrush"];
+        }
+    }
+
+    private void BackdropOption_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (_backdropInitializing) return;
+        if (sender is not Border border) return;
+        if (!Enum.TryParse<BackdropType>(border.Tag?.ToString(), out var type)) return;
+
+        BackdropService.SetBackdropType(type);
+        UpdateBackdropOptionSelection(type);
+    }
+
+    private void BackdropOption_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is Border border)
+        {
+            border.Opacity = 0.85;
+        }
+    }
+
+    private void BackdropOption_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is Border border)
+        {
+            border.Opacity = 1.0;
+        }
+    }
+
+    private void UpdateCustomTintPanelVisibility()
+    {
+        CustomTintPanel.Visibility = CustomTintToggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void CustomTintToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_backdropInitializing) return;
+        UpdateCustomTintPanelVisibility();
+        SaveCustomization();
+    }
+
+    private void TintSwatch_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (_backdropInitializing) return;
+        if (sender is not Border border) return;
+        var color = BackdropSettings.ParseColor(border.Tag?.ToString(), BackdropSettings.DefaultTintColor);
+        UpdateTintColorSelection(color);
+        SaveCustomization();
+    }
+
+    private void TintColorPicker_ColorChanged(ColorPicker sender, ColorChangedEventArgs args)
+    {
+        if (_backdropInitializing) return;
+        if (!CustomTintToggle.IsOn) return;
+        UpdateTintColorSelection(args.NewColor);
+        SaveCustomization();
+    }
+
+    private void TintOpacitySlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (_backdropInitializing) return;
+        TintOpacityText.Text = $"{(int)e.NewValue}%";
+        SaveCustomization();
+    }
+
+    private void TintLuminositySlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (_backdropInitializing) return;
+        TintLuminosityText.Text = $"{(int)e.NewValue}%";
+        SaveCustomization();
+    }
+
+    /// <summary>刷新色板选中环与"自定义颜色"色块,并同步 ColorPicker。</summary>
+    private void UpdateTintColorSelection(Color color)
+    {
+        _currentTintColor = color;
+        CustomTintColorChip.Background = new SolidColorBrush(color);
+        if (TintColorPicker.Color != color)
+            TintColorPicker.Color = color; // 赋值会触发 ColorChanged,值相同则跳过避免递归
+
+        foreach (var swatch in _tintSwatches)
+        {
+            var isSelected = BackdropSettings.ParseColor(swatch.Tag?.ToString(), Color.FromArgb(0, 0, 0, 0)) == color;
+            swatch.BorderBrush = isSelected
+                ? new SolidColorBrush(ThemeColors.AccentBlue)
+                : (Brush)App.Current.Resources["ControlStrokeColorDefaultBrush"];
+        }
+    }
+
+    private void SaveCustomization()
+    {
+        var customization = new BackdropCustomization(
+            CustomTintToggle.IsOn,
+            _currentTintColor,
+            TintOpacitySlider.Value / 100.0,
+            TintLuminositySlider.Value / 100.0);
+        BackdropService.SetCustomization(customization);
+    }
+
+    private void LoadBackgroundSettings()
+    {
+        _opacityChanging = true;
+        BgOpacitySlider.Minimum = 5;
+        BgOpacitySlider.Maximum = 80;
+        BgOpacitySlider.StepFrequency = 5;
+
+        var path = BackgroundService.GetBackgroundPath();
+        if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+        {
+            ShowBgPreview(path);
+        }
+
+        var opacity = BackgroundService.GetBackgroundOpacity();
+        BgOpacitySlider.Value = (int)(opacity * 100);
+        _opacityChanging = false;
+        BgOpacityText.Text = $"{(int)(opacity * 100)}%";
+
+        PopulateBgList();
+    }
+
+    private void PopulateBgList()
+    {
+        var entries = BackgroundService.GetImportedBackgrounds();
+        BgListPanel.Children.Clear();
+
+        if (entries.Count == 0)
+        {
+            BgListEmptyText.Visibility = Visibility.Visible;
+            BgListScrollViewer.Visibility = Visibility.Collapsed;
+            BgHistoryCountText.Text = "";
+            BgHistoryExpander.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        BgListEmptyText.Visibility = Visibility.Collapsed;
+        BgListScrollViewer.Visibility = Visibility.Visible;
+        BgHistoryCountText.Text = $"({entries.Count})";
+        BgHistoryExpander.Visibility = Visibility.Visible;
+
+        foreach (var entry in entries)
+        {
+            var item = CreateBgListItem(entry);
+            BgListPanel.Children.Add(item);
+        }
+    }
+
+    private Border CreateBgListItem(BackgroundImageEntry entry)
+    {
+        var isSelected = entry.IsSelected;
+        var accentBrush = (Brush)App.Current.Resources["AccentFillColorDefaultBrush"];
+
+        var thumbnailBorder = new Border
+        {
+            Width = 140,
+            CornerRadius = new CornerRadius(8),
+            BorderThickness = new Thickness(isSelected ? 2 : 1),
+            BorderBrush = isSelected ? accentBrush : (Brush)App.Current.Resources["CardStrokeColorDefaultBrush"],
+            Tag = entry.Path,
+            Padding = new Thickness(0),
+        };
+
+        var grid = new Grid { RowSpacing = 0 };
+        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(80) });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        var image = new Image
+        {
+            Stretch = Stretch.UniformToFill,
+            Source = new BitmapImage(new Uri(entry.Path)),
+        };
+        Grid.SetRow(image, 0);
+        grid.Children.Add(image);
+
+        var infoPanel = new Grid
+        {
+            Padding = new Thickness(6, 4, 6, 4),
+            ColumnSpacing = 4,
+        };
+        Grid.SetRow(infoPanel, 1);
+        infoPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        infoPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var nameText = new TextBlock
+        {
+            Text = entry.FileName,
+            FontSize = 12,
+            Foreground = new SolidColorBrush(ThemeColors.SecondaryText),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        Grid.SetColumn(nameText, 0);
+        infoPanel.Children.Add(nameText);
+
+        var deleteButton = new Button
+        {
+            Padding = new Thickness(2),
+            MinWidth = 0,
+            MinHeight = 0,
+            Width = 22,
+            Height = 22,
+            VerticalAlignment = VerticalAlignment.Center,
+            Tag = entry.Path,
+        };
+        var deleteIcon = new FontIcon
+        {
+            Glyph = "\uE74D",
+            FontSize = 12,
+            Foreground = new SolidColorBrush(ThemeColors.SecondaryText),
+        };
+        deleteButton.Content = deleteIcon;
+        deleteButton.Click += BgDeleteItem_Click;
+        Grid.SetColumn(deleteButton, 1);
+        infoPanel.Children.Add(deleteButton);
+
+        grid.Children.Add(infoPanel);
+        thumbnailBorder.Child = grid;
+
+        if (isSelected)
+        {
+            var checkBadge = new Border
+            {
+                Width = 20,
+                Height = 20,
+                CornerRadius = new CornerRadius(12),
+                Background = accentBrush,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 4, 4, 0),
+            };
+            var checkIcon = new FontIcon
+            {
+                Glyph = "\uE73E",
+                FontSize = 12,
+                Foreground = (Brush)App.Current.Resources["TextOnAccentFillColorPrimaryBrush"],
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            checkBadge.Child = checkIcon;
+            grid.Children.Add(checkBadge);
+        }
+
+        thumbnailBorder.PointerPressed += (s, e) =>
+        {
+            BgListItem_Tapped(entry.Path);
+        };
+
+        return thumbnailBorder;
+    }
+
+    private void BgListItem_Tapped(string path)
+    {
+        if (!File.Exists(path)) return;
+
+        BackgroundService.SelectBackground(path);
+        ShowBgPreview(path);
+        PopulateBgList();
+    }
+
+    private void BgDeleteItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not string path) return;
+
+        BackgroundService.DeleteBackground(path);
+
+        var currentPath = BackgroundService.GetBackgroundPath();
+        if (string.IsNullOrWhiteSpace(currentPath))
+            HideBgPreview();
+        else
+            ShowBgPreview(currentPath);
+
+        PopulateBgList();
+    }
+
+    private void ShowBgPreview(string path)
+    {
+        try
+        {
+            BgPreviewImage.Source = new BitmapImage(new Uri(path));
+            BgFileNameText.Text = Path.GetFileName(path);
+            BgPreviewPanel.Visibility = Visibility.Visible;
+            BgPreviewBorder.Visibility = Visibility.Visible;
+            ClearBgButton.Visibility = Visibility.Visible;
+        }
+        catch { }
+    }
+
+    private void HideBgPreview()
+    {
+        BgPreviewImage.Source = null;
+        BgFileNameText.Text = string.Empty;
+        BgPreviewPanel.Visibility = Visibility.Collapsed;
+        BgPreviewBorder.Visibility = Visibility.Collapsed;
+        ClearBgButton.Visibility = Visibility.Collapsed;
+    }
+
+    private async void ImportBgButton_Click(object sender, RoutedEventArgs e)
+    {
+        var ofn = new OPENFILENAME();
+        ofn.lStructSize = Marshal.SizeOf(ofn);
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
+        ofn.hwndOwner = hwnd;
+        ofn.lpstrFilter = LocalizationService.L("Settings_ImageFileFilter", "图片文件") + "\0*.jpg;*.jpeg;*.png;*.bmp\0"
+            + LocalizationService.L("Settings_AllFilesFilter", "所有文件") + "\0*.*\0\0";
+        ofn.lpstrFile = new string(new char[260]);
+        ofn.nMaxFile = 260;
+        ofn.lpstrTitle = LocalizationService.L("Settings_PickBackgroundImage", "选择背景图片");
+        ofn.Flags = OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+        ofn.nFilterIndex = 1;
+
+        if (!GetOpenFileName(ref ofn))
+            return;
+
+        var sourcePath = ofn.lpstrFile.TrimEnd('\0');
+        if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+            return;
+
+        try
+        {
+            var bgDir = ConfigManager.GetBackgroundsDir();
+            Directory.CreateDirectory(bgDir);
+
+            var destName = $"bg_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}{Path.GetExtension(sourcePath)}";
+            var destPath = Path.Combine(bgDir, destName);
+            File.Copy(sourcePath, destPath, true);
+
+            BackgroundService.SetBackgroundPath(destPath);
+            ShowBgPreview(destPath);
+        }
+        catch
+        {
+            BackgroundService.SetBackgroundPath(sourcePath);
+            ShowBgPreview(sourcePath);
+        }
+
+        PopulateBgList();
+    }
+
+    private void ClearBgButton_Click(object sender, RoutedEventArgs e)
+    {
+        BackgroundService.SetBackgroundPath(null);
+        HideBgPreview();
+        PopulateBgList();
+    }
+
+    private void BgOpacitySlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (_opacityChanging) return;
+        var percent = e.NewValue;
+        BackgroundService.SetBackgroundOpacity(percent / 100.0);
+        BgOpacityText.Text = $"{(int)percent}%";
+    }
+
+    private void BrandLogoToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_brandLogoInitializing) return;
+        AppSettings.Set("ShowBrandLogo", BrandLogoToggle.IsOn);
+    }
+
+    private void InitBrandLogoToggle()
+    {
+        _brandLogoInitializing = true;
+        BrandLogoToggle.IsOn = AppSettings.GetBool("ShowBrandLogo", true);
+        _brandLogoInitializing = false;
+    }
+
+    private void InitWatermarkSettings()
+    {
+        _watermarkInitializing = true;
+        var watermarkOn = AppSettings.GetBool("ScreenshotWatermark", true);
+        WatermarkToggle.IsOn = watermarkOn;
+        _watermarkInitializing = false;
+
+        UpdateWatermarkDetailVisibility(watermarkOn);
+
+        _watermarkTextInitializing = true;
+        WatermarkTextBox.Text = AppSettings.Get("ScreenshotWatermarkText") ?? LocalizationService.L("App_Title", "空岛图吧工具箱");
+        _watermarkTextInitializing = false;
+
+        _watermarkFontInitializing = true;
+        InitWatermarkFontComboBox();
+        _watermarkFontInitializing = false;
+    }
+
+    private void InitWatermarkFontComboBox()
+    {
+        WatermarkFontComboBox.Items.Clear();
+        var savedFont = AppSettings.Get("ScreenshotWatermarkFont") ?? "微软雅黑";
+
+        using var fc = new InstalledFontCollection();
+        var preferredFonts = new[] { "微软雅黑", "宋体", "黑体", "楷体", "仿宋", "Arial", "Segoe UI" };
+        var allFonts = new List<string>();
+
+        foreach (var preferred in preferredFonts)
+        {
+            if (fc.Families.Any(f => f.Name == preferred) && !allFonts.Contains(preferred))
+                allFonts.Add(preferred);
+        }
+
+        foreach (var family in fc.Families.OrderBy(f => f.Name))
+        {
+            if (!allFonts.Contains(family.Name))
+                allFonts.Add(family.Name);
+        }
+
+        var selectedIndex = 0;
+        for (var i = 0; i < allFonts.Count; i++)
+        {
+            WatermarkFontComboBox.Items.Add(allFonts[i]);
+            if (allFonts[i] == savedFont)
+                selectedIndex = i;
+        }
+
+        WatermarkFontComboBox.SelectedIndex = Math.Min(selectedIndex, allFonts.Count - 1);
+    }
+
+    private void UpdateWatermarkDetailVisibility(bool watermarkOn)
+    {
+        WatermarkDivider.Visibility = watermarkOn ? Visibility.Visible : Visibility.Collapsed;
+        WatermarkDetailPanel.Visibility = watermarkOn ? Visibility.Visible : Visibility.Collapsed;
+        WatermarkFontPanel.Visibility = watermarkOn ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void WatermarkToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_watermarkInitializing) return;
+        var enabled = WatermarkToggle.IsOn;
+        AppSettings.Set("ScreenshotWatermark", enabled);
+        UpdateWatermarkDetailVisibility(enabled);
+    }
+
+    private void WatermarkTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_watermarkTextInitializing) return;
+        var text = WatermarkTextBox.Text.Trim();
+        AppSettings.Set("ScreenshotWatermarkText", string.IsNullOrEmpty(text) ? LocalizationService.L("App_Title", "空岛图吧工具箱") : text);
+    }
+
+    private void WatermarkFontComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_watermarkFontInitializing) return;
+        if (WatermarkFontComboBox.SelectedItem is string font)
+            AppSettings.Set("ScreenshotWatermarkFont", font);
+    }
+
+    private bool _hardwareStyleInitializing;
+
+    private void InitHardwareStyle()
+    {
+        _hardwareStyleInitializing = true;
+        HardwareStyleComboBox.SelectedIndex = AppSettings.GetBool("HardwareDiagramStyle", false) ? 1 : 0;
+        _hardwareStyleInitializing = false;
+        HardwareFitScreenToggle.IsEnabled = HardwareStyleComboBox.SelectedIndex == 0;
+    }
+
+    private void HardwareStyleComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_hardwareStyleInitializing || HardwareStyleComboBox.SelectedIndex < 0) return;
+        var modern = HardwareStyleComboBox.SelectedIndex == 1;
+        AppSettings.Set("HardwareDiagramStyle", modern);
+        HardwareFitScreenToggle.IsEnabled = !modern;
+    }
+
+    private void InitHardwareFitScreenToggle()
+    {
+        _hardwareFitScreenInitializing = true;
+        HardwareFitScreenToggle.IsOn = AppSettings.GetBool("HardwareFitScreen", true);
+        _hardwareFitScreenInitializing = false;
+    }
+
+    private void HardwareFitScreenToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_hardwareFitScreenInitializing) return;
+        AppSettings.Set("HardwareFitScreen", HardwareFitScreenToggle.IsOn);
+    }
+
+    private void InitHardwareMultiDeviceNewLineToggle()
+    {
+        _hardwareMultiDeviceNewLineInitializing = true;
+        HardwareMultiDeviceNewLineToggle.IsOn = AppSettings.GetBool("HardwareMultiDeviceNewLine", true);
+        _hardwareMultiDeviceNewLineInitializing = false;
+    }
+
+    private void HardwareMultiDeviceNewLineToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_hardwareMultiDeviceNewLineInitializing) return;
+        AppSettings.Set("HardwareMultiDeviceNewLine", HardwareMultiDeviceNewLineToggle.IsOn);
+        HardwareInfoService.InvalidateCache();
+    }
+
+    private bool _activeInterceptInitializing;
+    private bool _telemetryInitializing;
+
+    private void InitActiveInterceptToggle()
+    {
+        // MSIX 沙箱下不支持主动拦截后端，隐藏相关卡片
+        if (RuntimeHelper.IsPackagedContext)
+        {
+            if (SettingsActiveInterceptCard is not null)
+                SettingsActiveInterceptCard.Visibility = Visibility.Collapsed;
+            if (SettingsActiveInterceptNotifyCard is not null)
+                SettingsActiveInterceptNotifyCard.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        _activeInterceptInitializing = true;
+        ActiveInterceptToggle.IsOn = AppSettings.GetBool("ActiveInterceptEnabled", false);
+        _activeInterceptInitializing = false;
+        UpdateActiveInterceptStatus();
+    }
+
+    private void OnInterceptSettingChanged(string key)
+    {
+        if (key == "ActiveInterceptEnabled")
+            DispatcherQueue.TryEnqueue(InitActiveInterceptToggle);
+    }
+
+    private async void ActiveInterceptToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_activeInterceptInitializing) return;
+        var enabled = ActiveInterceptToggle.IsOn;
+        ActiveInterceptToggle.IsEnabled = false;
+        try
+        {
+            var result = await ActiveInterceptStartupService.SetStartupEnabledAsync(enabled);
+            if (!result.Success)
+                ActiveInterceptStatusText.Text = result.Error ?? "操作失败";
+            _activeInterceptInitializing = true;
+            ActiveInterceptToggle.IsOn = AppSettings.GetBool("ActiveInterceptEnabled", false);
+            _activeInterceptInitializing = false;
+            if (result.Success) UpdateActiveInterceptStatus();
+        }
+        catch (Exception ex)
+        {
+            InitActiveInterceptToggle();
+            ActiveInterceptStatusText.Text = ex.Message;
+        }
+        finally { ActiveInterceptToggle.IsEnabled = true; }
+    }
+
+    private async void ManageToolVisibility_Click(object sender, RoutedEventArgs e)
+    {
+        var button = (Button)sender;
+        button.IsEnabled = false;
+        try
+        {
+            var picker = new Controls.SearchToolPicker();
+            var enablePicker = new Controls.SearchToolPicker { IsBuiltinEnablement = true };
+            var tabs = new Grid
+            {
+                Width = Math.Clamp(XamlRoot.Size.Width - 80, 240, 560),
+                Height = Math.Clamp(XamlRoot.Size.Height - 240, 360, 540)
+            };
+            tabs.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            tabs.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            var searchTab = new SelectorBarItem { Text = LocalizationService.L("Settings_SearchTools_Tab", "Windows 搜索"), IsSelected = true };
+            var builtinTab = new SelectorBarItem { Text = LocalizationService.L("Settings_BuiltinTools_Tab", "内置工具启用") };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(searchTab, "SearchToolsTab");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(builtinTab, "BuiltinToolsTab");
+            var selector = new SelectorBar { Margin = new Thickness(0, 0, 0, 12) };
+            selector.Items.Add(searchTab);
+            selector.Items.Add(builtinTab);
+            enablePicker.Visibility = Visibility.Collapsed;
+            selector.SelectionChanged += (_, _) =>
+            {
+                picker.Visibility = selector.SelectedItem == searchTab ? Visibility.Visible : Visibility.Collapsed;
+                enablePicker.Visibility = selector.SelectedItem == builtinTab ? Visibility.Visible : Visibility.Collapsed;
+            };
+            Grid.SetRow(picker, 1);
+            Grid.SetRow(enablePicker, 1);
+            tabs.Children.Add(selector);
+            tabs.Children.Add(picker);
+            tabs.Children.Add(enablePicker);
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot, RequestedTheme = ThemeService.CurrentElementTheme,
+                Title = LocalizationService.L("Settings_ToolVisibility_Title", "管理内置工具与开始菜单展示"),
+                Content = tabs,
+                PrimaryButtonText = LocalizationService.L("Settings_ToolVisibility_Save", "保存"),
+                CloseButtonText = LocalizationService.L("Settings_ToolVisibility_Cancel", "取消"),
+                DefaultButton = ContentDialogButton.Primary,
+                IsPrimaryButtonEnabled = picker.CanApply
+            };
+            dialog.Resources["ContentDialogMaxWidth"] = 680d;
+            dialog.Resources["ContentDialogMinWidth"] = 280d;
+            picker.StateChanged += (_, _) => dialog.IsPrimaryButtonEnabled = picker.CanApply;
+            void ResizePicker(XamlRoot root, XamlRootChangedEventArgs args)
+            {
+                tabs.Width = Math.Clamp(root.Size.Width - 80, 240, 560);
+                tabs.Height = Math.Clamp(root.Size.Height - 240, 360, 540);
+            }
+            var dialogRoot = XamlRoot;
+            dialog.Opened += async (_, _) =>
+            {
+                dialogRoot.Changed += ResizePicker;
+                await Task.WhenAll(picker.InitializeAsync(), enablePicker.InitializeAsync());
+            };
+            dialog.Closed += (_, _) =>
+            {
+                dialogRoot.Changed -= ResizePicker;
+                picker.CancelPendingLoad();
+                enablePicker.CancelPendingLoad();
+            };
+            dialog.PrimaryButtonClick += (_, args) => args.Cancel = !picker.CanApply;
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+            await enablePicker.ApplySettingsAsync();
+            var result = await picker.ApplySettingsAsync();
+            SearchRegistrationResultBar.Severity = result.Errors.Count > 0 ? InfoBarSeverity.Warning : InfoBarSeverity.Success;
+            SearchRegistrationResultBar.Title = string.Format(LocalizationService.L("SearchPicker_Registered", "已注册 {0} 个工具"), result.Registered);
+            SearchRegistrationResultBar.Message = result.Errors.Count > 0 ? string.Join("\n", result.Errors)
+                : result.Unavailable > 0 ? string.Format(LocalizationService.L("SearchPicker_Unavailable", "另有 {0} 个工具尚未下载或未启用，暂未注册。"), result.Unavailable)
+                : LocalizationService.L("SearchPicker_Synchronized", "已按当前选择同步开始菜单与 Windows 搜索。一个都不选会移除全部工具注册。");
+            SearchRegistrationResultBar.IsOpen = true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ToolVisibility] {ex}");
+            var error = new ContentDialog
+            {
+                XamlRoot = XamlRoot, RequestedTheme = ThemeService.CurrentElementTheme,
+                Title = LocalizationService.L("Settings_ToolVisibility_Title", "管理内置工具与开始菜单展示"),
+                Content = ex.Message, CloseButtonText = LocalizationService.L("Settings_ToolVisibility_Cancel", "取消")
+            };
+            await error.ShowAsync();
+        }
+        finally { button.IsEnabled = true; }
+    }
+
+    private void UpdateActiveInterceptStatus()
+    {
+        var enabled = AppSettings.GetBool("ActiveInterceptEnabled", false);
+        if (ActiveInterceptStatusText is null) return;
+
+        if (!enabled)
+        {
+            ActiveInterceptStatusText.Text = LocalizationService.L("Settings_InterceptStatusOff", "已关闭");
+            ActiveInterceptStatusText.Foreground = new SolidColorBrush(ThemeColors.Neutral);
+        }
+        else if (ActiveInterceptService.IsRunning)
+        {
+            ActiveInterceptStatusText.Text = LocalizationService.L("Settings_InterceptStatusRunning", "运行中");
+            ActiveInterceptStatusText.Foreground = new SolidColorBrush(ThemeColors.AccentGreen);
+        }
+        else
+        {
+            ActiveInterceptStatusText.Text = LocalizationService.L("Settings_InterceptStatusBackendMissing", "未运行（后端缺失）");
+            ActiveInterceptStatusText.Foreground = new SolidColorBrush(ThemeColors.AccentRed);
+        }
+    }
+
+    private void InitTelemetryToggle()
+    {
+        _telemetryInitializing = true;
+        TelemetryToggle.IsOn = AppSettings.GetBool(TelemetryService.SettingKey, true);
+        _telemetryInitializing = false;
+    }
+
+    private void TelemetryToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_telemetryInitializing) return;
+        TelemetryService.SetEnabled(TelemetryToggle.IsOn);
+    }
+
+    private bool _activeInterceptNotifyModeInitializing;
+
+    private void InitActiveInterceptNotifyModeComboBox()
+    {
+        _activeInterceptNotifyModeInitializing = true;
+        ActiveInterceptNotifyModeComboBox.Items.Clear();
+        ActiveInterceptNotifyModeComboBox.Items.Add(LocalizationService.L("Settings_InterceptNotifyAlways", "每次拦截都通知"));
+        ActiveInterceptNotifyModeComboBox.Items.Add(LocalizationService.L("Settings_InterceptNotifyBatch", "仅批量时通知"));
+        ActiveInterceptNotifyModeComboBox.Items.Add(LocalizationService.L("Settings_InterceptNotifyNever", "从不通知"));
+
+        var mode = AppSettings.Get("ActiveInterceptNotifyMode") ?? "always";
+        ActiveInterceptNotifyModeComboBox.SelectedIndex = mode switch
+        {
+            "batch_only" => 1,
+            "never" => 2,
+            _ => 0,
+        };
+        _activeInterceptNotifyModeInitializing = false;
+    }
+
+    private void ActiveInterceptNotifyModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_activeInterceptNotifyModeInitializing) return;
+        var mode = ActiveInterceptNotifyModeComboBox.SelectedIndex switch
+        {
+            1 => "batch_only",
+            2 => "never",
+            _ => "always",
+        };
+        AppSettings.Set("ActiveInterceptNotifyMode", mode);
+        // 重启后端使新配置生效
+        ActiveInterceptService.RestartBackend();
+    }
+
+    private void InitCpuzDataSourceStatus()
+    {
+        UpdateCpuzDataSourceUI();
+    }
+
+    private void UpdateCpuzDataSourceUI()
+    {
+        var useCpuz = AppSettings.GetBool("UseCpuzDataSource", false);
+        var cpuzAvailable = CpuzInfoService.FindCpuzExe() != null;
+
+        if (useCpuz && CpuzInfoService.CachedInfo != null)
+        {
+            CpuzDataSourceStatusText.Text = LocalizationService.L("Settings_CpuzStatusInUse", "当前使用 CPU-Z 数据源（真实硬件读取）");
+            CpuzDataSourceButtonText.Text = LocalizationService.L("Settings_CpuzButtonRevert", "切回默认");
+            CpuzDataSourceIcon.Glyph = "\uE73E";
+        }
+        else if (useCpuz)
+        {
+            CpuzDataSourceStatusText.Text = cpuzAvailable
+                ? LocalizationService.L("Settings_CpuzStatusWaiting", "CPU-Z 数据源已启用，等待获取数据...")
+                : LocalizationService.L("Settings_CpuzStatusNotFound", "CPU-Z 数据源已启用，但未找到 CPU-Z");
+            CpuzDataSourceButtonText.Text = LocalizationService.L("Settings_CpuzButtonRevert", "切回默认");
+            CpuzDataSourceIcon.Glyph = "\uE950;";
+        }
+        else
+        {
+            CpuzDataSourceStatusText.Text = cpuzAvailable
+                ? LocalizationService.L("Settings_CpuzStatusWmiCanSwitch", "当前使用 WMI 数据源，可切换为 CPU-Z 获取真实信息")
+                : LocalizationService.L("Settings_CpuzStatusWmiNoTool", "当前使用 WMI 数据源（未找到 CPU-Z 工具）");
+            CpuzDataSourceButtonText.Text = LocalizationService.L("Settings_CpuzSource_Button", "切换");
+            CpuzDataSourceIcon.Glyph = "\uE950";
+        }
+    }
+
+    private async void CpuzDataSourceButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_cpuzBusy) return;
+
+        var useCpuz = AppSettings.GetBool("UseCpuzDataSource", false);
+
+        if (useCpuz)
+        {
+            AppSettings.Set("UseCpuzDataSource", false);
+            UpdateCpuzDataSourceUI();
+            return;
+        }
+
+        var cpuzExe = CpuzInfoService.FindCpuzExe();
+        if (cpuzExe == null)
+        {
+            await ShowMessageAsync(
+                LocalizationService.L("Settings_CpuzNotFoundTitle", "未找到 CPU-Z"),
+                LocalizationService.L("Settings_CpuzNotFoundMessage", "在工具目录中未找到 CPU-Z 可执行文件，无法使用此功能。\n\n请确保 Tools/处理器工具/CPUZ/ 目录下存在 cpuz_x64.exe。"));
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = LocalizationService.L("Settings_CpuzDialogTitle", "切换硬件信息数据源"),
+            PrimaryButtonText = LocalizationService.L("Settings_CpuzDialogPrimary", "确认切换"),
+            CloseButtonText = LocalizationService.L("Common_Cancel", "取消"),
+            DefaultButton = ContentDialogButton.Close,
+            RequestedTheme = ThemeService.CurrentElementTheme
+        };
+
+        var stack = new StackPanel { Spacing = 12 };
+
+        // 语义色统一取自 ThemeColors（随生效主题解析），透明度为派生的浅底/描边
+        var cautionColor = ThemeColors.AccentOrange;
+        var successColor = ThemeColors.AccentGreen;
+        var accentColor = ThemeColors.AccentBlue;
+        var darkTheme = ThemeService.IsDarkEffective;
+
+        stack.Children.Add(new TextBlock
+        {
+            Text = LocalizationService.L("Settings_CpuzIntro", "当前硬件信息通过 WMI（Windows 管理规范）获取，数据来源于厂商在 SMBIOS/DMI 中填写的内容。"),
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = new SolidColorBrush(ThemeColors.SecondaryText)
+        });
+
+        var problemBorder = new Border
+        {
+            Padding = new Thickness(12),
+            CornerRadius = new CornerRadius(8),
+            Background = new SolidColorBrush(Color.FromArgb(darkTheme ? (byte)40 : (byte)30, cautionColor.R, cautionColor.G, cautionColor.B)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(darkTheme ? (byte)80 : (byte)60, cautionColor.R, cautionColor.G, cautionColor.B)),
+            BorderThickness = new Thickness(1)
+        };
+        problemBorder.Child = new StackPanel
+        {
+            Spacing = 4,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = LocalizationService.L("Settings_CpuzWmiWarningTitle", "⚠ WMI 数据可能被伪造"),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    FontSize = 14
+                },
+                new TextBlock
+                {
+                    Text = LocalizationService.L("Settings_CpuzWmiWarningBody", "部分厂商或商家可能通过修改 BIOS/SMBIOS 信息来伪造 CPU 型号、内存品牌、主板型号等，导致 WMI 读取到的信息与实际硬件不符。"),
+                    TextWrapping = TextWrapping.Wrap,
+                    Foreground = new SolidColorBrush(ThemeColors.SecondaryText),
+                    FontSize = 14
+                }
+            }
+        };
+        stack.Children.Add(problemBorder);
+
+        var solutionBorder = new Border
+        {
+            Padding = new Thickness(12),
+            CornerRadius = new CornerRadius(8),
+            Background = new SolidColorBrush(Color.FromArgb(darkTheme ? (byte)40 : (byte)25, successColor.R, successColor.G, successColor.B)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(darkTheme ? (byte)80 : (byte)60, successColor.R, successColor.G, successColor.B)),
+            BorderThickness = new Thickness(1)
+        };
+        solutionBorder.Child = new StackPanel
+        {
+            Spacing = 4,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = LocalizationService.L("Settings_CpuzHowTitle", "✓ CPU-Z 读取原理"),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    FontSize = 14
+                },
+                new TextBlock
+                {
+                    Text = LocalizationService.L("Settings_CpuzHowBody", "CPU-Z 通过 CPUID 指令直接读取 CPU 硬件寄存器，通过 PCI 枚举直接扫描硬件，通过 SPD 芯片直接读取内存条信息——这些是底层硬件级别的数据，厂商无法通过修改 SMBIOS 来伪造。"),
+                    TextWrapping = TextWrapping.Wrap,
+                    Foreground = new SolidColorBrush(ThemeColors.SecondaryText),
+                    FontSize = 14
+                }
+            }
+        };
+        stack.Children.Add(solutionBorder);
+
+        var warnBorder = new Border
+        {
+            Padding = new Thickness(12),
+            CornerRadius = new CornerRadius(8),
+            Background = new SolidColorBrush(Color.FromArgb(darkTheme ? (byte)40 : (byte)25, accentColor.R, accentColor.G, accentColor.B)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(darkTheme ? (byte)80 : (byte)60, accentColor.R, accentColor.G, accentColor.B)),
+            BorderThickness = new Thickness(1)
+        };
+        warnBorder.Child = new StackPanel
+        {
+            Spacing = 4,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = LocalizationService.L("Settings_CpuzNotesTitle", "⏱ 注意事项"),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    FontSize = 14
+                },
+                new TextBlock
+                {
+                    Text = LocalizationService.L("Settings_CpuzNotesBody", "• 使用 CPU-Z 获取信息需要约 3~8 秒，期间会短暂启动 CPU-Z 进程\n• 获取完成后会自动关闭 CPU-Z 进程\n• 切换后可在设置中随时切回 WMI 数据源"),
+                    TextWrapping = TextWrapping.Wrap,
+                    Foreground = new SolidColorBrush(ThemeColors.SecondaryText),
+                    FontSize = 14
+                }
+            }
+        };
+        stack.Children.Add(warnBorder);
+
+        dialog.Content = new ScrollViewer
+        {
+            MaxHeight = 400,
+            Content = stack
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary) return;
+
+        _cpuzBusy = true;
+        CpuzDataSourceButton.IsEnabled = false;
+        CpuzDataSourceStatusText.Text = LocalizationService.L("Settings_CpuzFetching", "正在通过 CPU-Z 获取硬件信息，请稍候...");
+
+        try
+        {
+            var cpuzInfo = await CpuzInfoService.FetchAsync(timeoutMs: 30000);
+
+            if (cpuzInfo != null)
+            {
+                AppSettings.Set("UseCpuzDataSource", true);
+                UpdateCpuzDataSourceUI();
+            }
+            else
+            {
+                CpuzInfoService.KillCpuzProcesses();
+                await ShowMessageAsync(
+                    LocalizationService.L("Settings_CpuzFetchFailedTitle", "获取失败"),
+                    LocalizationService.L("Settings_CpuzFetchFailedMessage", "CPU-Z 未能成功获取硬件信息。\n\n可能原因：\n• CPU-Z 运行超时\n• CPU-Z 被安全软件拦截\n• 当前架构不支持此版本 CPU-Z"));
+                UpdateCpuzDataSourceUI();
+            }
+        }
+        catch (Exception ex)
+        {
+            CpuzInfoService.KillCpuzProcesses();
+            await ShowMessageAsync(
+                LocalizationService.L("Settings_CpuzFetchFailedTitle", "获取失败"),
+                string.Format(LocalizationService.L("Settings_CpuzFetchError", "CPU-Z 获取过程中出现错误：\n{0}"), ex.Message));
+            UpdateCpuzDataSourceUI();
+        }
+        finally
+        {
+            _cpuzBusy = false;
+            CpuzDataSourceButton.IsEnabled = true;
+        }
+    }
+
+    private void InitProxySettings()
+    {
+        _proxySettingsInitializing = true;
+        
+        var proxyEnabled = ProxyService.IsProxyEnabled;
+        ProxyToggle.IsOn = proxyEnabled;
+        
+        ProxyAddressTextBox.Text = ProxyService.ProxyAddress ?? "";
+        ProxyUsernameTextBox.Text = ProxyService.ProxyUsername ?? "";
+        ProxyPasswordBox.Password = ProxyService.ProxyPassword ?? "";
+        
+        UpdateProxyPanelVisibility(proxyEnabled);
+        
+        _proxySettingsInitializing = false;
+    }
+
+    private void UpdateProxyPanelVisibility(bool enabled)
+    {
+        ProxyDivider.Visibility = Visibility.Collapsed;
+        ProxyAddressPanel.Visibility = Visibility.Visible;
+        ProxyAddressTextBox.IsEnabled = enabled;
+        ProxyAuthPanel.Visibility = Visibility.Visible;
+        ProxyUsernameTextBox.IsEnabled = enabled;
+        ProxyPasswordBox.IsEnabled = enabled;
+        ProxyTestPanel.Visibility = Visibility.Visible;
+        ProxyTestButton.IsEnabled = enabled;
+        
+        UpdateProxyStatus();
+    }
+
+    private void UpdateProxyStatus()
+    {
+        if (!ProxyService.IsProxyEnabled)
+        {
+            ProxyStatusText.Text = LocalizationService.L("Settings_Proxy_Desc", "配置 HTTP/HTTPS 代理，所有网络请求将使用代理");
+            return;
+        }
+        
+        var address = ProxyService.ProxyAddress;
+        if (string.IsNullOrWhiteSpace(address))
+        {
+            ProxyStatusText.Text = LocalizationService.L("Settings_ProxyEnabledNoAddress", "代理已启用，但未配置地址");
+            return;
+        }
+        
+        var hasAuth = !string.IsNullOrWhiteSpace(ProxyService.ProxyUsername);
+        ProxyStatusText.Text = hasAuth
+            ? string.Format(LocalizationService.L("Settings_ProxyEnabledWithAuth", "代理已启用：{0}（已配置认证）"), address)
+            : string.Format(LocalizationService.L("Settings_ProxyEnabled", "代理已启用：{0}"), address);
+    }
+
+    private void ProxyToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_proxySettingsInitializing) return;
+        
+        var enabled = ProxyToggle.IsOn;
+        AppSettings.Set("ProxyEnabled", enabled);
+        UpdateProxyPanelVisibility(enabled);
+    }
+
+    private void ProxyAddressTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_proxySettingsInitializing) return;
+        AppSettings.Set("ProxyAddress", ProxyAddressTextBox.Text.Trim());
+        UpdateProxyStatus();
+    }
+
+    private void ProxyUsernameTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_proxySettingsInitializing) return;
+        AppSettings.Set("ProxyUsername", ProxyUsernameTextBox.Text.Trim());
+        UpdateProxyStatus();
+    }
+
+    private void ProxyPasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+    {
+        if (_proxySettingsInitializing) return;
+        AppSettings.Set("ProxyPassword", ProxyPasswordBox.Password);
+        UpdateProxyStatus();
+    }
+
+    private async void ProxyTestButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_proxyTesting) return;
+        
+        var address = ProxyAddressTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(address))
+        {
+            await ShowMessageAsync(
+                LocalizationService.L("Settings_ProxyTestCannotTitle", "无法测试"),
+                LocalizationService.L("Settings_ProxyTestNoAddress", "请先输入代理地址"));
+            return;
+        }
+        
+        _proxyTesting = true;
+        ProxyTestButton.IsEnabled = false;
+        ProxyTestIcon.Glyph = "\uE950";
+        ProxyTestButtonText.Text = LocalizationService.L("Settings_ProxyTesting", "测试中...");
+        ProxyTestStatusText.Text = LocalizationService.L("Settings_ProxyTestTesting", "正在测试代理连接...");
+        
+        try
+        {
+            using var client = ProxyService.CreateClient(TimeSpan.FromSeconds(15));
+            client.DefaultRequestHeaders.Add("User-Agent", "TubaWinUi3-ProxyTest");
+            
+            var testUrls = new[]
+            {
+                "https://www.google.com/favicon.ico",
+                "https://github.com/favicon.ico",
+                "https://api.github.com"
+            };
+            
+            Exception? lastError = null;
+            foreach (var url in testUrls)
+            {
+                try
+                {
+                    using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+                    if (response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.Redirect)
+                    {
+                        ProxyTestIcon.Glyph = "\uE73E";
+                        ProxyTestButtonText.Text = LocalizationService.L("Settings_ProxyTestSuccess", "连接成功");
+                        ProxyTestStatusText.Text = string.Format(LocalizationService.L("Settings_ProxyTestSuccess", "代理连接成功（{0}）"), response.StatusCode);
+                        ProxyTestStatusText.Foreground = new SolidColorBrush(ThemeColors.AccentGreen);
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    lastError = ex;
+                }
+            }
+            
+            ProxyTestIcon.Glyph = "\uE783";
+            ProxyTestButtonText.Text = LocalizationService.L("Settings_ProxyTestFailed", "连接失败");
+            ProxyTestStatusText.Text = lastError?.Message ?? LocalizationService.L("Settings_ProxyTestUnreachable", "无法连接代理服务器");
+            ProxyTestStatusText.Foreground = new SolidColorBrush(ThemeColors.AccentRed);
+        }
+        catch (Exception ex)
+        {
+            ProxyTestIcon.Glyph = "\uE783";
+            ProxyTestButtonText.Text = LocalizationService.L("Settings_ProxyTestFailed", "连接失败");
+            ProxyTestStatusText.Text = ex.Message;
+            ProxyTestStatusText.Foreground = new SolidColorBrush(ThemeColors.AccentRed);
+        }
+        finally
+        {
+            _proxyTesting = false;
+            ProxyTestButton.IsEnabled = true;
+            
+            await Task.Delay(3000);
+            
+            if (!_proxyTesting)
+            {
+                ProxyTestIcon.Glyph = "\uE73E";
+                ProxyTestButtonText.Text = LocalizationService.L("Settings_ProxyTest_Button", "测试连接");
+                ProxyTestStatusText.Foreground = (Brush)App.Current.Resources["TextFillColorSecondaryBrush"];
+            }
+        }
+    }
+
+    private void ConfigManagerButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ConfigManagerDialog
+        {
+            XamlRoot = XamlRoot,
+            RequestedTheme = ThemeService.CurrentElementTheme
+        };
+        _ = dialog.ShowAsync();
+    }
+
+    private async void StorageUsageButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_storageUsageBusy) return;
+
+        _storageUsageBusy = true;
+        StorageUsageButton.IsEnabled = false;
+
+        try
+        {
+            var dialog = new StorageUsageDialog
+            {
+                XamlRoot = XamlRoot,
+                RequestedTheme = ThemeService.CurrentElementTheme
+            };
+            await dialog.ShowAsync();
+
+            if (!string.IsNullOrEmpty(dialog.ResultSummary))
+                StorageUsageStatusText.Text = $"{dialog.ResultSummary}（{DateTime.Now:MM-dd HH:mm}）";
+        }
+        catch (Exception ex)
+        {
+            StorageUsageStatusText.Text = string.Format(LocalizationService.L("Settings_StorageUsageOpenFailed", "打开存储占用失败: {0}"), ex.Message);
+        }
+        finally
+        {
+            StorageUsageButton.IsEnabled = true;
+            _storageUsageBusy = false;
+        }
+    }
+
+    private async void ExportAppButton_Click(object sender, RoutedEventArgs e)
+    {
+        var exportPath = PickSaveFile(
+            LocalizationService.L("Settings_ExportApp_Title", "导出当前软件"),
+            LocalizationService.L("Settings_ZipFileFilter", "压缩包") + "\0*.zip\0" + LocalizationService.L("Settings_AllFilesFilter", "所有文件") + "\0*.*\0\0",
+            "TubaWinUi3-Custom.zip", "zip");
+        if (string.IsNullOrWhiteSpace(exportPath))
+            return;
+
+        if (!exportPath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            exportPath += ".zip";
+
+        ExportAppButton.IsEnabled = false;
+        ExportAppStatusText.Text = LocalizationService.L("Settings_Exporting", "正在打包当前软件...");
+
+        try
+        {
+            await CustomToolPackageService.ExportCurrentAppAsync(exportPath);
+            ExportAppStatusText.Text = string.Format(LocalizationService.L("Settings_Exported", "已导出 {0}"), Path.GetFileName(exportPath));
+            await ShowMessageAsync(
+                LocalizationService.L("Settings_ExportDoneTitle", "导出完成"),
+                string.Format(LocalizationService.L("Settings_ExportSavedTo", "已保存到：\n{0}"), exportPath));
+        }
+        catch (Exception ex)
+        {
+            ExportAppStatusText.Text = string.Format(LocalizationService.L("Settings_ExportFailedStatus", "导出失败: {0}"), ex.Message);
+            await ShowMessageAsync(LocalizationService.L("Common_ExportFailed", "导出失败"), ex.Message);
+        }
+        finally
+        {
+            ExportAppButton.IsEnabled = true;
+        }
+    }
+
+    private static string? PickSaveFile(string title, string filter, string defaultFileName, string defaultExtension)
+    {
+        var buffer = defaultFileName + new string('\0', 1024 - defaultFileName.Length);
+        var ofn = new OPENFILENAME
+        {
+            lStructSize = Marshal.SizeOf<OPENFILENAME>(),
+            hwndOwner = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow),
+            lpstrFilter = filter,
+            lpstrFile = buffer,
+            nMaxFile = 1024,
+            lpstrTitle = title,
+            lpstrDefExt = defaultExtension,
+            Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR,
+            nFilterIndex = 1
+        };
+
+        return GetSaveFileName(ref ofn) ? ofn.lpstrFile.TrimEnd('\0') : null;
+    }
+
+    private async void InitGitHubLoginStatus()
+    {
+        try
+        {
+            if (GitHubAuthService.IsLoggedIn)
+            {
+                var user = await GitHubAuthService.GetCurrentUserAsync();
+                if (user is not null)
+                {
+                    GitHubLoginStatusText.Text = string.Format(LocalizationService.L("Settings_GitHubLoggedIn", "已登录：{0}"), user.Name ?? user.Login);
+                    GitHubLoginButton.Visibility = Visibility.Collapsed;
+                    GitHubLogoutButton.Visibility = Visibility.Visible;
+                    GitHubAvatar.Visibility = Visibility.Visible;
+
+                    if (!string.IsNullOrWhiteSpace(user.AvatarUrl))
+                    {
+                        GitHubAvatar.ProfilePicture = new BitmapImage(new Uri(user.AvatarUrl));
+                    }
+                    return;
+                }
+            }
+
+            GitHubLoginStatusText.Text = LocalizationService.L("Settings_GitHub_Status", "未登录");
+            GitHubLoginButton.Visibility = Visibility.Visible;
+            GitHubLogoutButton.Visibility = Visibility.Collapsed;
+            GitHubAvatar.Visibility = Visibility.Collapsed;
+        }
+        catch
+        {
+            GitHubLoginStatusText.Text = LocalizationService.L("Settings_GitHub_Status", "未登录");
+        }
+    }
+
+    private async void GitHubLoginButton_Click(object sender, RoutedEventArgs e)
+    {
+        await GitHubAuthService.StartDeviceFlowAsync(XamlRoot);
+        InitGitHubLoginStatus();
+    }
+
+    private void GitHubLogoutButton_Click(object sender, RoutedEventArgs e)
+    {
+        GitHubAuthService.Logout();
+        InitGitHubLoginStatus();
+    }
+
+	private async void CommunitySubmitButton_Click(object sender, RoutedEventArgs e)
+	{
+		var tool = BuiltinToolRegistry.GetById("community-tools");
+		if (tool is not null)
+		{
+			var context = new BuiltinToolContext
+			{
+				XamlRoot = XamlRoot,
+				CancellationToken = CancellationToken.None
+			};
+			MainWindow.ActiveToolName = tool.Name;
+			try { await tool.ExecuteAsync(context); } catch { }
+			finally { MainWindow.ActiveToolName = null; }
+		}
+	}
+
+    private async void FeedbackButton_Click(object sender, RoutedEventArgs e)
+    {
+        const string repoIssuesUrl = "https://github.com/luolangaga/tubatool/issues/new";
+
+        var descriptionBox = new TextBox
+        {
+            PlaceholderText = LocalizationService.L("Settings_FeedbackDescPlaceholder", "请描述您的问题或建议..."),
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            MinHeight = 80,
+            MaxHeight = 160,
+            FontSize = 14,
+        };
+
+        var stepsBox = new TextBox
+        {
+            PlaceholderText = LocalizationService.L("Settings_FeedbackStepsPlaceholder", "1. 打开xxx页面\n2. 点击xxx按钮\n3. 出现xxx问题"),
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            MinHeight = 80,
+            MaxHeight = 160,
+            FontSize = 14,
+        };
+
+        var panel = new StackPanel { Spacing = 12 };
+        panel.Children.Add(new TextBlock { Text = LocalizationService.L("Settings_FeedbackDescLabel", "问题描述"), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, FontSize = 14 });
+        panel.Children.Add(descriptionBox);
+        panel.Children.Add(new TextBlock { Text = LocalizationService.L("Settings_FeedbackStepsLabel", "复现步骤 *必填"), FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, FontSize = 14 });
+        panel.Children.Add(stepsBox);
+
+        while (true)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = LocalizationService.L("Settings_Feedback_Button", "提交反馈"),
+                Content = panel,
+                PrimaryButtonText = LocalizationService.L("Settings_FeedbackSubmit", "提交"),
+                CloseButtonText = LocalizationService.L("Common_Cancel", "取消"),
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = XamlRoot,
+                RequestedTheme = ThemeService.CurrentElementTheme,
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+
+            var steps = stepsBox.Text.Trim();
+            if (string.IsNullOrEmpty(steps))
+            {
+                var warn = new ContentDialog
+                {
+                    Title = LocalizationService.L("Settings_FeedbackStepsRequiredTitle", "请填写复现步骤"),
+                    Content = LocalizationService.L("Settings_FeedbackStepsRequiredMessage", "提交反馈前请描述复现步骤，这能帮助我们快速定位和修复问题。"),
+                    CloseButtonText = LocalizationService.L("Settings_FeedbackBackToEdit", "返回填写"),
+                    XamlRoot = XamlRoot,
+                    RequestedTheme = ThemeService.CurrentElementTheme,
+                };
+                await warn.ShowAsync();
+                continue;
+            }
+
+            var description = descriptionBox.Text.Trim();
+            var descSection = string.IsNullOrEmpty(description)
+                ? ""
+                : "## " + LocalizationService.L("Settings_FeedbackIssueDescSection", "描述") + "\n\n" + description + "\n\n";
+            var body = Uri.EscapeDataString(
+                descSection +
+                "## " + LocalizationService.L("Settings_FeedbackIssueStepsSection", "复现步骤") + "\n\n" + steps + "\n\n" +
+                "## " + LocalizationService.L("Settings_FeedbackIssueSystemSection", "系统信息") + "\n\n```\n" + GetSystemInfoForFeedback() + "\n```\n");
+            var url = $"{repoIssuesUrl}?title=[{Uri.EscapeDataString(LocalizationService.L("Settings_FeedbackIssueTitle", "反馈"))}]+&body={body}";
+            await global::Windows.System.Launcher.LaunchUriAsync(new Uri(url));
+            return;
+        }
+    }
+
+    private static string GetSystemInfoForFeedback()
+    {
+        try
+        {
+            var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
+            var osVersion = Environment.OSVersion.VersionString;
+            var arch = RuntimeInformation.ProcessArchitecture;
+            return $"App: {version}\nOS: {osVersion}\nArch: {arch}";
+        }
+        catch
+        {
+            return "Unable to get system info";
+        }
+    }
+
+    private async void ErrorReportButton_Click(object sender, RoutedEventArgs e)
+    {
+        ErrorReportButton.IsEnabled = false;
+        ErrorReportButtonText.Text = LocalizationService.L("Settings_ErrorReportPacking", "正在打包…");
+        try
+        {
+            var result = await ErrorReportService.CreateReportAsync();
+
+            var content = LocalizationService.L("Settings_ErrorReportZipPath", "压缩包位置：") + $"\n{result.ZipPath}\n\n" +
+                          string.Format(LocalizationService.L("Settings_ErrorReportSize", "大小：{0}"), TempCleanupService.FormatBytes(result.SizeBytes)) + "\n" +
+                          string.Format(LocalizationService.L("Settings_ErrorReportEvents", "Windows 事件日志：{0} 条"), result.EventCount) + "\n" +
+                          string.Format(LocalizationService.L("Settings_ErrorReportLogs", "应用日志文件：{0} 个"), result.LogFileCount) + "\n\n" +
+                          LocalizationService.L("Settings_ErrorReportHint", "如需反馈，请把该压缩包拖入 GitHub Issue 的附件区上传。");
+            if (!string.IsNullOrEmpty(result.Warning))
+                content += $"\n\n⚠ {result.Warning}";
+
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = LocalizationService.L("Settings_ErrorReportDoneTitle", "错误日志打包完成"),
+                Content = new TextBlock { Text = content, TextWrapping = TextWrapping.Wrap },
+                PrimaryButtonText = LocalizationService.L("Settings_OpenFolderButton", "打开文件夹"),
+                CloseButtonText = LocalizationService.L("Common_Close", "关闭"),
+                DefaultButton = ContentDialogButton.Primary,
+                RequestedTheme = ThemeService.CurrentElementTheme,
+            };
+
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+                ErrorReportService.RevealInExplorer(result.ZipPath);
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync(LocalizationService.L("Settings_ErrorReportFailedTitle", "打包失败"), ex.Message);
+        }
+        finally
+        {
+            ErrorReportButton.IsEnabled = true;
+            ErrorReportButtonText.Text = LocalizationService.L("Settings_ErrorReport_Button", "打包日志");
+        }
+    }
+
+    // ===== 日志目录（issue #165：崩溃/启动日志可自定义位置 + 一键打开）=====
+
+    private void RefreshLogDirCard()
+    {
+        var custom = AppSettings.Get(LogService.LogDirSettingKey);
+        var usingCustom = !string.IsNullOrWhiteSpace(custom) && Directory.Exists(custom);
+        LogDirPathText.Text = usingCustom
+            ? custom
+            : LogService.DefaultLogDirectory + LocalizationService.L("Settings_LogDir_DefaultSuffix", "（默认）");
+        ResetLogDirButton.Visibility = usingCustom ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async void ChangeLogDirButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dir = await Win32Dialogs.PickFolderAsync();
+        if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
+
+        if (!LogService.IsDirectoryWritable(dir))
+        {
+            await ShowMessageAsync(
+                LocalizationService.L("Settings_LogDir_UnwritableTitle", "目录不可写"),
+                LocalizationService.L("Settings_LogDir_UnwritableDesc", "请选择一个程序可以写入的目录，例如本地磁盘上的普通文件夹。"));
+            return;
+        }
+
+        AppSettings.Set(LogService.LogDirSettingKey, dir);
+        LogService.Prepare();
+        RefreshLogDirCard();
+    }
+
+    private void OpenLogDirButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            LogService.Prepare();
+            Process.Start(new ProcessStartInfo("explorer.exe", LogService.LogDirectory) { UseShellExecute = true });
+        }
+        catch { }
+    }
+
+    private void ViewLogsButton_Click(object sender, RoutedEventArgs e)
+    {
+        App.MainWindow?.NavigateToToolPage(typeof(TubaWinUi3.Pages.LogViewerPage));
+    }
+
+    private void ResetLogDirButton_Click(object sender, RoutedEventArgs e)
+    {
+        AppSettings.Remove(LogService.LogDirSettingKey);
+        LogService.Prepare();
+        RefreshLogDirCard();
+    }
+
+    private async void StoreRatingButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_storeRatingBusy) return;
+        _storeRatingBusy = true;
+        StoreRatingButton.IsEnabled = false;
+        try
+        {
+            if (!IsStorePackagedApp())
+            {
+                await ShowMessageAsync(
+                    LocalizationService.L("Settings_StoreRatingUnavailableTitle", "暂不可用"),
+                    LocalizationService.L("Settings_StoreRatingUnavailableMessage", "当前为开发版本，商店评分仅在从 Microsoft Store 安装的版本中可用。"));
+                return;
+            }
+
+            try
+            {
+                var storeContext = Windows.Services.Store.StoreContext.GetDefault();
+                WinRT.Interop.InitializeWithWindow.Initialize(storeContext, WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow));
+
+                var result = await storeContext.RequestRateAndReviewAppAsync();
+                if (result.Status is Windows.Services.Store.StoreRateAndReviewStatus.Succeeded)
+                {
+                    ShowRatingThanks();
+                    return;
+                }
+
+                if (result.Status is Windows.Services.Store.StoreRateAndReviewStatus.CanceledByUser)
+                {
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[SettingsPage] 商店评分组件调用失败，回退到商店评价页: {ex}");
+            }
+
+            await OpenStoreReviewPageAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SettingsPage] 打开商店评分失败: {ex}");
+        }
+        finally
+        {
+            _storeRatingBusy = false;
+            StoreRatingButton.IsEnabled = true;
+        }
+    }
+
+    private static bool IsStorePackagedApp()
+    {
+        try
+        {
+            return Windows.ApplicationModel.Package.Current.Id.Name == StorePackageName;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task OpenStoreReviewPageAsync()
+    {
+        try
+        {
+            var launched = await Windows.System.Launcher.LaunchUriAsync(new Uri($"ms-windows-store://review/?ProductId={StoreProductId}"));
+            if (!launched)
+                await ShowMessageAsync(
+                    LocalizationService.L("Settings_OpenFailedTitle", "打开失败"),
+                    LocalizationService.L("Settings_StoreRatingOpenFailed", "暂时无法打开商店评分，请稍后重试。"));
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SettingsPage] 打开商店评分页失败: {ex}");
+            await ShowMessageAsync(
+                LocalizationService.L("Settings_OpenFailedTitle", "打开失败"),
+                LocalizationService.L("Settings_StoreRatingOpenFailed", "暂时无法打开商店评分，请稍后重试。"));
+        }
+    }
+
+    private void RatingThanksScrim_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        HideRatingThanks();
+    }
+
+    private void RatingThanksCloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        HideRatingThanks();
+    }
+
+    private void ShowRatingThanks()
+    {
+        RatingThanksOverlay.Visibility = Visibility.Visible;
+        RatingThanksOverlay.UpdateLayout();
+
+        RatingThanksScrim.Opacity = 0;
+        RatingThanksCard.Opacity = 0;
+        RatingThanksCardTransform.ScaleX = 0.88;
+        RatingThanksCardTransform.ScaleY = 0.88;
+        RatingThanksCardTransform.TranslateY = 16;
+        RatingThanksBadgeTransform.ScaleX = 0.3;
+        RatingThanksBadgeTransform.ScaleY = 0.3;
+        RatingThanksBadgeTransform.Rotation = -80;
+        RatingThanksHalo.Opacity = 0;
+        RatingThanksRing1.Opacity = 0;
+        RatingThanksRing2.Opacity = 0;
+        RatingThanksRing1Transform.ScaleX = 0.4;
+        RatingThanksRing1Transform.ScaleY = 0.4;
+        RatingThanksRing2Transform.ScaleX = 0.4;
+        RatingThanksRing2Transform.ScaleY = 0.4;
+
+        PlayRatingThanksFlourish();
+        SpawnRatingSparkles();
+        ScheduleRatingThanksAutoHide();
+    }
+
+    private void HideRatingThanks()
+    {
+        _ratingThanksTimer?.Stop();
+
+        foreach (var storyboard in _ratingThanksStoryboards) storyboard.Stop();
+        _ratingThanksStoryboards.Clear();
+        RatingThanksParticleCanvas.Children.Clear();
+
+        RatingThanksOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private void ScheduleRatingThanksAutoHide()
+    {
+        if (_ratingThanksTimer is null)
+        {
+            _ratingThanksTimer = DispatcherQueue.CreateTimer();
+            _ratingThanksTimer.IsRepeating = false;
+            _ratingThanksTimer.Tick += (_, _) => HideRatingThanks();
+        }
+
+        _ratingThanksTimer.Stop();
+        _ratingThanksTimer.Interval = TimeSpan.FromSeconds(7);
+        _ratingThanksTimer.Start();
+    }
+
+    private void PlayRatingThanksFlourish()
+    {
+        if (FastModeService.IsFastModeEnabled())
+        {
+            RatingThanksScrim.Opacity = 1;
+            RatingThanksCard.Opacity = 1;
+            RatingThanksCardTransform.ScaleX = 1;
+            RatingThanksCardTransform.ScaleY = 1;
+            RatingThanksCardTransform.TranslateY = 0;
+            RatingThanksBadgeTransform.ScaleX = 1;
+            RatingThanksBadgeTransform.ScaleY = 1;
+            RatingThanksBadgeTransform.Rotation = 0;
+            RatingThanksHalo.Opacity = 0.9;
+            return;
+        }
+
+        var storyboard = new Storyboard();
+        AddAnimation(storyboard, RatingThanksScrim, "Opacity", 1, 220, 0, new CubicEase { EasingMode = EasingMode.EaseOut });
+        AddAnimation(storyboard, RatingThanksHalo, "Opacity", 0.9, 720, 180, new CubicEase { EasingMode = EasingMode.EaseOut });
+        AddAnimation(storyboard, RatingThanksCard, "Opacity", 1, 320, 40, new CubicEase { EasingMode = EasingMode.EaseOut });
+        AddAnimation(storyboard, RatingThanksCardTransform, "ScaleX", 1, 520, 40, new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.35 });
+        AddAnimation(storyboard, RatingThanksCardTransform, "ScaleY", 1, 520, 40, new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.35 });
+        AddAnimation(storyboard, RatingThanksCardTransform, "TranslateY", 0, 520, 40, new CubicEase { EasingMode = EasingMode.EaseOut });
+        AddAnimation(storyboard, RatingThanksBadgeTransform, "ScaleX", 1, 640, 140, new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.5 });
+        AddAnimation(storyboard, RatingThanksBadgeTransform, "ScaleY", 1, 640, 140, new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.5 });
+        AddAnimation(storyboard, RatingThanksBadgeTransform, "Rotation", 0, 760, 140, new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.3 });
+        AddShockwave(storyboard, RatingThanksRing1, RatingThanksRing1Transform, 0);
+        AddShockwave(storyboard, RatingThanksRing2, RatingThanksRing2Transform, 240);
+
+        storyboard.Begin();
+        _ratingThanksStoryboards.Add(storyboard);
+    }
+
+    private static void AddShockwave(Storyboard storyboard, UIElement ring, CompositeTransform transform, double beginMs)
+    {
+        var opacity = new DoubleAnimationUsingKeyFrames
+        {
+            Duration = TimeSpan.FromMilliseconds(900),
+            BeginTime = TimeSpan.FromMilliseconds(beginMs)
+        };
+        opacity.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.Zero), Value = 0 });
+        opacity.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(140)), Value = 0.85 });
+        opacity.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(900)), Value = 0 });
+        Storyboard.SetTarget(opacity, ring);
+        Storyboard.SetTargetProperty(opacity, "Opacity");
+        storyboard.Children.Add(opacity);
+
+        AddAnimation(storyboard, transform, "ScaleX", 1.75, 900, beginMs, new CubicEase { EasingMode = EasingMode.EaseOut });
+        AddAnimation(storyboard, transform, "ScaleY", 1.75, 900, beginMs, new CubicEase { EasingMode = EasingMode.EaseOut });
+    }
+
+    private void SpawnRatingSparkles()
+    {
+        RatingThanksParticleCanvas.Children.Clear();
+        if (FastModeService.IsFastModeEnabled()) return;
+
+        var badgeWidth = RatingThanksBadge.ActualWidth;
+        var badgeHeight = RatingThanksBadge.ActualHeight;
+        if (badgeWidth <= 0 || badgeHeight <= 0) return;
+
+        var canvas = RatingThanksParticleCanvas;
+        var origin = RatingThanksBadge.TransformToVisual(canvas).TransformPoint(new Point(badgeWidth / 2, badgeHeight / 2));
+
+        var random = new Random();
+        Color[] tints =
+        [
+            ThemeColors.AccentOrange,
+            ThemeColors.AccentGreen,
+            ThemeColors.AccentBlue,
+            ThemeColors.PrimaryText,
+        ];
+
+        const int count = 18;
+        for (var i = 0; i < count; i++)
+        {
+            var angle = 360.0 / count * i + random.Next(-11, 12);
+            var radians = angle * Math.PI / 180;
+            var distance = 116 + random.Next(0, 120);
+            var size = 4.5 + random.NextDouble() * 7;
+            var duration = 820 + random.Next(0, 420);
+            var delay = 120 + random.Next(0, 300);
+            var tint = new SolidColorBrush(tints[random.Next(tints.Length)]);
+
+            Shapes.Shape shape = i % 3 == 0
+                ? CreateSparkleStar(size, tint)
+                : new Shapes.Ellipse { Width = size * 1.7, Height = size * 1.7, Fill = tint };
+
+            var width = shape.Width;
+            var height = shape.Height;
+            var transform = new CompositeTransform { CenterX = width / 2, CenterY = height / 2 };
+            shape.RenderTransform = transform;
+            Canvas.SetLeft(shape, origin.X - width / 2);
+            Canvas.SetTop(shape, origin.Y - height / 2);
+            canvas.Children.Add(shape);
+
+            var storyboard = new Storyboard();
+            AddAnimation(storyboard, transform, "TranslateX", Math.Cos(radians) * distance, duration, delay, new CubicEase { EasingMode = EasingMode.EaseOut });
+            AddAnimation(storyboard, transform, "TranslateY", Math.Sin(radians) * distance + 30, duration, delay, new CubicEase { EasingMode = EasingMode.EaseOut });
+            AddAnimation(storyboard, transform, "Rotation", random.Next(-200, 201), duration, delay, new CubicEase { EasingMode = EasingMode.EaseOut });
+
+            var scale = new DoubleAnimationUsingKeyFrames
+            {
+                Duration = TimeSpan.FromMilliseconds(duration),
+                BeginTime = TimeSpan.FromMilliseconds(delay)
+            };
+            scale.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.Zero), Value = 0.2 });
+            scale.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(duration * 0.22)), Value = 1.1 });
+            scale.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(duration)), Value = 0.55 });
+            Storyboard.SetTarget(scale, transform);
+            Storyboard.SetTargetProperty(scale, "ScaleX");
+            storyboard.Children.Add(scale);
+
+            var scaleY = new DoubleAnimationUsingKeyFrames
+            {
+                Duration = TimeSpan.FromMilliseconds(duration),
+                BeginTime = TimeSpan.FromMilliseconds(delay)
+            };
+            scaleY.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.Zero), Value = 0.2 });
+            scaleY.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(duration * 0.22)), Value = 1.1 });
+            scaleY.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(duration)), Value = 0.55 });
+            Storyboard.SetTarget(scaleY, transform);
+            Storyboard.SetTargetProperty(scaleY, "ScaleY");
+            storyboard.Children.Add(scaleY);
+
+            var opacity = new DoubleAnimationUsingKeyFrames
+            {
+                Duration = TimeSpan.FromMilliseconds(duration),
+                BeginTime = TimeSpan.FromMilliseconds(delay)
+            };
+            opacity.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.Zero), Value = 0 });
+            opacity.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(duration * 0.18)), Value = 1 });
+            opacity.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(duration * 0.62)), Value = 1 });
+            opacity.KeyFrames.Add(new LinearDoubleKeyFrame { KeyTime = KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(duration)), Value = 0 });
+            Storyboard.SetTarget(opacity, shape);
+            Storyboard.SetTargetProperty(opacity, "Opacity");
+            storyboard.Children.Add(opacity);
+
+            storyboard.Begin();
+            _ratingThanksStoryboards.Add(storyboard);
+        }
+    }
+
+    private static Shapes.Polygon CreateSparkleStar(double size, Brush fill)
+    {
+        var points = new PointCollection
+        {
+            new Point(size, 0),
+            new Point(size * 1.3, size * 0.7),
+            new Point(size * 2, size),
+            new Point(size * 1.3, size * 1.3),
+            new Point(size, size * 2),
+            new Point(size * 0.7, size * 1.3),
+            new Point(0, size),
+            new Point(size * 0.7, size * 0.7),
+        };
+
+        return new Shapes.Polygon { Points = points, Fill = fill, Width = size * 2, Height = size * 2 };
+    }
+
+    private static void AddAnimation(Storyboard storyboard, DependencyObject target, string property, double to, double durationMs, double beginMs, EasingFunctionBase? easing = null)
+    {
+        var animation = new DoubleAnimation
+        {
+            To = to,
+            Duration = TimeSpan.FromMilliseconds(durationMs),
+            BeginTime = TimeSpan.FromMilliseconds(beginMs)
+        };
+
+        if (easing is not null) animation.EasingFunction = easing;
+
+        Storyboard.SetTarget(animation, target);
+        Storyboard.SetTargetProperty(animation, property);
+        storyboard.Children.Add(animation);
+    }
+
+    private void ThrowErrorButton_Click(object sender, RoutedEventArgs e)
+    {
+        throw new InvalidOperationException(LocalizationService.L("Settings_TestErrorThrow", "这是一条手动抛出的测试异常，用于验证全局错误页面是否正常工作。"));
+    }
+
+    private int _easterEggClickCount;
+    private CancellationTokenSource? _easterEggCts;
+
+    private static string[] EasterEggMessages =>
+    [
+        LocalizationService.L("Settings_Egg1", "被你发现啦～ 🎉"),
+        LocalizationService.L("Settings_Egg2", "呜呜别戳我啦 >_<"),
+        LocalizationService.L("Settings_Egg3", "再戳就要坏掉了哦～"),
+        LocalizationService.L("Settings_Egg4", "嘻嘻，你真有耐心呢 ✨"),
+        LocalizationService.L("Settings_Egg5", "今天也要元气满满鸭！"),
+        LocalizationService.L("Settings_Egg6", "偷偷告诉你：开发者很可爱 🤫"),
+        LocalizationService.L("Settings_Egg7", "戳我干嘛～看配置去啦！"),
+        LocalizationService.L("Settings_Egg8", "我是一只工具箱喵～ 🐱"),
+        LocalizationService.L("Settings_Egg9", "你点我一下，我开心一下 ☺️"),
+        LocalizationService.L("Settings_Egg10", "好啦好啦，知道你在啦～"),
+    ];
+
+    private void AppInfoCard_Tapped(object sender, TappedRoutedEventArgs e)
+    {
+        _easterEggCts?.Cancel();
+        _easterEggCts = new CancellationTokenSource();
+        var ct = _easterEggCts.Token;
+
+        _easterEggClickCount++;
+        var idx = (_easterEggClickCount - 1) % EasterEggMessages.Length;
+
+        AppTitleText.Text = "🎉 " + EasterEggMessages[idx];
+        AppSubtitleText.Opacity = 0.5;
+
+        if (FastModeService.IsFastModeEnabled())
+        {
+            // 低配模式：跳过弹跳动画，文案保留 2 秒后照常复位（不播放恢复动画）。
+            AppInfoCardScale.ScaleX = 1.0;
+            AppInfoCardScale.ScaleY = 1.0;
+            _ = RestoreEasterEggAsync(ct);
+            return;
+        }
+
+        AppInfoCardScale.ScaleX = 0.92;
+        AppInfoCardScale.ScaleY = 1.08;
+
+        var bounce = new Storyboard();
+        var sx = new DoubleAnimation { From = 0.92, To = 1.0, Duration = TimeSpan.FromMilliseconds(300), EasingFunction = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.6 } };
+        var sy = new DoubleAnimation { From = 1.08, To = 1.0, Duration = TimeSpan.FromMilliseconds(300), EasingFunction = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.6 } };
+        Storyboard.SetTarget(sx, AppInfoCardScale);
+        Storyboard.SetTargetProperty(sx, "ScaleX");
+        Storyboard.SetTarget(sy, AppInfoCardScale);
+        Storyboard.SetTargetProperty(sy, "ScaleY");
+        bounce.Children.Add(sx);
+        bounce.Children.Add(sy);
+        bounce.Begin();
+
+        _ = RestoreEasterEggAsync(ct);
+    }
+
+    private async Task RestoreEasterEggAsync(CancellationToken ct)
+    {
+        try { await Task.Delay(2000, ct); } catch (OperationCanceledException) { return; }
+        if (ct.IsCancellationRequested) return;
+
+        AppInfoCardScale.ScaleX = 1.0;
+        AppInfoCardScale.ScaleY = 1.0;
+        ApplyLocalizedAppTitle();
+        AppSubtitleText.Opacity = 1.0;
+
+        if (FastModeService.IsFastModeEnabled())
+            return; // 低配模式：跳过恢复动画，直接复位。
+
+        var restore = new Storyboard();
+        var rx = new DoubleAnimation { From = 0.95, To = 1.0, Duration = TimeSpan.FromMilliseconds(250), EasingFunction = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.3 } };
+        var ry = new DoubleAnimation { From = 1.05, To = 1.0, Duration = TimeSpan.FromMilliseconds(250), EasingFunction = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.3 } };
+        Storyboard.SetTarget(rx, AppInfoCardScale);
+        Storyboard.SetTargetProperty(rx, "ScaleX");
+        Storyboard.SetTarget(ry, AppInfoCardScale);
+        Storyboard.SetTargetProperty(ry, "ScaleY");
+        restore.Children.Add(rx);
+        restore.Children.Add(ry);
+        restore.Begin();
+    }
+
+    private async Task ShowMessageAsync(string title, string message)
+    {
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = title,
+            Content = new TextBlock
+            {
+                Text = message,
+                TextWrapping = TextWrapping.Wrap
+            },
+            CloseButtonText = LocalizationService.L("Common_Confirm", "确定"),
+            RequestedTheme = ThemeService.CurrentElementTheme
+        };
+
+        await dialog.ShowAsync();
+    }
+
+    private static string GetDefaultHttpDownloadPath()
+        => Path.Combine(ConfigManager.GetDataDir(), "download");
+
+    private static string GetHttpDownloadPath()
+        => PathResolver.MakeAbsolute(AppSettings.Get("HttpDownloadPath")) ?? GetDefaultHttpDownloadPath();
+
+    private void InitHttpDownloadSettings()
+    {
+        // 避免 Uid 附加属性解析提示文字时扫描所有程序集，保持 AI 依赖按需加载。
+        ToolTipService.SetToolTip(HttpDownloadResetPathButton,
+            LocalizationService.L("Settings_HttpDownloadResetPath_Button", "恢复默认路径"));
+        HttpDownloadPathText.Text = GetHttpDownloadPath();
+
+        HttpDownloadActionComboBox.ItemsSource = new[]
+        {
+            new { Key = "none", Label = LocalizationService.L("Settings_DownloadActionNone", "仅下载") },
+            new { Key = "extract", Label = LocalizationService.L("Settings_DownloadActionExtract", "下载并解压") },
+            new { Key = "install", Label = LocalizationService.L("Settings_DownloadActionInstall", "下载并运行") },
+        };
+        HttpDownloadActionComboBox.DisplayMemberPath = "Label";
+        HttpDownloadActionComboBox.SelectedValuePath = "Key";
+
+        var savedAction = AppSettings.Get("HttpDownloadAction") ?? "none";
+        HttpDownloadActionComboBox.SelectedValue = savedAction;
+        if (HttpDownloadActionComboBox.SelectedIndex < 0)
+            HttpDownloadActionComboBox.SelectedIndex = 0;
+
+        HttpDownloadActionComboBox.SelectionChanged -= HttpDownloadActionComboBox_SelectionChanged;
+        HttpDownloadActionComboBox.SelectionChanged += HttpDownloadActionComboBox_SelectionChanged;
+
+        UpdateDownloadQueueStatus();
+    }
+
+    private void HttpDownloadActionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        var selected = HttpDownloadActionComboBox.SelectedValue as string;
+        if (selected is not null)
+            AppSettings.Set("HttpDownloadAction", selected);
+    }
+
+    private void UpdateDownloadQueueStatus()
+    {
+        var pending = DownloadQueueService.PendingCount;
+        var total = DownloadQueueService.Queue.Count;
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            HttpDownloadQueueStatusText.Text = pending > 0
+                ? string.Format(LocalizationService.L("Settings_DownloadQueuePending", "队列中 {0} 项，{1} 项待下载"), total, pending)
+                : total > 0
+                    ? string.Format(LocalizationService.L("Settings_DownloadQueueAllDone", "队列中 {0} 项，全部完成"), total)
+                    : LocalizationService.L("Settings_DownloadQueueEmpty", "队列为空");
+        });
+    }
+
+    private async void HttpDownloadBrowseButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dir = await Win32Dialogs.PickFolderAsync();
+        if (string.IsNullOrEmpty(dir))
+            return;
+
+        AppSettings.Set("HttpDownloadPath", dir);
+        HttpDownloadPathText.Text = dir;
+    }
+
+    private void HttpDownloadResetPathButton_Click(object sender, RoutedEventArgs e)
+    {
+        AppSettings.Remove("HttpDownloadPath");
+        HttpDownloadPathText.Text = GetDefaultHttpDownloadPath();
+    }
+
+    private void HttpDownloadAddButton_Click(object sender, RoutedEventArgs e)
+    {
+        var url = HttpDownloadUrlTextBox.Text?.Trim();
+        if (string.IsNullOrEmpty(url))
+        {
+            _ = ShowMessageAsync(LocalizationService.L("Settings_PromptTitle", "提示"), LocalizationService.L("Settings_DownloadEnterUrl", "请输入下载链接"));
+            return;
+        }
+
+        if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = ShowMessageAsync(LocalizationService.L("Settings_PromptTitle", "提示"), LocalizationService.L("Settings_DownloadInvalidUrl", "请输入有效的 HTTP/HTTPS 链接"));
+            return;
+        }
+
+        var destPath = GetHttpDownloadPath();
+        Directory.CreateDirectory(destPath);
+
+        var action = AppSettings.Get("HttpDownloadAction") ?? "none";
+        IDownloadPostProcessor? postProcessor = action switch
+        {
+            "extract" => new ArchiveExtractProcessor(),
+            "install" => new InstallerLaunchProcessor(),
+            _ => null
+        };
+
+        var fileName = Path.GetFileName(new Uri(url).LocalPath);
+        if (string.IsNullOrWhiteSpace(fileName) || fileName.Contains('?') || fileName.Contains('='))
+            fileName = null;
+
+        var displayName = fileName ?? string.Format(LocalizationService.L("Settings_DownloadFileDefaultName", "下载文件 {0}"), DateTime.Now.ToString("HH:mm:ss"));
+
+        DownloadQueueService.Enqueue(displayName, url, destPath, postProcessor,
+            description: url, glyph: "\uE896");
+
+        HttpDownloadUrlTextBox.Text = "";
+        UpdateDownloadQueueStatus();
+
+        _ = ShowMessageAsync(
+            LocalizationService.L("Settings_DownloadEnqueuedTitle", "已加入下载"),
+            string.Format(LocalizationService.L("Settings_DownloadEnqueuedMessage", "\"{0}\" 已加入下载队列\n保存至：{1}"), displayName, destPath));
+    }
+
+    private Flyout? _downloadFlyout;
+
+    private void HttpDownloadViewQueueButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_downloadFlyout is null)
+        {
+            _downloadFlyout = new Flyout
+            {
+                Content = new DownloadQueueFlyout(),
+                Placement = FlyoutPlacementMode.BottomEdgeAlignedRight
+            };
+        }
+        _downloadFlyout.ShowAt(sender as FrameworkElement);
+    }
+}

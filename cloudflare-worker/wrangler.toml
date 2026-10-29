@@ -1,0 +1,12 @@
+name = "tuba-file-transfer-signaling"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+[durable_objects]
+bindings = [
+  { name = "GROUP_ROOM", class_name = "GroupRoom" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GroupRoom"]

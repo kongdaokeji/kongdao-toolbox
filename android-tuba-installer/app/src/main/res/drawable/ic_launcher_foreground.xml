@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 图标：下载箭头落入收纳盒，呼应"下载安装包"用途 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 下载箭头 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,30 L54,52 L46.8,44.8 L42.8,48.8 L54,60 L65.2,48.8 L61.2,44.8 L54,52 L54,30 Z" />
+    <!-- 收纳盒 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,64 L72,64 L72,72 L36,72 Z" />
+</vector>

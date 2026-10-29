@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="TubaWinUi3.Pages.PhoneLinkPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:TubaWinUi3.Controls">
+
+    <Page.Resources>
+        <!-- 整行可点的卡片行按钮：静息透明，悬停走官方 SubtleFill 反馈 -->
+        <Style x:Key="ActionRowButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="16,12" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <controls:ToolPageHeader ToolId="phone-link"
+            Grid.Row="0"
+            Title="连接手机"
+            Subtitle="手机端经局域网连接本机：查看配置与屏幕、执行命令、安装软件、互传文件"
+            Glyph="&#xE8EA;" />
+
+        <ScrollViewer Grid.Row="1" HorizontalScrollMode="Disabled" VerticalScrollBarVisibility="Auto" Padding="24,4,24,32" HorizontalContentAlignment="Stretch" controls:ToolViewport.ConstrainContent="True">
+            <StackPanel Spacing="24" MaxWidth="1120">
+                <StackPanel.ChildrenTransitions>
+                    <TransitionCollection>
+                        <EntranceThemeTransition FromHorizontalOffset="0" FromVerticalOffset="24" IsStaggeringEnabled="True" />
+                    </TransitionCollection>
+                </StackPanel.ChildrenTransitions>
+
+                <!-- 服务状态 -->
+                <Border Style="{StaticResource FluentCardStyle}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource IconTileStyle}" Width="36" Height="36" VerticalAlignment="Center">
+                            <FontIcon FontSize="16" Glyph="&#xE8EA;" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource CardTitleStyle}" Text="手机连接服务" />
+                            <TextBlock
+                                x:Name="ServiceStatusText"
+                                Style="{StaticResource CaptionTextStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextWrapping="Wrap"
+                                Text="已关闭" />
+                        </StackPanel>
+                        <ToggleSwitch
+                            x:Name="ServiceToggle"
+                            Grid.Column="2"
+                            MinWidth="0"
+                            VerticalAlignment="Center"
+                            OnContent="已开启"
+                            OffContent="已关闭"
+                            Toggled="ServiceToggle_Toggled" />
+                    </Grid>
+                </Border>
+
+                <InfoBar
+                    IsOpen="True"
+                    IsClosable="False"
+                    Severity="Warning"
+                    Title="仅限可信的局域网"
+                    Message="配对后的手机拥有执行 PowerShell 命令与安装软件的权限，不用时请关闭服务；首次开启时 Windows 防火墙可能需要放行 HTTP 与 UDP 18764（局域网发现）。" />
+
+                <!-- 配对 -->
+                <Border Style="{StaticResource FluentCardStyle}">
+                    <StackPanel Spacing="16">
+                        <StackPanel Spacing="2">
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="配对设备" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextWrapping="Wrap"
+                                Text="手机扫码或输入配对码即可连接；配对码重启后保持不变，手机可保存后自动重连；首次连接仍需电脑授权。" />
+                        </StackPanel>
+
+                        <Grid x:Name="PairRunningPanel" ColumnSpacing="24">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <!-- 二维码给白底衬：暗色主题下也能正常扫描 -->
+                            <Border
+                                Background="White"
+                                CornerRadius="8"
+                                Padding="8"
+                                VerticalAlignment="Top">
+                                <Image x:Name="QrImage" Width="180" Height="180" Stretch="Uniform" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Top">
+                                <TextBlock
+                                    Style="{StaticResource CaptionTextStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="配对码" />
+                                <TextBlock
+                                    x:Name="PairCodeText"
+                                    FontSize="28"
+                                    FontWeight="SemiBold"
+                                    IsTextSelectionEnabled="True"
+                                    Text="—" />
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock
+                                            x:Name="AddressText"
+                                            Style="{StaticResource CaptionTextStyle}"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            x:Name="DevicesText"
+                                            Style="{StaticResource CaptionTextStyle}"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            TextWrapping="Wrap"
+                                            Text="暂无已连接的手机" />
+                                        <StackPanel x:Name="DeviceListPanel" Spacing="6" />
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button x:Name="RefreshCodeBtn" Click="RefreshCodeBtn_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon FontSize="12" Glyph="&#xE72C;" />
+                                            <TextBlock Text="刷新配对码" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button x:Name="RevokeBtn" Click="RevokeBtn_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon FontSize="12" Glyph="&#xE711;" />
+                                            <TextBlock Text="撤销全部授权" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock
+                            x:Name="PairOffHint"
+                            Style="{StaticResource PageSubtitleStyle}"
+                            TextWrapping="Wrap"
+                            Visibility="Collapsed"
+                            Text="开启服务后，这里会显示配对二维码、配对码与连接地址。" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 快捷操作 -->
+                <Border Style="{StaticResource FluentCardStyle}" Padding="0">
+                    <StackPanel>
+                        <Button
+                            x:Name="ChatRowBtn"
+                            Style="{StaticResource ActionRowButtonStyle}"
+                            CornerRadius="8,8,0,0"
+                            Click="ChatRowBtn_Click">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource IconTileStyle}" Width="36" Height="36" VerticalAlignment="Center">
+                                    <FontIcon FontSize="16" Glyph="&#xE8BD;" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="聊天与文件" />
+                                    <TextBlock
+                                        Style="{StaticResource CaptionTextStyle}"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="气泡会话：互发文字、图片与文件，可另存为" />
+                                </StackPanel>
+                                <FontIcon
+                                    Grid.Column="2"
+                                    FontSize="12"
+                                    Glyph="&#xE72A;"
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </Grid>
+                        </Button>
+                        <Border Height="1" Margin="16,0" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                        <Button
+                            x:Name="JobsRowBtn"
+                            Style="{StaticResource ActionRowButtonStyle}"
+                            CornerRadius="0,0,8,8"
+                            Click="JobsRowBtn_Click">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource IconTileStyle}" Width="36" Height="36" VerticalAlignment="Center">
+                                    <FontIcon FontSize="16" Glyph="&#xE823;" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="手机任务" />
+                                    <TextBlock
+                                        Style="{StaticResource CaptionTextStyle}"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="查看命令与安装任务的实时输出，运行中可终止" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <TextBlock
+                                        x:Name="JobsBadgeText"
+                                        Style="{StaticResource CaptionTextStyle}"
+                                        Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                        VerticalAlignment="Center"
+                                        Visibility="Collapsed"
+                                        Text="" />
+                                    <FontIcon FontSize="12" Glyph="&#xE72A;" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- 文件接收 -->
+                <Border Style="{StaticResource FluentCardStyle}">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource IconTileStyle}" Width="36" Height="36" VerticalAlignment="Center">
+                            <FontIcon FontSize="16" Glyph="&#xE896;" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource SectionHeaderStyle}" Text="文件接收" />
+                            <TextBlock
+                                x:Name="ReceivePathText"
+                                Style="{StaticResource CaptionTextStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <Button
+                            x:Name="ChangeReceiveBtn"
+                            Grid.Column="2"
+                            Content="更改…"
+                            VerticalAlignment="Center"
+                            Click="ChangeReceiveBtn_Click" />
+                        <Button
+                            x:Name="ResetReceiveBtn"
+                            Grid.Column="3"
+                            Content="恢复默认"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed"
+                            Click="ResetReceiveBtn_Click" />
+                        <Button
+                            x:Name="OpenReceiveBtn"
+                            Grid.Column="4"
+                            VerticalAlignment="Center"
+                            Click="OpenReceiveBtn_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon FontSize="12" Glyph="&#xE8B7;" />
+                                <TextBlock Text="打开文件夹" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <TextBlock
+                    Style="{StaticResource CaptionTextStyle}"
+                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                    TextWrapping="Wrap"
+                    Text="提示：关闭本页或把窗口收进托盘都不会断开连接，服务会继续运行；关闭服务则会断开所有已配对手机。" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>
