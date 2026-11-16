@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>GPU Compute Benchmark</title>
+<style>body{margin:0;overflow:hidden;background:#000}canvas{width:1px;height:1px}</style></head>
+<body><canvas id="c"></canvas>
+<script>
+(function(){
+const canvas=document.getElementById('c');
+const gl=canvas.getContext('webgl2',{antialias:false});
+if(!gl){window.chrome.webview.postMessage(JSON.stringify({error:'WebGL2 not supported'}));return;}
+
+const WORKGROUP=256;
+const N=WORKGROUP*1024;
+const ITERS=window.COMPUTE_ITERS||200;
+
+const cs=`#version 310 es
+layout(local_size_x=256)in;
+layout(std430,binding=0)buffer A{float a[];};
+layout(std430,binding=1)buffer B{float b[];};
+layout(std430,binding=2)buffer C{float c[];};
+uniform int uN;
+void main(){
+uint idx=gl_GlobalInvocationID.x;
+if(idx>=uint(uN))return;
+float sum=0.0;
+for(int i=0;i<${ITERS};i++){
+float v=a[idx]+float(i)*0.001;
+sum+=sin(v)*cos(v)+sqrt(abs(v)+1.0);
+}
+c[idx]=sum;
+}`;
+
+function compileShader(src,type){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(s));return null;}return s;}
+const prog=gl.createProgram();
+gl.attachShader(prog,compileShader(cs,gl.COMPUTE_SHADER));
+gl.linkProgram(prog);
+
+const bufA=gl.createBuffer();gl.bindBuffer(gl.SHADER_STORAGE_BUFFER,bufA);gl.bufferData(gl.SHADER_STORAGE_BUFFER,N*4,new Float32Array(Array.from({length:N},(_,i)=>Math.sin(i*0.01))),gl.STATIC_DRAW);
+const bufB=gl.createBuffer();gl.bindBuffer(gl.SHADER_STORAGE_BUFFER,bufB);gl.bufferData(gl.SHADER_STORAGE_BUFFER,N*4,new Float32Array(Array.from({length:N},(_,i)=>Math.cos(i*0.01))),gl.STATIC_DRAW);
+const bufC=gl.createBuffer();gl.bindBuffer(gl.SHADER_STORAGE_BUFFER,bufC);gl.bufferData(gl.SHADER_STORAGE_BUFFER,N*4,null,gl.DYNAMIC_DRAW);
+
+gl.useProgram(prog);
+gl.uniform1i(gl.getUniformLocation(prog,'uN'),N);
+
+const DURATION=window.BENCH_DURATION||8;
+const startT=performance.now();
+let dispatches=0;
+
+function runDispatch(){
+const now=performance.now();
+if((now-startT)/1000>=DURATION){
+const elapsed=(now-startT)/1000;
+const totalOps=dispatches*N*ITERS*6;
+const gflops=totalOps/elapsed/1e9;
+window.chrome.webview.postMessage(JSON.stringify({type:'result',gflops:gflops}));
+return;
+}
+gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER,0,bufA);
+gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER,1,bufB);
+gl.bindBufferBase(gl.SHADER_STORAGE_BUFFER,2,bufC);
+gl.dispatchCompute(N/WORKGROUP,1,1);
+gl.memoryBarrier(gl.SHADER_STORAGE_BARRIER_BIT);
+dispatches++;
+if(dispatches%10===0){
+const elapsed=(now-startT)/1000;
+const totalOps=dispatches*N*ITERS*6;
+const gflops=totalOps/elapsed/1e9;
+window.chrome.webview.postMessage(JSON.stringify({type:'progress',gflops:gflops}));
+}
+requestAnimationFrame(runDispatch);
+}
+requestAnimationFrame(runDispatch);
+})();
+</script></body></html>

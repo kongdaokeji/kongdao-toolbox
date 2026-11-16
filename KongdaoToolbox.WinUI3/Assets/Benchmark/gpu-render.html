@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>GPU Render Benchmark</title>
+<style>body{margin:0;overflow:hidden;background:#000}canvas{width:100vw;height:100vh;display:block}#hud{position:fixed;top:8px;right:12px;color:#fff;font:bold 20px sans-serif;z-index:9;pointer-events:none}</style></head>
+<body><canvas id="c"></canvas><div id="hud">FPS: --</div>
+<script>
+(function(){
+const canvas=document.getElementById('c');
+const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});
+if(!gl){window.chrome.webview.postMessage(JSON.stringify({error:'WebGL2 not supported'}));return;}
+
+canvas.width=window.innerWidth;canvas.height=window.innerHeight;
+gl.viewport(0,0,canvas.width,canvas.height);
+
+function createIcosphere(subdivisions){
+const t=(1+Math.sqrt(5))/2;
+let verts=[[-1,t,0],[1,t,0],[-1,-t,0],[1,-t,0],[0,-1,t],[0,1,t],[0,-1,-t],[0,1,-t],[t,0,-1],[t,0,1],[-t,0,-1],[-t,0,1]];
+let faces=[[0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],[1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],[3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],[4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]];
+const midCache={};
+function normalize(v){const l=Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);return[v[0]/l,v[1]/l,v[2]/l];}
+function getMid(a,b){const key=Math.min(a,b)+'_'+Math.max(a,b);if(midCache[key]!==undefined)return midCache[key];const p=[(verts[a][0]+verts[b][0])/2,(verts[a][1]+verts[b][1])/2,(verts[a][2]+verts[b][2])/2];verts.push(normalize(p));const idx=verts.length-1;midCache[key]=idx;return idx;}
+for(let i=0;i<subdivisions;i++){const nf=[];for(const f of faces){const a=getMid(f[0],f[1]),b=getMid(f[1],f[2]),c=getMid(f[2],f[0]);nf.push([f[0],a,c],[f[1],b,a],[f[2],c,b],[a,b,c]);}faces=nf;}
+return{vertices:new Float32Array(verts.flat()),indices:new Uint16Array(faces.flat())};
+}
+
+const mesh=createIcosphere(3);
+const vertCount=mesh.vertices.length/3;
+const idxCount=mesh.indices.length;
+
+const vao=gl.createVertexArray();gl.bindVertexArray(vao);
+const vbo=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vbo);gl.bufferData(gl.ARRAY_BUFFER,mesh.vertices,gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
+const ibo=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ibo);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,mesh.indices,gl.STATIC_DRAW);
+gl.bindVertexArray(null);
+
+const N=window.INSTANCE_COUNT||500;
+const instanceData=new Float32Array(N*16);
+const offsets=[];
+for(let i=0;i<N;i++){
+const x=(Math.random()-0.5)*60,y=(Math.random()-0.5)*60,z=(Math.random()-0.5)*60;
+offsets.push({x,y,z,rx:Math.random()*6.28,ry:Math.random()*6.28,spd:0.3+Math.random()*1.2});
+}
+function updateInstances(time){
+for(let i=0;i<N;i++){
+const o=offsets[i];
+const cx=Math.cos(o.rx+time*o.spd),sx=Math.sin(o.rx+time*o.spd);
+const cy=Math.cos(o.ry+time*o.spd),sy=Math.sin(o.ry+time*o.spd);
+const m=instanceData,i16=i*16;
+m[i16]=cy;m[i16+1]=0;m[i16+2]=sy;m[i16+3]=0;
+m[i16+4]=sx*sy;m[i16+5]=cx;m[i16+6]=-sx*cy;m[i16+7]=0;
+m[i16+8]=-cx*sy;m[i16+9]=sx;m[i16+10]=cx*cy;m[i16+11]=0;
+m[i16+12]=o.x;m[i16+13]=o.y;m[i16+14]=o.z;m[i16+15]=1;
+}}
+
+const instanceVbo=gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER,instanceVbo);
+gl.bufferData(gl.ARRAY_BUFFER,instanceData.byteLength,gl.DYNAMIC_DRAW);
+
+const vaoInst=gl.createVertexArray();gl.bindVertexArray(vaoInst);
+gl.bindBuffer(gl.ARRAY_BUFFER,vbo);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
+gl.bindBuffer(gl.ARRAY_BUFFER,instanceVbo);
+for(let i=0;i<4;i++){gl.enableVertexAttribArray(1+i);gl.vertexAttribPointer(1+i,4,gl.FLOAT,false,64,i*16);gl.vertexAttribDivisor(1+i,1);}
+
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ibo);
+gl.bindVertexArray(null);
+
+const vs=`#version 300 es
+layout(location=0)in vec3 aPos;
+layout(location=1)in mat4 iModel;
+uniform mat4 uVP;
+out vec3 vNorm;
+void main(){
+vec4 wp=iModel*vec4(aPos,1.0);
+gl_Position=uVP*wp;
+vNorm=mat3(iModel)*aPos;
+}`;
+const fs=`#version 300 es
+precision highp float;
+in vec3 vNorm;
+out vec4 fragColor;
+void main(){
+vec3 n=normalize(vNorm);
+vec3 l=normalize(vec3(1.0,1.0,0.5));
+float d=max(dot(n,l),0.0);
+vec3 c=vec3(0.2,0.45,0.85)*(d*0.7+0.3);
+fragColor=vec4(c,1.0);
+}`;
+
+function compileShader(src,type){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(s));return null;}return s;}
+const prog=gl.createProgram();
+gl.attachShader(prog,compileShader(vs,gl.VERTEX_SHADER));
+gl.attachShader(prog,compileShader(fs,gl.FRAGMENT_SHADER));
+gl.linkProgram(prog);gl.useProgram(prog);
+
+const uVP=gl.getUniformLocation(prog,'uVP');
+function mat4Perspective(fov,asp,near,far){
+const f=1/Math.tan(fov/2),nf=1/(near-far);
+return new Float32Array([f/asp,0,0,0,0,f,0,0,0,0,(far+near)*nf,-1,0,0,2*far*near*nf,0]);
+}
+function mat4LookAt(eye,center,up){
+const zx=eye[0]-center[0],zy=eye[1]-center[1],zz=eye[2]-center[2];
+let l=Math.sqrt(zx*zx+zy*zy+zz*zz);const z=[zx/l,zy/l,zz/l];
+const xx=up[1]*z[2]-up[2]*z[1],xy=up[2]*z[0]-up[0]*z[2],xz=up[0]*z[1]-up[1]*z[0];
+l=Math.sqrt(xx*xx+xy*xy+xz*xz);const x=[xx/l,xy/l,xz/l];
+const y=[z[1]*x[2]-z[2]*x[1],z[2]*x[0]-z[0]*x[2],z[0]*x[1]-z[1]*x[0]];
+return new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-(x[0]*eye[0]+x[1]*eye[1]+x[2]*eye[2]),-(y[0]*eye[0]+y[1]*eye[1]+y[2]*eye[2]),-(z[0]*eye[0]+z[1]*eye[1]+z[2]*eye[2]),1]);
+}
+function mat4Mul(a,b){
+const r=new Float32Array(16);
+for(let i=0;i<4;i++)for(let j=0;j<4;j++)r[j*4+i]=a[i]*b[j*4]+a[4+i]*b[j*4+1]+a[8+i]*b[j*4+2]+a[12+i]*b[j*4+3];
+return r;
+}
+const proj=mat4Perspective(Math.PI/3,canvas.width/canvas.height,0.1,200);
+const view=mat4LookAt([0,10,50],[0,0,0],[0,1,0]);
+const vp=mat4Mul(proj,view);
+gl.uniformMatrix4fv(uVP,false,vp);
+
+gl.enable(gl.DEPTH_TEST);gl.clearColor(0.05,0.05,0.08,1);
+
+const DURATION=window.BENCH_DURATION||10;
+const DRAWS_PER_FRAME=8;
+const startT=performance.now();
+let totalDraws=0;
+let lastReportT=startT;
+let reportDraws=0;
+const hud=document.getElementById('hud');
+
+function doDraw(time){
+gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+for(let d=0;d<DRAWS_PER_FRAME;d++){
+const t=time+d*0.016;
+updateInstances(t);
+gl.bindBuffer(gl.ARRAY_BUFFER,instanceVbo);gl.bufferSubData(gl.ARRAY_BUFFER,0,instanceData);
+gl.bindVertexArray(vaoInst);gl.drawElementsInstanced(gl.TRIANGLES,idxCount,gl.UNSIGNED_SHORT,0,N);
+}
+gl.bindVertexArray(null);
+totalDraws+=DRAWS_PER_FRAME;
+reportDraws+=DRAWS_PER_FRAME;
+}
+
+function frame(){
+const now=performance.now();
+const elapsed=(now-startT)/1000;
+const time=elapsed;
+
+doDraw(time);
+
+if(now-lastReportT>=500){
+const curDrawsPerSec=reportDraws/((now-lastReportT)/1000);
+const curFps=curDrawsPerSec/DRAWS_PER_FRAME;
+hud.textContent='Draws/s: '+curDrawsPerSec.toFixed(0)+' (~'+curFps.toFixed(0)+' FPS)';
+window.chrome.webview.postMessage(JSON.stringify({type:'progress',fps:curFps,drawsPerSec:curDrawsPerSec}));
+reportDraws=0;
+lastReportT=now;
+}
+
+if(elapsed>=DURATION){
+const avgDrawsPerSec=totalDraws/elapsed;
+const avgFps=avgDrawsPerSec/DRAWS_PER_FRAME;
+hud.textContent='Done! Draws/s: '+avgDrawsPerSec.toFixed(0);
+window.chrome.webview.postMessage(JSON.stringify({type:'result',fps:avgFps,drawsPerSec:avgDrawsPerSec}));
+return;
+}
+
+requestAnimationFrame(frame);
+}
+requestAnimationFrame(function(){frame();});
+})();
+</script></body></html>

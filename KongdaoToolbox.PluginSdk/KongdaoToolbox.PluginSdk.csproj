@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>2.1.0</Version>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <Description>图吧工具箱插件契约（API v2）</Description>
+    <PackageTags>KongdaoToolbox;SDK;plugin</PackageTags>
+    <PackageId>KongdaoToolbox.PluginSdk</PackageId>
+    <Authors>图吧工具箱</Authors>
+    <PackageProjectUrl>https://kongdaokeji.top</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/kongdaokeji/kongdao-toolbox</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+</Project>

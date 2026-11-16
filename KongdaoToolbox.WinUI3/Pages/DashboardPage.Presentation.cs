@@ -1,0 +1,119 @@
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using KongdaoToolbox.Services;
+
+namespace KongdaoToolbox.Pages;
+
+public sealed partial class DashboardPage
+{
+    private bool? _lastNarrowLayout;
+    private bool _heroHidden;
+
+    /// <summary>上次应用布局时的视口宽度；用于在 LayoutUpdated 高频回调里做短路。</summary>
+    private double _lastLayoutWidth = -1;
+
+    /// <summary>上次应用布局时的 ItemsPanelRoot 引用；面板被重建时即使宽度没变也要重算列宽。</summary>
+    private object? _lastLayoutPanel;
+
+    /// <summary>
+    /// 设置里的「首页大卡片」开关：关闭后整块欢迎横幅收起，卡片从页面顶部开始，
+    /// 编辑入口移到工具栏（否则唯一的「编辑大卡片」入口会随横幅一起消失）。
+    /// </summary>
+    private void ApplyHeroVisibility()
+    {
+        if (!_ready) return;
+        _heroHidden = AppSettings.GetBool(HomeDashboardContent.HideHeroSettingsKey);
+        HeroPanel.Visibility = _heroHidden ? Visibility.Collapsed : Visibility.Visible;
+        CompactManageButton.Visibility = _heroHidden ? Visibility.Visible : Visibility.Collapsed;
+        // 宽度没变，必须强制重算（否则会被上面的短路直接跳过，Hero 收起后间距不更新）。
+        UpdateCardLayout(force: true);
+    }
+
+    private void DashboardViewport_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (e.NewSize.Width != e.PreviousSize.Width)
+            UpdateCardLayout();
+    }
+
+    /// <summary>
+    /// 按当前视口宽度重算页头与卡片网格。所有赋值都是幂等的，可以在布局更新时反复调用：
+    /// ItemsPanelRoot 在部分时机（页面刚加载、面板被重建）还是 null，此时不能把宽度当成
+    /// 已处理，否则面板出现后卡片仍停留在旧列宽，右侧就会空出一整列（窗口拉大后尤其明显）。
+    /// </summary>
+    private void UpdateCardLayout(bool force = false)
+    {
+        if (!_ready) return;
+        // Use the page's viewport so the grid's header and item sizes cannot feed
+        // back into the width used to calculate them.
+        double width = DashboardViewport.ActualWidth;
+        if (width <= 0) return;
+
+        // 短路：这个方法挂在 ToolsGrid.LayoutUpdated 上，而 LayoutUpdated 每个布局周期都会触发，
+        // 本方法又会修改 ContentStack.Width / HeroPanel.Height / ItemsWrapGrid.ItemWidth 等属性，
+        // 从而再次触发布局。窗口拖动或改变大小时布局会连续刷新，没有短路就会「布局→重算→再布局」
+        // 反复空转，表现为拖窗口/拉边框明显卡顿（窗口移动其实不改变任何尺寸，这些重算全是白做）。
+        var panelNow = ToolsGrid.ItemsPanelRoot;
+        bool unchanged = !force
+            && Math.Abs(width - _lastLayoutWidth) < 0.5
+            && ReferenceEquals(panelNow, _lastLayoutPanel)
+            && _lastNarrowLayout.HasValue;
+        if (unchanged) return;
+
+        _lastLayoutWidth = width;
+        _lastLayoutPanel = panelNow;
+
+        bool narrow = width < 720;
+        double margin = narrow ? 20 : 36;
+        ContentStack.Width = width;
+        // Extend the quiet left side in layout; uniformly scale the complete artwork.
+        HeroPanel.Height = Math.Clamp(width / 3.6, narrow ? 160 : 220, 320);
+        HeroArtwork.Width = HeroLeftBlend.Width = Math.Min(width, HeroPanel.Height * 2.4);
+        HeroArtwork.Height = HeroPanel.Height;
+        // Keep the raised row clear of the title in short, narrow headers.
+        FeatureStrip.Margin = _heroHidden
+            ? new Thickness(0, 16, 0, 0)
+            : new Thickness(0, -Math.Min(112, Math.Max(0, HeroPanel.Height - 112)), 0, 0);
+        double artworkOffset = Math.Min(100, Math.Min(width * .08, width - HeroArtwork.Width));
+        HeroArtwork.Margin = HeroLeftBlend.Margin = HeroRightBlend.Margin = new Thickness(0, 0, artworkOffset, 0);
+        HeroRightBlend.Width = Math.Min(80, HeroArtwork.Width * .12);
+        if (_lastNarrowLayout != narrow)
+        {
+            HeaderPanel.Margin = new Thickness(margin, narrow ? 20 : 28, margin, 24);
+            TitleText.Style = (Style)Application.Current.Resources[narrow ? "TitleTextBlockStyle" : "TitleLargeTextBlockStyle"];
+            GreetingText.Style = (Style)Application.Current.Resources[narrow ? "BodyTextBlockStyle" : "BodyLargeTextBlockStyle"];
+            FeatureScroll.Padding = new Thickness(margin, 0, margin, 12);
+            FilterBar.Margin = new Thickness(margin, 20, margin, 20);
+            ToolsToolbar.Margin = new Thickness(margin, 0, margin, 12);
+            _lastNarrowLayout = narrow;
+        }
+        ToolSearchBox.Width = Math.Min(240, Math.Max(120, width * .4));
+        if (ToolsGrid.ItemsPanelRoot is ItemsWrapGrid panel)
+        {
+            double available = Math.Max(1, width - margin * 2);
+            int columns = Math.Max(1, (int)((available + 12) / (narrow ? 232 : 280)));
+            // 槽宽含卡片右侧 12px 外边距；交给 FitItemWidth 留出取整余量，
+            // 否则特定宽度下列宽会正好顶到边界，最后一整列被挤到下一行。
+            double itemWidth = ToolCardLayout.FitItemWidth(available + 12, columns);
+            var panelMargin = new Thickness(margin, 0, Math.Max(0, margin - 12), 28);
+            if (panel.ItemWidth != itemWidth || panel.ItemHeight != 108 || panel.Margin != panelMargin)
+            {
+                panel.ItemWidth = itemWidth;
+                panel.ItemHeight = 108;
+                panel.Margin = panelMargin;
+            }
+        }
+        UpdateFeatureButtons();
+    }
+
+    private void FeatureScroll_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e) => UpdateFeatureButtons();
+    private void UpdateFeatureButtons()
+    {
+        bool overflow = FeatureScroll.ScrollableWidth > 1;
+        FeaturePrevious.Visibility = FeatureNext.Visibility = overflow ? Visibility.Visible : Visibility.Collapsed;
+        FeaturePrevious.IsEnabled = FeatureScroll.HorizontalOffset > 1;
+        FeatureNext.IsEnabled = FeatureScroll.HorizontalOffset < FeatureScroll.ScrollableWidth - 1;
+    }
+    private void FeaturePrevious_Click(object sender, RoutedEventArgs e) => FeatureScroll.ChangeView(Math.Max(0, FeatureScroll.HorizontalOffset - Math.Max(244, FeatureScroll.ViewportWidth - 244)), null, null);
+    private void FeatureNext_Click(object sender, RoutedEventArgs e) => FeatureScroll.ChangeView(Math.Min(FeatureScroll.ScrollableWidth, FeatureScroll.HorizontalOffset + Math.Max(244, FeatureScroll.ViewportWidth - 244)), null, null);
+}
+

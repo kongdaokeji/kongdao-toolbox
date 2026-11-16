@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+
+<!--
+If needed, you can force the DPI scale by adding dpi_scale. 
+For example to force a DPI scale of 175%:
+dpi_scale="1.75"
+
+If you need to disable log/traces file (_geexlab_log.txt) for FurMark GUI, you can set
+enable_traces="0" in this file.
+To disable the log file (_furmark_log.txt) of the furmark binary, edit the settings.lua file and 
+set enable_traces=0.
+-->
+
+<geexlab_init
+    demofile="gui.gxl"
+    enable_traces="1"
+    opengl_check_major="2"
+    opengl_check_minor="1"
+    enable_window_offsets="0"
+	window_offset_x="-1"
+	window_offset_y="-1"
+    dpi_scale="0.0"
+/>

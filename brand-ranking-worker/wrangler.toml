@@ -1,0 +1,9 @@
+name = "kongdao-brand-ranking"
+main = "src/index.ts"
+compatibility_date = "2026-10-13"
+routes = [{ pattern = "rt.kongdaokeji.top", custom_domain = true }]
+[[d1_databases]]
+binding = "DB"
+database_name = "kongdao-brand-ranking"
+database_id = "8dab37eb-6c4f-412b-8616-0712ecc7185c"
+migrations_dir = "migrations"
